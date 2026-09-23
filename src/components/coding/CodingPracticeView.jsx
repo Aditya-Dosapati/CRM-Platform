@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Code2,
   CheckCircle2,
@@ -38,6 +38,7 @@ import {
   codingAchievements
 } from '../../data/codingData.js';
 import CodingWorkspaceModal from './CodingWorkspaceModal.jsx';
+import EmptyState from '../common/EmptyState.jsx';
 
 export default function CodingPracticeView({ onOpenRagQuery }) {
   // Filters & Search
@@ -53,23 +54,25 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
   // Tabs for sub-views
   const [activeViewTab, setActiveViewTab] = useState('problems'); // 'problems' | 'leaderboard' | 'achievements'
 
-  // Filter logic
-  const filteredProblems = codingProblemsList.filter(p => {
-    if (selectedDifficulty !== 'all' && p.difficulty.toLowerCase() !== selectedDifficulty.toLowerCase()) {
-      return false;
-    }
-    if (selectedTopic !== 'all' && p.topic.toLowerCase() !== selectedTopic.toLowerCase()) {
-      return false;
-    }
-    if (selectedStatus !== 'all' && p.status.toLowerCase() !== selectedStatus.toLowerCase()) {
-      return false;
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return p.title.toLowerCase().includes(q) || p.topic.toLowerCase().includes(q);
-    }
-    return true;
-  });
+  // Filter logic memoized
+  const filteredProblems = useMemo(() => {
+    return codingProblemsList.filter(p => {
+      if (selectedDifficulty !== 'all' && p.difficulty.toLowerCase() !== selectedDifficulty.toLowerCase()) {
+        return false;
+      }
+      if (selectedTopic !== 'all' && p.topic.toLowerCase() !== selectedTopic.toLowerCase()) {
+        return false;
+      }
+      if (selectedStatus !== 'all' && p.status.toLowerCase() !== selectedStatus.toLowerCase()) {
+        return false;
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return p.title.toLowerCase().includes(q) || p.topic.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [selectedDifficulty, selectedTopic, selectedStatus, searchQuery]);
 
   const getTopicIcon = (iconName) => {
     switch (iconName) {
@@ -424,30 +427,20 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
                 </thead>
                 <tbody>
                   {filteredProblems.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: '48px 20px', textAlign: 'center' }}>
-                        <div style={{ maxWidth: '340px', margin: '0 auto' }}>
-                          <Code2 size={36} color="var(--text-muted)" style={{ margin: '0 auto 10px', display: 'block' }} />
-                          <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                            No problems match your filters
-                          </h4>
-                          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                            Try adjusting your search query, difficulty, or topic filters.
-                          </p>
-                          <button
-                            onClick={() => {
-                              setSearchQuery('');
-                              setSelectedDifficulty('all');
-                              setSelectedTopic('all');
-                              setSelectedStatus('all');
-                            }}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            Clear All Filters
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <EmptyState
+                      icon={Code2}
+                      title="No problems match your filters"
+                      description="Try adjusting your search query, difficulty, or topic filters."
+                      actionText="Clear All Filters"
+                      onAction={() => {
+                        setSearchQuery('');
+                        setSelectedDifficulty('all');
+                        setSelectedTopic('all');
+                        setSelectedStatus('all');
+                      }}
+                      isTableRow={true}
+                      colSpan={7}
+                    />
                   ) : (
                     filteredProblems.map(p => {
                       const isSolved = p.status === 'Solved';

@@ -1,10 +1,35 @@
-node_modules
-dist
-dist-ssr
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build Output
+dist/
+dist-ssr/
 *.local
+
+# Environment Variables & Secrets (CRITICAL: Never commit real keys or secrets)
+.env
+.env.*
+!.env.example
+
+# Scratch & Temporary Testing Scripts
+scratch/
+CN-UNIT1.pdf
+*.log
+
+# Supabase Local CLI Temp Files
+supabase/.temp/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE & OS Files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*

@@ -1,26 +1,69 @@
-import React from 'react';
-import { adminKPIs, adminSystemHealth } from '../../data/mockData';
-import { Shield, Cpu, Users, Award, BookOpen, FileText, Database, Activity, CheckCircle2, AlertCircle, ArrowUpRight, Sparkles, UserPlus, UploadCloud, RefreshCw, KeyRound } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Shield, Cpu, Users, Award, BookOpen, FileText, Database, 
+  Activity, CheckCircle2, AlertCircle, ArrowUpRight, Sparkles, 
+  UserPlus, UploadCloud, RefreshCw, KeyRound 
+} from 'lucide-react';
+import academicDataService from '../../services/academicDataService';
+import ragDocumentService from '../../services/ragDocumentService';
+import authService from '../../services/authService';
 
 export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
-  const getIcon = (iconName) => {
-    switch (iconName) {
-      case 'Users': return <Users size={16} />;
-      case 'Award': return <Award size={16} />;
-      case 'BookOpen': return <BookOpen size={16} />;
-      case 'FileText': return <FileText size={16} />;
-      case 'Cpu': return <Cpu size={16} />;
-      default: return <Shield size={16} />;
-    }
-  };
+  const [stats, setStats] = useState({
+    usersCount: 0,
+    studentsCount: 0,
+    facultyCount: 0,
+    departmentsCount: 0,
+    subjectsCount: 0,
+    documentsCount: 0,
+    indexedDocs: 0,
+    processingDocs: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const kpiConfigs = [
-    { bg: 'var(--pastel-blue-bg)', text: 'var(--pastel-blue-text)', border: 'var(--pastel-blue-border)', iconBg: '#DBEAFE', iconColor: '#2563EB' },
-    { bg: 'var(--pastel-green-bg)', text: 'var(--pastel-green-text)', border: 'var(--pastel-green-border)', iconBg: '#D1FAE5', iconColor: '#059669' },
-    { bg: 'var(--pastel-purple-bg)', text: 'var(--pastel-purple-text)', border: 'var(--pastel-purple-border)', iconBg: '#EDE9FE', iconColor: '#7C3AED' },
-    { bg: 'var(--pastel-orange-bg)', text: 'var(--pastel-orange-text)', border: 'var(--pastel-orange-border)', iconBg: '#FFEDD5', iconColor: '#EA580C' },
-    { bg: 'var(--pastel-cyan-bg)', text: 'var(--pastel-cyan-text)', border: 'var(--pastel-cyan-border)', iconBg: '#CFFAFE', iconColor: '#0891B2' },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStats() {
+      setIsLoading(true);
+      try {
+        const [users, deptsRes, subsRes, docsRes] = await Promise.all([
+          Promise.resolve(authService.getAllUsers()),
+          academicDataService.getDepartments(),
+          academicDataService.getSubjects(),
+          ragDocumentService.getDocuments()
+        ]);
+
+        if (isMounted) {
+          const userList = Array.isArray(users) ? users : [];
+          const docs = docsRes?.data || [];
+          const depts = deptsRes?.data || [];
+          const subs = subsRes?.data || [];
+
+          const stdCount = userList.filter(u => u.role === 'student').length;
+          const facCount = userList.filter(u => u.role === 'faculty').length;
+          const indexed = docs.filter(d => (d.rawStatus || d.status) === 'indexed').length;
+          const processing = docs.filter(d => (d.rawStatus || d.status) === 'processing').length;
+
+          setStats({
+            usersCount: userList.length,
+            studentsCount: stdCount,
+            facultyCount: facCount,
+            departmentsCount: depts.length,
+            subjectsCount: subs.length,
+            documentsCount: docs.length,
+            indexedDocs: indexed,
+            processingDocs: processing
+          });
+        }
+      } catch (err) {
+        console.warn('Error loading admin dashboard stats:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    loadStats();
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <div className="page-content">
@@ -34,10 +77,10 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
         gap: '14px'
       }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.4px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px' }}>
             Administration Console
           </h1>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+          <p style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
             Manage the complete GMRIT academic ecosystem, user provisioning, and AI RAG knowledge infrastructure
           </p>
         </div>
@@ -54,63 +97,137 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
         </div>
       </div>
 
-      {/* Admin Pastel KPI Cards - Compact & Vibrant */}
+      {/* Admin KPI Cards - 6-Color System */}
       <div className="kpi-grid">
-        {adminKPIs.map((kpi, idx) => {
-          const config = kpiConfigs[idx % kpiConfigs.length];
-          return (
-            <div key={kpi.id} style={{
-              background: config.bg,
-              border: `1px solid ${config.border}`,
-              borderRadius: 'var(--radius-md)',
-              padding: '13px 16px',
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              TOTAL USERS
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-primary)',
               display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              transition: 'transform 0.12s ease'
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: config.text, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {kpi.label}
-                </span>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: config.iconBg,
-                  color: config.iconColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {getIcon(kpi.icon)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.4px', lineHeight: 1.15 }}>
-                  {kpi.value}
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 500 }}>
-                  {kpi.subtext}
-                </div>
-              </div>
+              <Users size={16} />
             </div>
-          );
-        })}
+          </div>
+          <div>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px', lineHeight: 1.15 }}>
+              {isLoading ? '...' : stats.usersCount}
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px', fontWeight: 500 }}>
+              {stats.studentsCount} Students • {stats.facultyCount} Faculty
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              DEPARTMENTS
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Award size={16} />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px', lineHeight: 1.15 }}>
+              {isLoading ? '...' : stats.departmentsCount}
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px', fontWeight: 500 }}>
+              Active Engineering Branches
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              COURSES & SUBJECTS
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <BookOpen size={16} />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px', lineHeight: 1.15 }}>
+              {isLoading ? '...' : stats.subjectsCount}
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px', fontWeight: 500 }}>
+              R20 & R23 Regulations
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              RAG DOCUMENTS
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Cpu size={16} />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px', lineHeight: 1.15 }}>
+              {isLoading ? '...' : stats.documentsCount}
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px', fontWeight: 500 }}>
+              {stats.indexedDocs} Indexed • {stats.processingDocs} In-Flight
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Admin Quick Actions */}
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', letterSpacing: '-0.2px' }}>
+        <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '10px', letterSpacing: '-0.2px' }}>
           Administrative Quick Actions
         </h2>
         <div className="quick-actions-grid">
           <div
             className="quick-action-card"
             onClick={() => onNavigate('users')}
-            style={{ background: 'var(--pastel-blue-bg)', borderColor: 'var(--pastel-blue-border)' }}
+            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
           >
-            <div className="quick-action-icon" style={{ background: '#DBEAFE', color: '#2563EB' }}>
+            <div className="quick-action-icon" style={{ background: 'var(--color-bg)', color: 'var(--color-primary)' }}>
               <UserPlus size={18} />
             </div>
             <div>
@@ -122,13 +239,13 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
           <div
             className="quick-action-card"
             onClick={() => onNavigate('syllabus')}
-            style={{ background: 'var(--pastel-green-bg)', borderColor: 'var(--pastel-green-border)' }}
+            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
           >
-            <div className="quick-action-icon" style={{ background: '#D1FAE5', color: '#059669' }}>
+            <div className="quick-action-icon" style={{ background: 'var(--color-bg)', color: 'var(--color-accent)' }}>
               <UploadCloud size={18} />
             </div>
             <div>
-              <div className="quick-action-title">Upload Syllabus</div>
+              <div className="quick-action-title">Manage Syllabus</div>
               <div className="quick-action-desc">BOS curriculum R20 / R23 PDFs</div>
             </div>
           </div>
@@ -136,23 +253,23 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
           <div
             className="quick-action-card"
             onClick={() => onNavigate('rag-base')}
-            style={{ background: 'var(--pastel-purple-bg)', borderColor: 'var(--pastel-purple-border)' }}
+            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
           >
-            <div className="quick-action-icon" style={{ background: '#EDE9FE', color: '#7C3AED' }}>
+            <div className="quick-action-icon" style={{ background: 'var(--color-bg)', color: 'var(--color-primary)' }}>
               <RefreshCw size={18} />
             </div>
             <div>
-              <div className="quick-action-title">Sync Vector DB</div>
-              <div className="quick-action-desc">Verify Qdrant 42.8k chunk embeddings</div>
+              <div className="quick-action-title">RAG Ingestion Center</div>
+              <div className="quick-action-desc">Upload & manage documents in Supabase</div>
             </div>
           </div>
 
           <div
             className="quick-action-card"
             onClick={() => onNavigate('analytics')}
-            style={{ background: 'var(--pastel-orange-bg)', borderColor: 'var(--pastel-orange-border)' }}
+            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
           >
-            <div className="quick-action-icon" style={{ background: '#FFEDD5', color: '#EA580C' }}>
+            <div className="quick-action-icon" style={{ background: 'var(--color-bg)', color: 'var(--color-accent)' }}>
               <Activity size={18} />
             </div>
             <div>
@@ -178,21 +295,21 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
                 width: '32px',
                 height: '32px',
                 borderRadius: 'var(--radius-sm)',
-                background: 'var(--pastel-blue-bg)',
+                background: 'var(--color-bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--primary-blue)',
-                border: '1px solid var(--pastel-blue-border)'
+                color: 'var(--color-primary)',
+                border: '1px solid var(--color-border)'
               }}>
                 <Cpu size={16} />
               </div>
               <div>
                 <h3 className="card-title">
-                  GMRIT RAG Knowledge Vector Engine Telemetry
+                  GMRIT RAG Knowledge Vector Engine
                 </h3>
                 <p className="card-subtitle">
-                  Cluster: Qdrant Production Hybrid Search • Ingestion Pipeline Status: Normal
+                  Engine: PostgreSQL pgvector (384 dim) • Model: intfloat/multilingual-e5-small
                 </p>
               </div>
             </div>
@@ -204,61 +321,48 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '10px',
             marginTop: '12px',
             marginBottom: '16px'
           }}>
             <div style={{
               padding: '11px 13px',
-              background: 'var(--pastel-blue-bg)',
+              background: 'var(--color-bg)',
               borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--pastel-blue-border)'
+              border: '1px solid var(--color-border)'
             }}>
-              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--pastel-blue-text)', textTransform: 'uppercase' }}>QUERY LATENCY</span>
-              <p style={{ fontSize: '19px', fontWeight: 800, color: 'var(--primary-blue)', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
-                {adminSystemHealth.vectorLatency}
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>EMBEDDING DIMENSIONS</span>
+              <p style={{ fontSize: '19px', fontWeight: 800, color: 'var(--color-text)', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
+                384-dim
               </p>
-              <span style={{ fontSize: '10.5px', color: 'var(--success)', fontWeight: 600 }}>p99 &lt; 25ms</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.7 }}>HNSW Cosine Vector Index</span>
             </div>
 
             <div style={{
               padding: '11px 13px',
-              background: 'var(--bg-canvas)',
+              background: 'var(--color-bg)',
               borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-subtle)'
+              border: '1px solid var(--color-border)'
             }}>
-              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>STORAGE USED</span>
-              <p style={{ fontSize: '19px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
-                {adminSystemHealth.storageUsed}
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase' }}>INDEXED ASSETS</span>
+              <p style={{ fontSize: '19px', fontWeight: 800, color: 'var(--color-text)', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
+                {stats.indexedDocs} Docs
               </p>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>14.2% Capacity</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.7 }}>In Supabase Storage Bucket</span>
             </div>
 
             <div style={{
               padding: '11px 13px',
-              background: 'var(--pastel-green-bg)',
+              background: 'var(--color-bg)',
               borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--pastel-green-border)'
+              border: '1px solid var(--color-border)'
             }}>
-              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--pastel-green-text)', textTransform: 'uppercase' }}>INDEXED ASSETS</span>
-              <p style={{ fontSize: '19px', fontWeight: 800, color: '#059669', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
-                {adminSystemHealth.indexedDocs} Docs
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>PIPELINE QUEUE</span>
+              <p style={{ fontSize: '19px', fontWeight: 800, color: 'var(--color-text)', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
+                {stats.processingDocs} In-Flight
               </p>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>42,800 Chunks</span>
-            </div>
-
-            <div style={{
-              padding: '11px 13px',
-              background: 'var(--pastel-orange-bg)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--pastel-orange-border)'
-            }}>
-              <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--pastel-orange-text)', textTransform: 'uppercase' }}>QUEUE & ERRORS</span>
-              <p style={{ fontSize: '19px', fontWeight: 800, color: '#EA580C', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
-                {adminSystemHealth.processingDocs} In-Flight
-              </p>
-              <span style={{ fontSize: '10.5px', color: 'var(--error)', fontWeight: 600 }}>12 Corrupted PDFs</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.7 }}>rag_ingestion_jobs</span>
             </div>
           </div>
 
@@ -277,7 +381,7 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
         <div className="card" style={{ gridColumn: 'span 4' }}>
           <div className="card-header" style={{ marginBottom: '12px' }}>
             <h3 className="card-title">
-              <Shield size={16} color="var(--primary-blue)" />
+              <Shield size={16} color="var(--color-primary)" />
               <span>Identity & Provisioning</span>
             </h3>
           </div>
@@ -285,24 +389,24 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
             <div style={{
               padding: '12px',
-              background: 'var(--pastel-orange-bg)',
-              border: '1px solid var(--pastel-orange-border)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-sm)'
             }}>
-              <strong style={{ fontSize: '12px', color: 'var(--pastel-orange-text)', display: 'block', marginBottom: '2px' }}>
-                Self-Registration: DISABLED
+              <strong style={{ fontSize: '12px', color: 'var(--color-primary)', display: 'block', marginBottom: '2px' }}>
+                Self-Registration: ADMIN CONTROLLED
               </strong>
-              <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                Accounts must be provisioned by Admin IT. Passwords require dual-factor campus validation.
+              <p style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.8, lineHeight: 1.4 }}>
+                Accounts are provisioned by Admin IT with Supabase Authentication and row-level security.
               </p>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: 'var(--text-secondary)', padding: '4px 0' }}>
-              <span>Total Active Sessions:</span>
-              <strong style={{ color: 'var(--text-primary)' }}>1,842 Live</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: 'var(--color-text)', padding: '4px 0' }}>
+              <span>Total Provisioned Users:</span>
+              <strong style={{ color: 'var(--color-primary)' }}>{stats.usersCount} Accounts</strong>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: 'var(--text-secondary)', padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: 'var(--color-text)', padding: '4px 0' }}>
               <span>Role Permissions:</span>
               <span className="badge badge-purple">Strict RBAC</span>
             </div>

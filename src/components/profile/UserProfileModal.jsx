@@ -1,7 +1,10 @@
 import React from 'react';
 import { X, User, Mail, Shield, BookOpen, Award, CheckCircle, Calendar, Hash, Building } from 'lucide-react';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function UserProfileModal({ isOpen, onClose, currentUser, activeRole }) {
+  useEscapeKey(onClose, isOpen);
+
   if (!isOpen) return null;
 
   return (

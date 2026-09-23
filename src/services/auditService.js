@@ -77,9 +77,11 @@ class AuditService {
 
   loadLogs() {
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      if (typeof sessionStorage !== 'undefined') {
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          return JSON.parse(stored);
+        }
       }
     } catch (e) {
       console.warn("Could not read audit logs from sessionStorage", e);
@@ -89,7 +91,9 @@ class AuditService {
 
   saveLogs() {
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.logs));
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.logs));
+      }
     } catch (e) {
       console.warn("Could not persist audit logs to sessionStorage", e);
     }
@@ -130,6 +134,10 @@ class AuditService {
     this.logs = [...initialAuditLogs];
     this.saveLogs();
     return this.logs;
+  }
+
+  exportLogsAsJson() {
+    return JSON.stringify(this.logs, null, 2);
   }
 }
 

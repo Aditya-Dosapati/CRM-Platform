@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, X, Send, Bot, FileText, Cpu, CheckCircle } from 'lucide-react';
 import { queryRagEngine } from '../../data/ragKnowledge';
+import useEscapeKey from '../../hooks/useEscapeKey';
+import useSafeTimeout from '../../hooks/useSafeTimeout';
 
 export default function RagChatbot({
   isOpen,
@@ -32,6 +34,11 @@ What would you like to explore today?`,
   const [isThinking, setIsThinking] = useState(false);
   const [activeStep, setActiveStep] = useState('');
   const messagesEndRef = useRef(null);
+  const setSafeTimeout = useSafeTimeout();
+
+  useEscapeKey(() => {
+    if (isOpen) onToggle();
+  }, isOpen);
 
   const sampleChips = [
     "Explain Unit 3 of Machine Learning",
@@ -50,14 +57,8 @@ What would you like to explore today?`,
     scrollToBottom();
   }, [messages, isThinking]);
 
-  useEffect(() => {
-    if (initialQuery && isOpen) {
-      handleSend(initialQuery);
-    }
-  }, [initialQuery, isOpen]);
-
-  const handleSend = (textToSend = inputVal) => {
-    const query = textToSend.trim();
+  const handleSend = useCallback((textToSend = inputVal) => {
+    const query = typeof textToSend === 'string' ? textToSend.trim() : inputVal.trim();
     if (!query || isThinking) return;
 
     const userMsg = {
@@ -71,11 +72,11 @@ What would you like to explore today?`,
     setIsThinking(true);
     setActiveStep('Scanning GMRIT Academic Knowledge Base...');
 
-    setTimeout(() => {
+    setSafeTimeout(() => {
       setActiveStep('Matching query vectors with course syllabi & notes...');
     }, 600);
 
-    setTimeout(() => {
+    setSafeTimeout(() => {
       const ragResult = queryRagEngine(query, activeRole, currentUser);
       const botMsg = {
         id: `bot_${Date.now()}`,
@@ -88,7 +89,13 @@ What would you like to explore today?`,
       setIsThinking(false);
       setActiveStep('');
     }, 1400);
-  };
+  }, [inputVal, isThinking, activeRole, currentUser, setSafeTimeout]);
+
+  useEffect(() => {
+    if (initialQuery && isOpen) {
+      handleSend(initialQuery);
+    }
+  }, [initialQuery, isOpen, handleSend]);
 
   return (
     <>

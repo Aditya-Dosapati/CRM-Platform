@@ -1,7 +1,10 @@
 import React from 'react';
 import { X, FileText, Download, ShieldCheck, Cpu } from 'lucide-react';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function SourceViewerModal({ isOpen, onClose, source }) {
+  useEscapeKey(onClose, isOpen && Boolean(source));
+
   if (!isOpen || !source) return null;
 
   return (

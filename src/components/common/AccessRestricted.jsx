@@ -1,12 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ShieldAlert, ArrowLeft, Lock, FileWarning, UserCheck } from 'lucide-react';
 import { VIEW_TITLES, accessControl } from '../../services/accessControl';
 
 export default function AccessRestricted({ currentUser, attemptedView, onReturn }) {
-  // Log unauthorized access incident once on mount
+  const loggedRef = useRef(false);
+
+  // Log unauthorized access incident once per mounted incident
   useEffect(() => {
-    accessControl.logUnauthorizedAttempt(currentUser, attemptedView);
-  }, [currentUser, attemptedView]);
+    if (!loggedRef.current && currentUser) {
+      accessControl.logUnauthorizedAttempt(currentUser, attemptedView);
+      loggedRef.current = true;
+    }
+  }, [currentUser?.userId, attemptedView]);
 
   const roleLabel = currentUser?.role === 'student' ? 'Student' : currentUser?.role === 'faculty' ? 'Faculty' : 'Administrator';
   const resourceTitle = VIEW_TITLES[attemptedView] || attemptedView;

@@ -131,6 +131,40 @@ end
 
 solve
 `
+  },
+  {
+    id: 'mysql',
+    name: 'MySQL',
+    version: 'MySQL 8.0.36',
+    runtime: 'Relational SQL Query Engine',
+    extension: '.sql',
+    status: 'enabled',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    defaultCode: `-- GMR CRM MySQL Query Sandbox
+-- Query: Retrieve students with attendance >= 75%
+SELECT student_id, name, department, attendance_pct 
+FROM student_records 
+WHERE attendance_pct >= 75.0 
+ORDER BY attendance_pct DESC;
+`
+  },
+  {
+    id: 'oracle',
+    name: 'Oracle SQL',
+    version: 'Oracle Database 21c (PL/SQL)',
+    runtime: 'Oracle Relational RDBMS Engine',
+    extension: '.sql',
+    status: 'enabled',
+    timeLimit: '2.5s',
+    memoryLimit: '256 MB',
+    defaultCode: `-- GMR CRM Oracle SQL Sandbox
+-- Query: Top performing students by CGPA
+SELECT roll_number, full_name, branch, cgpa,
+       RANK() OVER (PARTITION BY branch ORDER BY cgpa DESC) as dept_rank
+FROM gmrit_academic_registry
+WHERE status = 'ACTIVE';
+`
   }
 ];
 

@@ -1,29 +1,39 @@
 import React from 'react';
 import { X, Bell, CheckCircle2, AlertTriangle, AlertCircle, FileText, Check } from 'lucide-react';
-import { notificationsList } from '../../data/mockData';
+import useEscapeKey from '../../hooks/useEscapeKey';
+import EmptyState from './EmptyState';
 
-export default function NotificationCenter({ isOpen, onClose, activeRole, onNavigate }) {
+export default function NotificationCenter({
+  isOpen,
+  onClose,
+  activeRole,
+  onNavigate,
+  notifications: propNotifications,
+  onMarkAllRead
+}) {
+  useEscapeKey(onClose, isOpen);
+
   if (!isOpen) return null;
 
-  const notifications = notificationsList[activeRole] || [];
+  const notifications = propNotifications || [];
 
   const getIcon = (type) => {
     switch (type) {
-      case 'warning': return <AlertTriangle size={15} color="#EA580C" />;
+      case 'warning': return <AlertTriangle size={15} color="var(--color-primary)" />;
       case 'danger': return <AlertCircle size={15} color="var(--error)" />;
-      case 'rag': return <FileText size={15} color="var(--primary-blue)" />;
-      default: return <Bell size={15} color="var(--primary-blue)" />;
+      case 'rag': return <FileText size={15} color="var(--color-accent)" />;
+      default: return <Bell size={15} color="var(--color-primary)" />;
     }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ justifyContent: 'flex-end', padding: 0, backdropFilter: 'blur(3px)', background: 'rgba(15, 23, 42, 0.3)' }}>
+    <div className="modal-overlay" onClick={onClose} style={{ justifyContent: 'flex-end', padding: 0, backdropFilter: 'blur(3px)', background: 'rgba(43, 33, 24, 0.4)' }}>
       <div
         style={{
           width: '380px',
           height: '100vh',
-          background: '#FFFFFF',
-          borderLeft: '1px solid var(--border-light)',
+          background: 'var(--color-surface)',
+          borderLeft: '1px solid var(--color-border)',
           boxShadow: '-8px 0 25px rgba(0, 0, 0, 0.08)',
           display: 'flex',
           flexDirection: 'column',
@@ -34,20 +44,22 @@ export default function NotificationCenter({ isOpen, onClose, activeRole, onNavi
         {/* Header */}
         <div style={{
           padding: '18px 22px',
-          borderBottom: '1px solid var(--border-light)',
+          borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: '#FFFFFF'
+          background: 'var(--color-surface)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bell size={18} color="var(--primary-blue)" />
-            <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <Bell size={18} color="var(--color-primary)" />
+            <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: 'var(--color-text)' }}>
               Notifications
             </h3>
-            <span className="badge badge-blue" style={{ fontSize: '11px', padding: '2px 8px' }}>
-              {notifications.filter(n => !n.read).length} New
-            </span>
+            {notifications.length > 0 && (
+              <span className="badge badge-blue" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                {notifications.filter(n => !n.read).length} New
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -55,7 +67,8 @@ export default function NotificationCenter({ isOpen, onClose, activeRole, onNavi
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-muted)',
+              color: 'var(--color-text)',
+              opacity: 0.6,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -72,81 +85,80 @@ export default function NotificationCenter({ isOpen, onClose, activeRole, onNavi
 
         {/* Notifications list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-          {notifications.map((n) => (
-            <div
-              key={n.id}
-              style={{
-                padding: '14px',
-                borderRadius: '10px',
-                background: n.read ? '#FFFFFF' : 'var(--pastel-blue-bg)',
-                border: n.read ? '1px solid var(--border-light)' : '1px solid var(--pastel-blue-border)',
-                marginBottom: '12px',
-                boxShadow: 'var(--shadow-xs)',
-                transition: 'all 0.2s var(--ease-spring)',
-                cursor: 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateX(-3px)';
-                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.985) translateX(-3px)';
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'translateX(-3px)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <div style={{
-                  padding: '7px',
-                  borderRadius: '8px',
-                  background: n.read ? '#F1F5F9' : '#DBEAFE',
-                  marginTop: '1px',
-                  transition: 'transform 0.2s var(--ease-spring)'
-                }}>
-                  {getIcon(n.type)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <h4 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {n.title}
-                    </h4>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {n.time}
-                    </span>
+          {notifications.length === 0 ? (
+            <div style={{ padding: '40px 10px' }}>
+              <EmptyState
+                icon={Bell}
+                title="No Notifications"
+                message="You have no unread institutional alerts or messages at this time."
+              />
+            </div>
+          ) : (
+            notifications.map((n) => (
+              <div
+                key={n.id}
+                style={{
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: n.read ? 'var(--color-surface)' : 'var(--color-bg)',
+                  border: n.read ? '1px solid var(--color-border)' : '1px solid var(--color-primary)',
+                  marginBottom: '12px',
+                  transition: 'all 0.2s var(--ease-spring)',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <div style={{
+                    padding: '7px',
+                    borderRadius: '8px',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    marginTop: '1px'
+                  }}>
+                    {getIcon(n.type)}
                   </div>
-                  <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.45 }}>
-                    {n.desc}
-                  </p>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <h4 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text)' }}>
+                        {n.title}
+                      </h4>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6 }}>
+                        {n.time}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.8, marginTop: '4px', lineHeight: 1.45 }}>
+                      {n.desc}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '14px 20px',
-          borderTop: '1px solid var(--border-light)',
-          background: '#F8FAFC',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={onClose}
-          >
-            Mark all read
-          </button>
-          <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-            GMRIT Real-time Alert Relay
-          </span>
-        </div>
+        {notifications.length > 0 && (
+          <div style={{
+            padding: '14px 20px',
+            borderTop: '1px solid var(--color-border)',
+            background: 'var(--color-bg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                if (onMarkAllRead) onMarkAllRead();
+              }}
+            >
+              Mark all read
+            </button>
+            <span style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7 }}>
+              GMRIT Real-time Alert Relay
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

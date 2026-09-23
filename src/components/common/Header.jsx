@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 export default function Header({
   currentUser,
@@ -26,56 +26,8 @@ export default function Header({
         </p>
       </div>
 
-      {/* Right: Global Search, Notification & Read-Only Authenticated User Identity */}
+      {/* Right: Notification & Read-Only Authenticated User Identity */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Global Search Box */}
-        <div
-          onClick={onOpenCommandPalette}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: '#F8FAFC',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '6px 12px',
-            cursor: 'pointer',
-            width: '240px',
-            transition: 'transform var(--transition-spring), border-color var(--transition-smooth), box-shadow var(--transition-spring)',
-            userSelect: 'none'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--primary-blue)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 3px 8px rgba(37, 99, 235, 0.08)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border-subtle)';
-            e.currentTarget.style.transform = 'none';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-          onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-          onMouseUp={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-        >
-          <Search size={14} color="var(--text-muted)" />
-          <span style={{ fontSize: '12px', color: 'var(--text-dim)', flex: 1 }}>
-            Search subjects, resources...
-          </span>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-light)',
-            borderRadius: '4px',
-            padding: '1px 5px',
-            fontSize: '9.5px',
-            color: 'var(--text-muted)',
-            fontWeight: 700,
-            fontFamily: 'JetBrains Mono, monospace'
-          }}>
-            ⌘K
-          </div>
-        </div>
 
         {/* Notification Bell */}
         <button
@@ -83,6 +35,7 @@ export default function Header({
           className="btn-icon"
           style={{ position: 'relative', width: '32px', height: '32px' }}
           title="Notifications"
+          aria-label={`Notifications (${notificationCount} unread)`}
           onMouseEnter={(e) => {
             const icon = e.currentTarget.querySelector('svg');
             if (icon) icon.style.animation = 'bellJingle 0.6s ease';
@@ -102,14 +55,23 @@ export default function Header({
               borderRadius: '50%',
               backgroundColor: 'var(--primary-blue)',
               boxShadow: '0 0 0 2px #FFFFFF',
-              animation: 'pulseSubtle 2.5s infinite ease-in-out'
+              animation: 'pulseSubtle 2s infinite'
             }} />
           )}
         </button>
 
         {/* Read-Only Authenticated User Identity Pill (Non-Editable) */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="View authenticated institutional profile"
           onClick={onOpenProfile}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenProfile();
+            }
+          }}
           title="View authenticated institutional profile"
           style={{
             display: 'flex',
@@ -154,13 +116,13 @@ export default function Header({
             color: activeRole === 'student' ? 'var(--primary-blue)' : activeRole === 'faculty' ? 'var(--pastel-green-text)' : 'var(--pastel-purple-text)',
             flexShrink: 0
           }}>
-            {currentUser?.avatar || 'RK'}
+            {currentUser?.avatar || (currentUser?.name || currentUser?.email || 'U').slice(0, 2).toUpperCase()}
           </div>
 
           {/* User Name & Role indicator */}
           <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
             <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-              {currentUser?.name || 'Rahul Kumar'}
+              {currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : 'User')}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
               <span style={{

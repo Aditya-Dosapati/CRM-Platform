@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, ShieldAlert, FileText, Search, Filter, Download, RefreshCw, CheckCircle, AlertTriangle, Lock, Clock } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Shield, ShieldAlert, FileText, Search, Filter, Download, RefreshCw, CheckCircle, AlertTriangle, Lock, Clock, FileQuestion } from 'lucide-react';
 import auditService from '../../services/auditService';
+import EmptyState from '../common/EmptyState';
 
 export default function AdminAuditLogs() {
   const [logs, setLogs] = useState([]);
@@ -8,38 +9,44 @@ export default function AdminAuditLogs() {
   const [resultFilter, setResultFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const refreshLogs = () => {
+  const refreshLogs = useCallback(() => {
     setLogs(auditService.getLogs());
-  };
+  }, []);
 
   useEffect(() => {
     refreshLogs();
-  }, []);
+  }, [refreshLogs]);
 
-  const filteredLogs = logs.filter(log => {
-    if (roleFilter !== 'all' && log.role.toLowerCase() !== roleFilter.toLowerCase()) {
-      return false;
-    }
-    if (resultFilter !== 'all' && log.result.toLowerCase() !== resultFilter.toLowerCase()) {
-      return false;
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        log.user.toLowerCase().includes(q) ||
-        log.action.toLowerCase().includes(q) ||
-        log.resource.toLowerCase().includes(q) ||
-        (log.details && log.details.toLowerCase().includes(q))
-      );
-    }
-    return true;
-  });
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      if (roleFilter !== 'all' && log.role.toLowerCase() !== roleFilter.toLowerCase()) {
+        return false;
+      }
+      if (resultFilter !== 'all' && log.result.toLowerCase() !== resultFilter.toLowerCase()) {
+        return false;
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return (
+          log.user.toLowerCase().includes(q) ||
+          log.action.toLowerCase().includes(q) ||
+          log.resource.toLowerCase().includes(q) ||
+          (log.details && log.details.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [logs, roleFilter, resultFilter, searchQuery]);
 
-  const totalEvents = logs.length;
-  const blockedCount = logs.filter(l => l.result.includes('Blocked') || l.result.includes('403')).length;
-  const adminOps = logs.filter(l => l.role === 'admin').length;
+  const { totalEvents, blockedCount, adminOps } = useMemo(() => {
+    return {
+      totalEvents: logs.length,
+      blockedCount: logs.filter(l => l.result.includes('Blocked') || l.result.includes('403')).length,
+      adminOps: logs.filter(l => l.role === 'admin').length
+    };
+  }, [logs]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", jsonStr);
@@ -47,7 +54,7 @@ export default function AdminAuditLogs() {
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-  };
+  }, [logs]);
 
   return (
     <div className="page-content">
@@ -244,11 +251,19 @@ export default function AdminAuditLogs() {
             </thead>
             <tbody>
               {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No audit records match the selected filter criteria.
-                  </td>
-                </tr>
+                <EmptyState
+                  icon={FileQuestion}
+                  title="No Audit Records Found"
+                  message="No institutional security events match the selected role or status filters."
+                  isTableRow={true}
+                  colSpan={6}
+                  actionText="Reset Filters"
+                  onAction={() => {
+                    setRoleFilter('all');
+                    setResultFilter('all');
+                    setSearchQuery('');
+                  }}
+                />
               ) : (
                 filteredLogs.map(log => {
                   const isBlocked = log.result.includes('Blocked') || log.result.includes('403');

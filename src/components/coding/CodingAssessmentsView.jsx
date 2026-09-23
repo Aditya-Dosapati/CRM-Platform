@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Terminal,
   Calendar,
@@ -21,6 +21,7 @@ import {
 import { codingAssessmentsList } from '../../data/codingData.js';
 import CodingExamEnvironment from './CodingExamEnvironment.jsx';
 import CodingAssessmentResultModal from './CodingAssessmentResultModal.jsx';
+import useEscapeKey from '../../hooks/useEscapeKey.js';
 
 export default function CodingAssessmentsView() {
   const [assessments, setAssessments] = useState(codingAssessmentsList);
@@ -34,23 +35,39 @@ export default function CodingAssessmentsView() {
   const [activeExamSession, setActiveExamSession] = useState(null);
   const [selectedCompletedAssessment, setSelectedCompletedAssessment] = useState(null);
 
-  // Filtered lists
-  const filteredAssessments = assessments.filter(a => {
-    const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.faculty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.className.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (!matchesSearch) return false;
-
-    if (activeTab === 'active') {
-      return a.status === 'upcoming' || a.status === 'active';
-    } else {
-      return a.status === 'completed';
+  useEscapeKey(() => {
+    if (selectedCompletedAssessment) {
+      setSelectedCompletedAssessment(null);
+    } else if (isExamModalOpen) {
+      setIsExamModalOpen(false);
     }
-  });
+  }, isExamModalOpen || Boolean(selectedCompletedAssessment));
 
-  const activeCount = assessments.filter(a => a.status === 'upcoming' || a.status === 'active').length;
-  const completedCount = assessments.filter(a => a.status === 'completed').length;
+  // Filtered lists memoized
+  const filteredAssessments = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return assessments.filter(a => {
+      const matchesSearch = a.title.toLowerCase().includes(q) ||
+        a.faculty.toLowerCase().includes(q) ||
+        a.className.toLowerCase().includes(q);
+      
+      if (!matchesSearch) return false;
+
+      if (activeTab === 'active') {
+        return a.status === 'upcoming' || a.status === 'active';
+      } else {
+        return a.status === 'completed';
+      }
+    });
+  }, [assessments, searchQuery, activeTab]);
+
+  const activeCount = useMemo(() => {
+    return assessments.filter(a => a.status === 'upcoming' || a.status === 'active').length;
+  }, [assessments]);
+
+  const completedCount = useMemo(() => {
+    return assessments.filter(a => a.status === 'completed').length;
+  }, [assessments]);
 
   const handleStartExamClick = (assessment) => {
     setSelectedAssessmentForExam(assessment);

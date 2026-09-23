@@ -28,6 +28,8 @@ import {
   supportedLanguagesList
 } from '../../data/codingData.js';
 import CodingWorkspaceModal from '../coding/CodingWorkspaceModal.jsx';
+import useSafeTimeout from '../../hooks/useSafeTimeout';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function FacultyCodingManagement({ onOpenRagQuery }) {
   const [assessments, setAssessments] = useState(codingAssessmentsList);
@@ -40,6 +42,22 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
   const [isCreateAssessmentOpen, setIsCreateAssessmentOpen] = useState(false);
   const [previewProblem, setPreviewProblem] = useState(null);
   const [actionSuccessToast, setActionSuccessToast] = useState(null);
+  const setSafeTimeout = useSafeTimeout();
+
+  useEscapeKey(() => {
+    if (previewProblem) {
+      setPreviewProblem(null);
+    } else if (isCreateProblemOpen) {
+      setIsCreateProblemOpen(false);
+    } else if (isCreateAssessmentOpen) {
+      setIsCreateAssessmentOpen(false);
+    }
+  }, Boolean(previewProblem) || isCreateProblemOpen || isCreateAssessmentOpen);
+
+  const showToast = (msg) => {
+    setActionSuccessToast(msg);
+    setSafeTimeout(() => setActionSuccessToast(null), 3000);
+  };
 
   // New Problem Form State
   const [newProblem, setNewProblem] = useState({
@@ -66,11 +84,6 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
     allowedLanguages: ['Python', 'C++', 'Java', 'C'],
     selectedProblemIds: ['prob-1', 'prob-2', 'prob-3']
   });
-
-  const showToast = (msg) => {
-    setActionSuccessToast(msg);
-    setTimeout(() => setActionSuccessToast(null), 3000);
-  };
 
   const handleCreateProblemSubmit = (e) => {
     e.preventDefault();

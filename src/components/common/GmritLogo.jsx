@@ -67,7 +67,7 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
               color: '#111827',
               fontFamily: "'Plus Jakarta Sans', sans-serif"
             }}>
-              GMRIT <span style={{ color: '#2563EB' }}>Academic Hub</span>
+              GMR <span style={{ color: '#2563EB' }}>CRM</span>
             </span>
           </div>
           {showSubtitle && (
@@ -78,7 +78,7 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
               letterSpacing: '0.1px',
               whiteSpace: 'nowrap'
             }}>
-              AI-Powered Learning
+              Academic Management Platform
             </span>
           )}
         </div>

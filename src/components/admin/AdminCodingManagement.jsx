@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Code2,
   Cpu,
@@ -21,6 +21,7 @@ import {
   adminExecutionSettings,
   adminCodingAnalytics
 } from '../../data/codingData.js';
+import useSafeTimeout from '../../hooks/useSafeTimeout';
 
 export default function AdminCodingManagement() {
   const [languages, setLanguages] = useState(supportedLanguagesList);
@@ -28,8 +29,9 @@ export default function AdminCodingManagement() {
   const [analytics, setAnalytics] = useState(adminCodingAnalytics);
   const [isSaving, setIsSaving] = useState(false);
   const [saveToast, setSaveToast] = useState(null);
+  const setSafeTimeout = useSafeTimeout();
 
-  const handleToggleLanguage = (langId) => {
+  const handleToggleLanguage = useCallback((langId) => {
     setLanguages(prev =>
       prev.map(l => {
         if (l.id === langId) {
@@ -39,17 +41,17 @@ export default function AdminCodingManagement() {
         return l;
       })
     );
-  };
+  }, []);
 
-  const handleSaveSettings = (e) => {
+  const handleSaveSettings = useCallback((e) => {
     e.preventDefault();
     setIsSaving(true);
-    setTimeout(() => {
+    setSafeTimeout(() => {
       setIsSaving(false);
       setSaveToast('Execution Sandbox Limits & Container Policies updated successfully.');
-      setTimeout(() => setSaveToast(null), 3500);
+      setSafeTimeout(() => setSaveToast(null), 3500);
     }, 600);
-  };
+  }, [setSafeTimeout]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

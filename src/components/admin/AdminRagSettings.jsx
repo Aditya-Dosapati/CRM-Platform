@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sliders, Cpu, Shield, Save, CheckCircle2, RotateCcw } from 'lucide-react';
+import useSafeTimeout from '../../hooks/useSafeTimeout';
 
 export default function AdminRagSettings() {
   const [topK, setTopK] = useState(4);
@@ -21,10 +22,11 @@ export default function AdminRagSettings() {
   const [enableLectureNotes, setEnableLectureNotes] = useState(true);
 
   const [saved, setSaved] = useState(false);
+  const setSafeTimeout = useSafeTimeout();
 
   const handleSave = () => {
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSafeTimeout(() => setSaved(false), 2000);
   };
 
   return (

@@ -1,170 +1,223 @@
-// GMRIT Academic Hub - Institutional Authentication Service (RBAC)
+// GMR CRM - Institutional Authentication Service (Supabase Auth & RBAC)
 import auditService from './auditService.js';
+import userManagementService from './userManagementService.js';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 
-const USERS_STORAGE_KEY = 'gmrit_users_db';
 const SESSION_STORAGE_KEY = 'gmrit_auth_session';
-
-// Canonical initial accounts meeting institutional specification
-const initialUsers = [
-  {
-    userId: "STU001",
-    rollNumber: "23A81A0501",
-    name: "Rahul Kumar",
-    email: "student@gmrit.edu.in",
-    aliases: ["23a81a0501@gmrit.edu.in", "23A81A0501"],
-    role: "student",
-    password: "student123",
-    department: "Computer Science & Engineering",
-    program: "B.Tech",
-    regulation: "R20",
-    year: "II Year",
-    semester: 4,
-    section: "CSE-A",
-    academicYear: "2025-2026",
-    avatar: "RK",
-    cgpa: 8.42,
-    attendance: 91.0,
-    overallPerformance: 82.4,
-    isFirstLogin: false,
-    permissions: [
-      "student:read",
-      "syllabus:read",
-      "pyq:read",
-      "assessments:read",
-      "assessments:submit",
-      "performance:read",
-      "rag:query"
-    ]
-  },
-  {
-    userId: "FAC001",
-    employeeId: "GMR-CSE-1042",
-    name: "Dr. Priya Sharma",
-    email: "faculty@gmrit.edu.in",
-    aliases: ["priya.sharma@gmrit.edu.in", "GMR-CSE-1042"],
-    role: "faculty",
-    password: "faculty123",
-    designation: "Associate Professor & Lead - AI Specialization",
-    department: "Computer Science & Engineering",
-    subjects: ["Machine Learning", "Artificial Intelligence", "Deep Learning"],
-    totalStudents: 184,
-    averagePerformance: 78.6,
-    averageAttendance: 87.4,
-    avatar: "PS",
-    isFirstLogin: false,
-    permissions: [
-      "faculty:read",
-      "classes:manage",
-      "students:monitor",
-      "assessments:manage",
-      "resources:upload",
-      "analytics:read",
-      "rag:query"
-    ]
-  },
-  {
-    userId: "ADM001",
-    name: "System Administrator",
-    officialName: "Er. M. V. Subrahmanyam",
-    email: "admin@gmrit.edu.in",
-    aliases: ["dean.academics@gmrit.edu.in", "admin"],
-    role: "admin",
-    password: "admin123",
-    designation: "Dean of Academic Computing & IT Operations",
-    department: "Central Administrative IT Cell",
-    avatar: "SA",
-    isFirstLogin: false,
-    permissions: ["*"]
-  }
-];
 
 class AuthService {
   constructor() {
-    this.users = this.loadUsers();
     this.currentSession = this.loadSession();
+    this.authStateListeners = new Set();
+    this.setupSupabaseListener();
   }
 
-  loadUsers() {
+  setupSupabaseListener() {
+    if (isSupabaseConfigured() && supabase?.auth?.onAuthStateChange) {
+      try {
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT') {
+            this.saveSession(null);
+            this.clearStaleStorage();
+            this.notifyListeners('SIGNED_OUT', null, null);
+          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (session?.user) {
+              const profile = await this.getBackendProfile(session.user.id, session.user.email);
+              if (profile && profile.role) {
+                const finalRole = String(profile.role).trim().toLowerCase();
+                if (['admin', 'faculty', 'student'].includes(finalRole)) {
+                  const userObj = {
+                    userId: profile.id || session.user.id,
+                    id: profile.id || session.user.id,
+                    name: profile.name || profile.full_name || session.user.email.split('@')[0],
+                    email: profile.email || session.user.email,
+                    role: finalRole,
+                    status: profile.status || 'Active',
+                    department: profile.department || '',
+                    avatar: (profile.name || profile.full_name || 'U').slice(0, 2).toUpperCase()
+                  };
+
+                  const updatedSession = {
+                    sessionId: session.access_token ? `sess_${session.access_token.slice(-10)}` : `sess_${Date.now()}`,
+                    userId: userObj.userId,
+                    role: userObj.role,
+                    name: userObj.name,
+                    email: userObj.email,
+                    loginTimestamp: new Date().toISOString()
+                  };
+                  this.saveSession(updatedSession);
+                  this.notifyListeners(event, userObj, updatedSession);
+                }
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.warn('[AuthService] Could not attach Supabase auth state listener:', e);
+      }
+    }
+  }
+
+  onAuthStateChange(callback) {
+    if (typeof callback === 'function') {
+      this.authStateListeners.add(callback);
+      return () => this.authStateListeners.delete(callback);
+    }
+    return () => {};
+  }
+
+  notifyListeners(event, user, session) {
+    for (const listener of this.authStateListeners) {
+      try {
+        listener(event, user, session);
+      } catch (e) {
+        console.error('[AuthService] Listener error:', e);
+      }
+    }
+  }
+
+  clearStaleStorage() {
     try {
-      const stored = sessionStorage.getItem(USERS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.removeItem('gmrit_users_db');
+        sessionStorage.removeItem('gmrit_user_profile');
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('gmrit_auth_session');
+        localStorage.removeItem('gmrit_users_db');
+        localStorage.removeItem('gmrit_user_profile');
       }
     } catch (e) {
-      console.warn("Could not load users from storage", e);
-    }
-    return [...initialUsers];
-  }
-
-  saveUsers() {
-    try {
-      sessionStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(this.users));
-    } catch (e) {
-      console.warn("Could not save users to storage", e);
+      console.warn('[AuthService] Error clearing stale storage:', e);
     }
   }
 
   loadSession() {
     try {
-      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (stored) {
-        const session = JSON.parse(stored);
-        // Verify user still exists
-        const userExists = this.users.find(u => u.userId === session.userId);
-        if (userExists) {
-          return session;
+      if (typeof sessionStorage !== 'undefined') {
+        const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.userId && parsed.role && ['admin', 'faculty', 'student'].includes(parsed.role.toLowerCase())) {
+            return {
+              ...parsed,
+              role: parsed.role.toLowerCase()
+            };
+          }
         }
       }
     } catch (e) {
-      console.warn("Could not load session from storage", e);
+      console.warn('[AuthService] Could not load session from storage:', e);
     }
-    // Default initial session: Student (Rahul Kumar) for seamless experience,
-    // but fully bound to STU001 account record
-    const defaultUser = this.users[0];
-    const initialSession = {
-      sessionId: `sess_${Date.now()}_default`,
-      userId: defaultUser.userId,
-      role: defaultUser.role,
-      name: defaultUser.name,
-      email: defaultUser.email,
-      loginTimestamp: new Date().toISOString()
-    };
-    return initialSession;
+    return null;
   }
 
   saveSession(session) {
     this.currentSession = session;
     try {
-      if (session) {
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-      } else {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      if (typeof sessionStorage !== 'undefined') {
+        if (session) {
+          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        } else {
+          sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        }
       }
     } catch (e) {
-      console.warn("Could not save session to storage", e);
+      console.warn('[AuthService] Could not save session to storage:', e);
     }
   }
 
-  // Pure credential authentication against database records
-  login(identifier, password) {
+  /**
+   * Query user profile and verified backend role from public.users table.
+   * STRICT: Resolves role directly from public.users without guessing or fallback.
+   */
+  async getBackendProfile(userId, email) {
+    if (!isSupabaseConfigured()) {
+      return null;
+    }
+
+    try {
+      // 1. Primary lookup by UUID
+      if (userId) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, email, full_name, role, status, created_at, last_login')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (error) {
+          console.error('[AuthService] Error querying public.users by ID:', error.message);
+        } else if (data) {
+          return {
+            ...data,
+            id: data.id,
+            userId: data.id,
+            name: data.full_name || (data.email ? data.email.split('@')[0] : 'User'),
+            role: (data.role || '').toLowerCase().trim(),
+            status: data.status || 'Active'
+          };
+        }
+      }
+
+      // 2. Secondary fallback lookup by Email if ID lookup did not match
+      if (email) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, email, full_name, role, status, created_at, last_login')
+          .eq('email', email.toLowerCase().trim())
+          .maybeSingle();
+
+        console.log('[AuthService] Profile query by Email:', {
+          email,
+          rowCount: data ? 1 : 0,
+          errorCode: error?.code || null,
+          errorMessage: error?.message || null,
+          resolvedRole: data?.role || null
+        });
+
+        if (error) {
+          console.error('[AuthService] Error querying public.users by email:', error.message);
+        } else if (data) {
+          return {
+            ...data,
+            id: data.id,
+            userId: data.id,
+            name: data.full_name || (data.email ? data.email.split('@')[0] : 'User'),
+            role: (data.role || '').toLowerCase().trim(),
+            status: data.status || 'Active'
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[AuthService] Supabase profile fetch exception:', err);
+    }
+
+    return null;
+  }
+
+  /**
+   * Authenticate user with Supabase Auth credentials.
+   * Role is STRICTLY resolved from public.users.role.
+   */
+  async login(identifier, password) {
     const cleanId = (identifier || '').trim().toLowerCase();
     const cleanPass = (password || '').trim();
 
     if (!cleanId || !cleanPass) {
-      throw new Error("Please provide both User ID/Email and password.");
+      throw new Error("Please provide both email address and password.");
     }
 
-    // Find account by institutional email, userId, rollNumber, employeeId, or alias
-    const account = this.users.find(u => {
-      if (u.email.toLowerCase() === cleanId) return true;
-      if (u.userId.toLowerCase() === cleanId) return true;
-      if (u.rollNumber && u.rollNumber.toLowerCase() === cleanId) return true;
-      if (u.employeeId && u.employeeId.toLowerCase() === cleanId) return true;
-      if (u.aliases && u.aliases.some(a => a.toLowerCase() === cleanId)) return true;
-      return false;
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are not configured. Please check your .env settings.");
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanId,
+      password: cleanPass
     });
 
-    if (!account) {
+    if (authError) {
       auditService.logAction({
         user: identifier,
         role: "unauthenticated",
@@ -172,57 +225,420 @@ class AuthService {
         action: "Authentication Attempt",
         resource: "/auth/login",
         result: "Failed",
-        details: "Account identifier not found in GMRIT institutional directory."
+        details: authError.message
       });
-      throw new Error("Invalid institutional credentials. Please verify your User ID or institutional email.");
+
+      const msg = (authError.message || '').toLowerCase();
+      if (msg.includes('invalid login credentials') || msg.includes('invalid grant') || msg.includes('invalid credentials')) {
+        throw new Error("Invalid email or password. Please verify your credentials.");
+      } else if (msg.includes('email not confirmed')) {
+        throw new Error("Email address is not confirmed. Please verify your email or contact your administrator.");
+      } else if (msg.includes('invalid api key') || msg.includes('apikey') || msg.includes('jwt')) {
+        throw new Error(`Invalid Supabase API credentials: ${authError.message}`);
+      } else if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('enotfound')) {
+        throw new Error(`Supabase connection failed: Unable to connect to Supabase server. Please check your network or VITE_SUPABASE_URL.`);
+      }
+
+      throw new Error(authError.message || "Authentication failed. Please verify your credentials.");
     }
 
-    // Verify password
-    if (account.password !== cleanPass) {
-      auditService.logAction({
-        user: account.name,
-        role: account.role,
-        userId: account.userId,
-        action: "Authentication Attempt",
-        resource: "/auth/login",
-        result: "Failed",
-        details: "Password mismatch for verified institutional account."
-      });
-      throw new Error("Invalid institutional credentials. The password entered is incorrect.");
+    if (!authData?.user) {
+      throw new Error("Authentication failed: No user returned from Supabase Auth.");
     }
 
-    // Create authenticated session
+    // Diagnostic Step 3: Log immediately after signInWithPassword()
+    console.log('[Auth Diagnostics] signInWithPassword returned:', {
+      authDataUserId: authData.user.id,
+      authDataUserEmail: authData.user.email,
+      sessionExists: Boolean(authData.session)
+    });
+
+    // Diagnostic Step 4: Explicitly call supabase.auth.getUser() to verify session
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const currentUserFromAuth = userData?.user;
+
+    console.log('[Auth Diagnostics] supabase.auth.getUser() result:', {
+      userId: currentUserFromAuth?.id || null,
+      userEmail: currentUserFromAuth?.email || null,
+      userErrorCode: userError?.code || null,
+      userErrorMessage: userError?.message || null,
+      isExpectedAdminUid: (currentUserFromAuth?.id === '35f15d86-f4db-4b0f-ba31-48a977a692f3')
+    });
+
+    const activeAuthUid = currentUserFromAuth?.id || authData.user.id;
+    const activeAuthEmail = currentUserFromAuth?.email || authData.user.email;
+
+    // Diagnostic Step 5: Perform profile query using the authenticated session
+    const { data: profileData, error: profileError } = await supabase
+      .from('users')
+      .select('id, email, full_name, role, status')
+      .eq('id', activeAuthUid)
+      .maybeSingle();
+
+    console.log('[Auth Diagnostics] Profile query by UID:', {
+      returnedRowExists: Boolean(profileData),
+      dataId: profileData?.id || null,
+      dataEmail: profileData?.email || null,
+      dataRole: profileData?.role || null,
+      dataStatus: profileData?.status || null,
+      errorCode: profileError?.code || null,
+      errorMessage: profileError?.message || null
+    });
+
+    let profile = profileData;
+
+    // If ID lookup did not return a row, fallback to email lookup
+    if (!profile && activeAuthEmail) {
+      const { data: emailData, error: emailError } = await supabase
+        .from('users')
+        .select('id, email, full_name, role, status')
+        .eq('email', activeAuthEmail.toLowerCase().trim())
+        .maybeSingle();
+
+      console.log('[Auth Diagnostics] Profile query by Email fallback:', {
+        returnedRowExists: Boolean(emailData),
+        dataId: emailData?.id || null,
+        dataEmail: emailData?.email || null,
+        dataRole: emailData?.role || null,
+        dataStatus: emailData?.status || null,
+        errorCode: emailError?.code || null,
+        errorMessage: emailError?.message || null
+      });
+
+      if (emailData) {
+        profile = emailData;
+      }
+    }
+
+    if (!profile || !profile.role) {
+      await supabase.auth.signOut();
+      this.clearStaleStorage();
+      throw new Error(`Profile Authorization Error: No user profile or role found in public.users for account "${activeAuthEmail}". (Auth UID: ${activeAuthUid}). Please contact the administrator.`);
+    }
+
+    const finalRole = String(profile.role).trim().toLowerCase();
+    if (!['admin', 'faculty', 'student'].includes(finalRole)) {
+      await supabase.auth.signOut();
+      this.clearStaleStorage();
+      throw new Error(`Authorization Error: Unrecognized role "${profile.role}" in database for user "${authData.user.email}".`);
+    }
+
+    const accountStatus = (profile.status || 'Active').trim().toLowerCase();
+
+    if (accountStatus === 'pending') {
+      await supabase.auth.signOut();
+      this.clearStaleStorage();
+      throw new Error("Your account registration is currently pending administrator approval. Please wait for an administrator to activate your account.");
+    }
+
+    if (accountStatus === 'rejected') {
+      await supabase.auth.signOut();
+      this.clearStaleStorage();
+      throw new Error("Your registration request was rejected by administrator. Please contact the academic administration.");
+    }
+
+    if (accountStatus === 'inactive' || accountStatus === 'deactivated') {
+      await supabase.auth.signOut();
+      this.clearStaleStorage();
+      throw new Error("Your account has been deactivated. Please contact administrator.");
+    }
+
+    const userObj = {
+      userId: profile.id || authData.user.id,
+      id: profile.id || authData.user.id,
+      name: profile.name || profile.full_name || authData.user.email.split('@')[0],
+      email: profile.email || authData.user.email,
+      role: finalRole,
+      status: accountStatus.charAt(0).toUpperCase() + accountStatus.slice(1),
+      department: profile.department || '',
+      avatar: (profile.name || profile.full_name || 'U').slice(0, 2).toUpperCase()
+    };
+
     const session = {
-      sessionId: `sess_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-      userId: account.userId,
-      role: account.role,
-      name: account.name,
-      email: account.email,
+      sessionId: authData.session?.access_token ? `sess_${authData.session.access_token.slice(-10)}` : `sess_${Date.now()}`,
+      userId: userObj.userId,
+      role: userObj.role,
+      name: userObj.name,
+      email: userObj.email,
       loginTimestamp: new Date().toISOString()
     };
 
     this.saveSession(session);
 
-    // Audit log successful authentication
     auditService.logAction({
-      user: account.name,
-      role: account.role,
-      userId: account.userId,
+      user: userObj.name,
+      role: userObj.role,
+      userId: userObj.userId,
       action: "User Login",
-      resource: `/${account.role}/dashboard`,
+      resource: `/${userObj.role}/dashboard`,
       result: "Success",
-      details: `Successful credential authentication for role [${account.role.toUpperCase()}].`
+      details: `Supabase authenticated session established for role [${userObj.role.toUpperCase()}].`
     });
 
     return {
-      user: account,
+      user: userObj,
       session,
-      isFirstLogin: Boolean(account.isFirstLogin)
+      isFirstLogin: false
     };
   }
 
-  logout() {
+  /**
+   * Registration for new students and faculty (Admin registration is strictly prohibited)
+   * Uses atomic register_crm_user RPC to eliminate GoTrue SMTP rate-limit bottlenecks.
+   */
+  async registerUser(userData) {
+    const rawRole = (userData.role || 'student').toLowerCase();
+    
+    // Strict RBAC Rule: Never allow self-registration as Admin
+    if (rawRole === 'admin' || rawRole === 'administrator') {
+      auditService.logAction({
+        user: userData.name || "Anonymous",
+        role: "unauthorized",
+        userId: "ATTEMPT_ADMIN_REG",
+        action: "Unauthorized Admin Registration Attempt",
+        resource: "/auth/register",
+        result: "Blocked (403)",
+        details: "Attempted to register account with administrative privileges."
+      });
+      throw new Error("403 Forbidden: Administrator self-registration is strictly prohibited.");
+    }
+
+    const role = rawRole === 'faculty' ? 'faculty' : 'student';
+    const name = (userData.name || '').trim();
+    const email = (userData.email || '').trim().toLowerCase();
+    const password = (userData.password || '').trim();
+    const department = (userData.department || '').trim();
+    const identifier = role === 'student'
+      ? (userData.rollNumber || '').trim().toUpperCase()
+      : (userData.employeeId || '').trim().toUpperCase();
+
+    if (!name || name.length < 2) throw new Error("Full name is required (minimum 2 characters).");
+    if (!email || !email.includes('@') || !email.includes('.')) throw new Error("A valid email address is required.");
+    if (!password || password.length < 6) {
+      throw new Error("Password must be at least 6 characters long.");
+    }
+
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are not configured. Please check your .env settings.");
+    }
+
+    // Resolve department_id from public.departments
+    let resolvedDeptId = null;
+    if (department) {
+      try {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(department)) {
+          resolvedDeptId = department;
+        } else {
+          const { data: deptRows } = await supabase
+            .from('departments')
+            .select('id, code, name')
+            .or(`code.eq.${department},name.ilike.%${department}%`)
+            .limit(1);
+          if (deptRows && deptRows.length > 0) {
+            resolvedDeptId = deptRows[0].id;
+          }
+        }
+      } catch (deptErr) {
+        console.warn('[AuthService] Department lookup notice:', deptErr);
+      }
+    }
+
+    // PRIMARY SECURE PATH: Supabase Edge Function using Admin Auth API (email_confirm: true)
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('register-user', {
+        body: {
+          name,
+          email,
+          password,
+          role,
+          department,
+          rollNumber: role === 'student' ? identifier : undefined,
+          employeeId: role === 'faculty' ? identifier : undefined,
+          program: role === 'student' ? (userData.program || 'B.Tech') : undefined,
+          year: role === 'student' ? (() => {
+            const y = userData.year;
+            if (!y) return 1;
+            if (typeof y === 'number') return y;
+            const s = String(y).trim();
+            const d = s.match(/\d+/);
+            if (d) return parseInt(d[0], 10);
+            if (s.includes('IV')) return 4;
+            if (s.includes('III')) return 3;
+            if (s.includes('II')) return 2;
+            if (s.includes('I')) return 1;
+            return 1;
+          })() : undefined,
+          section: role === 'student' ? (() => {
+            const sec = userData.section;
+            if (!sec) return 'A';
+            const s = String(sec).trim();
+            const match = s.match(/Section\s*([A-Za-z0-9]+)/i);
+            return match ? match[1].toUpperCase() : s.toUpperCase();
+          })() : undefined,
+          designation: role === 'faculty' ? (userData.designation || 'Assistant Professor') : undefined
+        }
+      });
+
+      if (!fnError && data?.success) {
+        auditService.logAction({
+          user: name,
+          role,
+          userId: data.userId || identifier,
+          action: "Account Self-Registration",
+          resource: "/auth/register",
+          result: "Pending Approval",
+          details: `New [${role.toUpperCase()}] registered: ${name} (${email}). Awaiting Admin Approval.`
+        });
+
+        return {
+          name,
+          email,
+          role,
+          status: 'pending',
+          message: 'Registration submitted successfully. Your account is waiting for administrator approval.'
+        };
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (fnError) {
+        // Attempt to extract response error from edge function context
+        let detailedMsg = fnError.message || '';
+        try {
+          if (fnError.context && typeof fnError.context.json === 'function') {
+            const errBody = await fnError.context.json();
+            if (errBody?.error) detailedMsg = errBody.error;
+          }
+        } catch (_) {}
+
+        if (detailedMsg.includes('already exists') || detailedMsg.includes('duplicate')) {
+          throw new Error("An account with this email address already exists. Please sign in instead.");
+        } else if (detailedMsg && !detailedMsg.includes('FunctionsHttpError') && !detailedMsg.includes('non-2xx')) {
+          throw new Error(detailedMsg);
+        }
+      }
+    } catch (edgeEx) {
+      const msg = edgeEx.message || '';
+      if (msg && !msg.includes('FunctionsFetchError') && !msg.includes('Failed to send a request to Edge Function')) {
+        throw edgeEx;
+      }
+      console.warn('[AuthService] Edge function invoke notice, trying fallback:', msg);
+    }
+
+    // FALLBACK PATH: Standard Supabase Auth signUp
+    const { data: supaSignUp, error: supaErr } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          name,
+          role,
+          department,
+          roll_number: role === 'student' ? identifier : undefined,
+          employee_id: role === 'faculty' ? identifier : undefined,
+          program: role === 'student' ? (userData.program || 'B.Tech') : undefined,
+          year: role === 'student' ? (userData.year || 1) : undefined,
+          section: role === 'student' ? (userData.section || 'A') : undefined,
+          designation: role === 'faculty' ? (userData.designation || 'Assistant Professor') : undefined,
+          status: 'pending'
+        }
+      }
+    });
+
+    if (supaErr) {
+      const errMsg = supaErr.message || '';
+      if (errMsg.toLowerCase().includes('already registered') || errMsg.toLowerCase().includes('unique')) {
+        throw new Error("An account with this email address already exists. Please sign in instead.");
+      } else if (errMsg.toLowerCase().includes('rate limit') || errMsg.toLowerCase().includes('rate_limit')) {
+        throw new Error("Registration rate limit reached. Please wait a few moments or contact your administrator.");
+      }
+      throw new Error(supaErr.message || "Registration failed. Please review your details.");
+    }
+
+    if (supaSignUp?.user && Array.isArray(supaSignUp.user.identities) && supaSignUp.user.identities.length === 0) {
+      throw new Error("An account with this email address already exists. Please sign in instead.");
+    }
+
+    const authUserId = supaSignUp?.user?.id;
+
+    if (authUserId) {
+      // Create/link public.users profile
+      const userPayload = {
+        id: authUserId,
+        email,
+        full_name: name,
+        role,
+        status: 'pending'
+      };
+
+      try {
+        await supabase.from('users').insert([userPayload]);
+      } catch (userErr) {
+        console.warn('[AuthService] Exception during public.users insert:', userErr);
+      }
+
+      // Create role-specific record (students or faculty)
+      if (role === 'student') {
+        try {
+          const studentPayload = {
+            user_id: authUserId,
+            roll_number: identifier || null,
+            department_id: resolvedDeptId,
+            semester: userData.year ? Number(userData.year) * 2 - 1 : 1,
+            year: userData.year ? (isNaN(Number(userData.year)) ? userData.year : Number(userData.year)) : 1,
+            section: userData.section || 'A',
+            program: userData.program || 'B.Tech'
+          };
+          await supabase.from('students').insert([studentPayload]);
+        } catch (studentErr) {
+          console.warn('[AuthService] Exception during student record insert:', studentErr);
+        }
+      } else if (role === 'faculty') {
+        try {
+          const facultyPayload = {
+            user_id: authUserId,
+            employee_id: identifier || null,
+            department_id: resolvedDeptId,
+            designation: userData.designation || 'Assistant Professor'
+          };
+          await supabase.from('faculty').insert([facultyPayload]);
+        } catch (facultyErr) {
+          console.warn('[AuthService] Exception during faculty record insert:', facultyErr);
+        }
+      }
+    }
+
+    auditService.logAction({
+      user: name,
+      role,
+      userId: authUserId || identifier,
+      action: "Account Self-Registration",
+      resource: "/auth/register",
+      result: "Pending Approval",
+      details: `New [${role.toUpperCase()}] registered: ${name} (${email}). Awaiting Admin Approval.`
+    });
+
+    return {
+      name,
+      email,
+      role,
+      status: 'pending',
+      message: 'Registration submitted successfully. Your account is waiting for administrator approval.'
+    };
+  }
+
+  async logout() {
     const user = this.getCurrentUser();
+    if (isSupabaseConfigured() && supabase?.auth?.signOut) {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.warn('[AuthService] Supabase signOut error:', e);
+      }
+    }
     if (user) {
       auditService.logAction({
         user: user.name,
@@ -235,6 +651,7 @@ class AuthService {
       });
     }
     this.saveSession(null);
+    this.clearStaleStorage();
   }
 
   getCurrentSession() {
@@ -242,146 +659,31 @@ class AuthService {
   }
 
   getCurrentUser() {
-    if (!this.currentSession) return null;
-    return this.users.find(u => u.userId === this.currentSession.userId) || null;
-  }
-
-  getAllUsers() {
-    return [...this.users];
-  }
-
-  // Admin-Only User Provisioning
-  provisionUser(userData) {
-    const adminSession = this.getCurrentSession();
-    if (!adminSession || adminSession.role !== 'admin') {
-      auditService.logAction({
-        user: adminSession?.name || "Unknown",
-        role: adminSession?.role || "unauthorized",
-        userId: adminSession?.userId || "UNAUTH",
-        action: "Unauthorized Provisioning Attempt",
-        resource: "/admin/users/provision",
-        result: "Blocked (403)",
-        details: "Non-admin attempted to provision institutional credentials."
-      });
-      throw new Error("403 Forbidden: Only administrators are authorized to provision user accounts.");
-    }
-
-    const newUser = {
-      userId: userData.userId,
-      name: userData.name,
-      email: userData.email,
-      role: userData.role.toLowerCase(), // 'student' or 'faculty'
-      password: userData.temporaryPassword || `GMRIT@${Math.floor(1000 + Math.random() * 9000)}`,
-      department: userData.department || 'CSE',
-      program: userData.program || 'B.Tech',
-      year: userData.year || 'I Year',
-      section: userData.section || 'A',
-      semester: userData.semester || 1,
-      subjects: userData.subjects || [],
-      rollNumber: userData.role.toLowerCase() === 'student' ? userData.userId : undefined,
-      employeeId: userData.role.toLowerCase() === 'faculty' ? userData.userId : undefined,
-      avatar: userData.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-      isFirstLogin: true, // Requires mandatory password reset on first login
-      createdAt: new Date().toISOString(),
-      permissions: userData.role.toLowerCase() === 'student'
-        ? ["student:read", "syllabus:read", "pyq:read", "assessments:read", "assessments:submit", "performance:read", "rag:query"]
-        : ["faculty:read", "classes:manage", "students:monitor", "assessments:manage", "resources:upload", "analytics:read", "rag:query"]
+    if (!this.currentSession || !this.currentSession.role) return null;
+    return {
+      userId: this.currentSession.userId,
+      id: this.currentSession.userId,
+      name: this.currentSession.name,
+      email: this.currentSession.email,
+      role: this.currentSession.role,
+      status: 'Active'
     };
-
-    // Check duplicate
-    const exists = this.users.some(u => u.userId.toLowerCase() === newUser.userId.toLowerCase() || u.email.toLowerCase() === newUser.email.toLowerCase());
-    if (exists) {
-      throw new Error(`An account with User ID "${newUser.userId}" or Email "${newUser.email}" already exists.`);
-    }
-
-    this.users.unshift(newUser);
-    this.saveUsers();
-
-    auditService.logAction({
-      user: adminSession.name,
-      role: "admin",
-      userId: adminSession.userId,
-      action: "Account Provisioned",
-      resource: `/admin/users/${newUser.userId}`,
-      result: "Success",
-      details: `Provisioned new [${newUser.role.toUpperCase()}] account: ${newUser.name} (${newUser.userId}) with mandatory first-login password change.`
-    });
-
-    return newUser;
   }
 
-  // Mandatory First Login Password Reset
-  completeFirstLogin(userId, currentPassword, newPassword, profileUpdates = {}) {
-    const userIndex = this.users.findIndex(u => u.userId === userId);
-    if (userIndex === -1) {
-      throw new Error("Account not found.");
+  async getAllUsers() {
+    if (!isSupabaseConfigured()) {
+      return [];
     }
-
-    const user = this.users[userIndex];
-    if (user.password !== currentPassword) {
-      throw new Error("Temporary password does not match.");
+    try {
+      return await userManagementService.getAllUsers();
+    } catch (e) {
+      console.warn('[AuthService] Error fetching users from userManagementService:', e);
+      return [];
     }
-
-    if (!newPassword || newPassword.length < 8) {
-      throw new Error("New password must be at least 8 characters long.");
-    }
-
-    this.users[userIndex] = {
-      ...user,
-      ...profileUpdates,
-      password: newPassword,
-      isFirstLogin: false
-    };
-
-    this.saveUsers();
-
-    // Update active session
-    if (this.currentSession && this.currentSession.userId === userId) {
-      this.currentSession.name = this.users[userIndex].name;
-      this.saveSession(this.currentSession);
-    }
-
-    auditService.logAction({
-      user: user.name,
-      role: user.role,
-      userId: user.userId,
-      action: "First Login Password Reset",
-      resource: "/auth/first-login",
-      result: "Success",
-      details: "User successfully configured personal permanent password and completed onboarding."
-    });
-
-    return this.users[userIndex];
-  }
-
-  // Admin Reset Password
-  resetPassword(userId) {
-    const adminSession = this.getCurrentSession();
-    if (!adminSession || adminSession.role !== 'admin') {
-      throw new Error("403 Forbidden: Administrator access required.");
-    }
-
-    const userIndex = this.users.findIndex(u => u.userId === userId);
-    if (userIndex === -1) throw new Error("User not found.");
-
-    const tempPassword = `GMRIT@${Math.floor(1000 + Math.random() * 9000)}`;
-    this.users[userIndex].password = tempPassword;
-    this.users[userIndex].isFirstLogin = true;
-    this.saveUsers();
-
-    auditService.logAction({
-      user: adminSession.name,
-      role: "admin",
-      userId: adminSession.userId,
-      action: "Password Reset Triggered",
-      resource: `/admin/users/${userId}/reset`,
-      result: "Success",
-      details: `Generated temporary credentials for ${this.users[userIndex].name} (${userId}).`
-    });
-
-    return tempPassword;
   }
 }
 
 export const authService = new AuthService();
 export default authService;
+
+

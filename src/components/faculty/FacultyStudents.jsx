@@ -1,34 +1,72 @@
-import React, { useState } from 'react';
-import { facultyStudentRoster } from '../../data/mockData';
-import { Search, Filter, AlertTriangle, X, Send, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Search, Filter, AlertTriangle, X, Send, Sparkles, UserX, Users } from 'lucide-react';
+import academicDataService from '../../services/academicDataService';
+import authService from '../../services/authService';
+import useEscapeKey from '../../hooks/useEscapeKey';
+import useSafeTimeout from '../../hooks/useSafeTimeout';
+import EmptyState from '../common/EmptyState';
 
 export default function FacultyStudents({ onOpenRagQuery }) {
+  const [students, setStudents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filterAtRiskOnly, setFilterAtRiskOnly] = useState(false);
   const [sectionFilter, setSectionFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [counselingNote, setCounselingNote] = useState('');
   const [noteSent, setNoteSent] = useState(false);
+  const setSafeTimeout = useSafeTimeout();
 
-  const filteredStudents = facultyStudentRoster.filter(s => {
-    if (filterAtRiskOnly && !s.isAtRisk) return false;
-    if (sectionFilter !== 'All' && s.section !== sectionFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return s.name.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q);
+  useEscapeKey(() => {
+    setSelectedStudent(null);
+  }, Boolean(selectedStudent));
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStudents() {
+      setIsLoading(true);
+      try {
+        const res = await academicDataService.getStudents();
+        if (isMounted) {
+          setStudents(res?.data || []);
+        }
+      } catch (err) {
+        console.warn('Failed to load students:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
     }
-    return true;
-  });
+    loadStudents();
+    return () => { isMounted = false; };
+  }, []);
 
-  const handleSendNote = () => {
-    if (!counselingNote.trim()) return;
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      const name = (s.user?.full_name || s.name || '').toLowerCase();
+      const roll = (s.roll_number || s.rollNumber || s.user_id || '').toLowerCase();
+      const section = s.section || 'A';
+      
+      if (filterAtRiskOnly && !s.isAtRisk) return false;
+      if (sectionFilter !== 'All' && section !== sectionFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return name.includes(q) || roll.includes(q);
+      }
+      return true;
+    });
+  }, [students, filterAtRiskOnly, sectionFilter, searchQuery]);
+
+  const handleSendNote = useCallback(() => {
+    if (!counselingNote.trim() || !selectedStudent) return;
     setNoteSent(true);
-    setTimeout(() => {
+    const targetStudentName = selectedStudent.user?.full_name || selectedStudent.name || 'Student';
+    const targetRollNumber = selectedStudent.roll_number || selectedStudent.rollNumber || 'ID';
+    setSafeTimeout(() => {
       setNoteSent(false);
       setCounselingNote('');
-      alert(`Academic advisory note dispatched to ${selectedStudent.name} (${selectedStudent.rollNumber}).`);
+      alert(`Academic advisory note dispatched to ${targetStudentName} (${targetRollNumber}).`);
     }, 600);
-  };
+  }, [counselingNote, selectedStudent, setSafeTimeout]);
 
   return (
     <div className="page-content">
@@ -42,16 +80,16 @@ export default function FacultyStudents({ onOpenRagQuery }) {
         gap: '16px'
       }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' }}>
             Students Management
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+          <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
             Monitor student attendance, continuous marks, and assign interventions
           </p>
         </div>
 
         <button
-          onClick={() => onOpenRagQuery("Analyze at-risk students in Dr. Priya's class and suggest personalized remediation")}
+          onClick={() => onOpenRagQuery("Analyze student performance trends and suggest personalized remediation")}
           className="btn btn-primary"
         >
           <Sparkles size={14} />
@@ -72,7 +110,7 @@ export default function FacultyStudents({ onOpenRagQuery }) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ paddingLeft: '34px', paddingBlock: '7px' }}
               />
-              <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '10px' }} />
+              <Search size={15} color="var(--color-text)" style={{ position: 'absolute', left: '12px', top: '10px', opacity: 0.6 }} />
             </div>
 
             <select
@@ -82,8 +120,8 @@ export default function FacultyStudents({ onOpenRagQuery }) {
               style={{ width: '140px', paddingBlock: '7px' }}
             >
               <option value="All">All Sections</option>
-              <option value="CSE-A">Section A</option>
-              <option value="CSE-B">Section B</option>
+              <option value="A">Section A</option>
+              <option value="B">Section B</option>
             </select>
           </div>
 
@@ -91,7 +129,6 @@ export default function FacultyStudents({ onOpenRagQuery }) {
             <button
               onClick={() => setFilterAtRiskOnly(!filterAtRiskOnly)}
               className={`btn btn-sm ${filterAtRiskOnly ? 'btn-primary' : 'btn-secondary'}`}
-              style={filterAtRiskOnly ? { backgroundColor: 'var(--gmr-orange)', borderColor: 'var(--gmr-orange)' } : {}}
             >
               <AlertTriangle size={13} />
               <span>{filterAtRiskOnly ? 'Showing At-Risk Only' : 'Filter At-Risk'}</span>
@@ -107,75 +144,80 @@ export default function FacultyStudents({ onOpenRagQuery }) {
             <tr>
               <th>Student</th>
               <th>Roll Number</th>
-              <th>Attendance</th>
-              <th>Average</th>
-              <th>Assessments</th>
-              <th>Performance</th>
+              <th>Department</th>
+              <th>Year / Sem</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredStudents.map((std) => (
-              <tr key={std.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedStudent(std)}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      backgroundColor: std.isAtRisk ? 'var(--pastel-orange-bg)' : 'var(--pastel-blue-bg)',
-                      color: std.isAtRisk ? 'var(--gmr-orange)' : 'var(--primary-blue)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11.5px',
-                      fontWeight: 700
-                    }}>
-                      {std.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </div>
-                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{std.name}</span>
-                  </div>
-                </td>
-                <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>{std.rollNumber}</td>
-                <td>
-                  <span style={{
-                    fontWeight: 700,
-                    color: std.attendance >= 85 ? 'var(--success)' : std.attendance >= 75 ? 'var(--warning)' : 'var(--error)',
-                    fontFamily: 'JetBrains Mono, monospace'
-                  }}>
-                    {std.attendance}%
-                  </span>
-                </td>
-                <td>
-                  <strong style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-primary)' }}>
-                    {std.averageMarks}%
-                  </strong>
-                </td>
-                <td>{std.assessments}</td>
-                <td>
-                  <span className={`badge ${
-                    std.performance === 'Excellent' ? 'badge-blue' :
-                    std.performance === 'Good' ? 'badge-green' : 'badge-orange'
-                  }`}>
-                    {std.performance}
-                  </span>
-                </td>
-                <td>
-                  <span style={{ fontSize: '12px', color: std.isAtRisk ? 'var(--gmr-orange)' : 'var(--text-muted)', fontWeight: std.isAtRisk ? 600 : 400 }}>
-                    {std.status}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectedStudent(std); }}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    View
-                  </button>
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text)' }}>
+                  Loading enrolled students...
                 </td>
               </tr>
-            ))}
+            ) : filteredStudents.length === 0 ? (
+              <EmptyState
+                icon={UserX}
+                title="No Students Found"
+                message="No enrolled students match your search query or selected filters."
+                isTableRow={true}
+                colSpan={6}
+                actionText="Reset Filters"
+                onAction={() => {
+                  setFilterAtRiskOnly(false);
+                  setSectionFilter('All');
+                  setSearchQuery('');
+                }}
+              />
+            ) : (
+              filteredStudents.map((std) => {
+                const stdName = std.user?.full_name || std.name || 'Student';
+                const roll = std.roll_number || std.rollNumber || std.user_id || '—';
+                const initials = stdName.split(' ').map(n => n[0]).join('').slice(0, 2);
+                return (
+                  <tr key={std.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedStudent(std)}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--color-bg)',
+                          border: '1px solid var(--color-border)',
+                          color: 'var(--color-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11.5px',
+                          fontWeight: 700
+                        }}>
+                          {initials}
+                        </div>
+                        <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>{stdName}</span>
+                      </div>
+                    </td>
+                    <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>{roll}</td>
+                    <td>{std.department?.name || std.department_name || 'CSE'}</td>
+                    <td>{std.academic_year || 'III Year'} • Sem {std.current_semester || '5'}</td>
+                    <td>
+                      <span className="badge badge-green">
+                        Active
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedStudent(std); }}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -186,49 +228,30 @@ export default function FacultyStudents({ onOpenRagQuery }) {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {selectedStudent.name}
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
+                  {selectedStudent.user?.full_name || selectedStudent.name || 'Student Profile'}
                 </h3>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  {selectedStudent.rollNumber} • {selectedStudent.section}
+                <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>
+                  {selectedStudent.roll_number || selectedStudent.rollNumber || '—'} • {selectedStudent.department?.name || 'Computer Science & Engineering'}
                 </p>
               </div>
-              <button onClick={() => setSelectedStudent(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button onClick={() => setSelectedStudent(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <div className="modal-body">
-              {selectedStudent.isAtRisk && (
-                <div style={{
-                  padding: '12px 14px',
-                  backgroundColor: 'var(--pastel-orange-bg)',
-                  border: '1px solid var(--pastel-orange-border)',
-                  borderRadius: 'var(--radius-md)',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <AlertTriangle size={18} color="var(--gmr-orange)" />
-                  <div>
-                    <strong style={{ fontSize: '12.5px', color: 'var(--gmr-orange)' }}>At-Risk Notice</strong>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{selectedStudent.riskReason}</p>
-                  </div>
-                </div>
-              )}
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
-                <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ATTENDANCE</span>
-                  <p style={{ fontSize: '18px', fontWeight: 800, color: selectedStudent.attendance >= 75 ? 'var(--success)' : 'var(--error)' }}>
-                    {selectedStudent.attendance}%
+                <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>ACADEMIC YEAR</span>
+                  <p style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
+                    {selectedStudent.academic_year || 'III Year'}
                   </p>
                 </div>
-                <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AVERAGE MARKS</span>
-                  <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--primary-blue)' }}>
-                    {selectedStudent.averageMarks}%
+                <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>CURRENT SEMESTER</span>
+                  <p style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-primary)' }}>
+                    Semester {selectedStudent.current_semester || '5'}
                   </p>
                 </div>
               </div>
@@ -238,7 +261,7 @@ export default function FacultyStudents({ onOpenRagQuery }) {
                 <textarea
                   className="input-field"
                   rows={3}
-                  placeholder={`Write an advisory note or remedial assignment for ${selectedStudent.name}...`}
+                  placeholder={`Write an advisory note or remedial assignment for ${selectedStudent.user?.full_name || selectedStudent.name || 'this student'}...`}
                   value={counselingNote}
                   onChange={(e) => setCounselingNote(e.target.value)}
                 />

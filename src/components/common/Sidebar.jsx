@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import GmritLogo from './GmritLogo';
 import {
   LayoutDashboard,
@@ -19,6 +19,7 @@ import {
   Sliders,
   LogOut,
   GraduationCap,
+  Award,
   Shield,
   ShieldAlert,
   Code2,
@@ -33,14 +34,12 @@ export default function Sidebar({
   onOpenRag,
   currentUser
 }) {
-  const getNavItems = () => {
+  const navItems = useMemo(() => {
     switch (activeRole) {
       case 'student':
         return [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'subjects', label: 'My Subjects', icon: BookOpen },
-          { id: 'syllabus', label: 'Syllabus', icon: FileText },
-          { id: 'pyqs', label: 'PYQs', icon: HelpCircle },
           { id: 'assessments', label: 'Assessments', icon: CheckSquare },
           { id: 'coding-practice', label: 'Coding Practice', icon: Code2 },
           { id: 'coding-assessments', label: 'Coding Assessments', icon: Terminal },
@@ -54,10 +53,7 @@ export default function Sidebar({
           { id: 'classes', label: 'My Classes', icon: Layers },
           { id: 'students', label: 'Students', icon: Users },
           { id: 'assessments', label: 'Assessments', icon: CheckSquare },
-          { id: 'coding-practice', label: 'Coding Practice', icon: Code2 },
           { id: 'coding-assessments', label: 'Coding Assessments', icon: Terminal },
-          { id: 'performance', label: 'Performance', icon: BarChart2 },
-          { id: 'syllabus', label: 'Syllabus', icon: FileText },
           { id: 'resources', label: 'Resources', icon: FolderArchive },
           { id: 'analytics', label: 'Analytics', icon: Activity }
         ];
@@ -69,26 +65,24 @@ export default function Sidebar({
           { id: 'pyqs', label: 'PYQ Management', icon: HelpCircle },
           { id: 'coding-management', label: 'Coding Management', icon: Code2 },
           { id: 'rag-base', label: 'RAG Knowledge Base', icon: Cpu },
-          { id: 'rag-settings', label: 'RAG Settings', icon: Sliders },
-          { id: 'analytics', label: 'Admin Analytics', icon: BarChart2 },
+          { id: 'rag-settings', label: 'RAG Vector Settings', icon: Sliders },
+          { id: 'analytics', label: 'System Analytics', icon: BarChart2 },
           { id: 'audit-logs', label: 'Security Audit Logs', icon: ShieldAlert },
           { id: 'settings', label: 'System Settings', icon: Settings }
         ];
       default:
         return [];
     }
-  };
-
-  const navItems = getNavItems();
+  }, [activeRole]);
 
   const roleThemeBg = activeRole === 'student' ? 'var(--pastel-blue-bg)' : activeRole === 'faculty' ? 'var(--pastel-green-bg)' : 'var(--pastel-purple-bg)';
   const roleThemeBorder = activeRole === 'student' ? 'var(--pastel-blue-border)' : activeRole === 'faculty' ? 'var(--pastel-green-border)' : 'var(--pastel-purple-border)';
   const roleThemeColor = activeRole === 'student' ? 'var(--primary-blue)' : activeRole === 'faculty' ? 'var(--pastel-green-text)' : 'var(--pastel-purple-text)';
   const roleLabel = activeRole === 'student' ? 'Student' : activeRole === 'faculty' ? 'Faculty' : 'Admin';
 
-  const displayName = currentUser?.name || (activeRole === 'admin' ? 'System Administrator' : activeRole === 'faculty' ? 'Dr. Priya Sharma' : 'Rahul Kumar');
-  const displayEmail = currentUser?.email || (activeRole === 'admin' ? 'admin@gmrit.edu.in' : activeRole === 'faculty' ? 'faculty@gmrit.edu.in' : 'student@gmrit.edu.in');
-  const displayAvatar = currentUser?.avatar || (activeRole === 'admin' ? 'SA' : activeRole === 'faculty' ? 'PS' : 'RK');
+  const displayName = currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : 'User');
+  const displayEmail = currentUser?.email || '';
+  const displayAvatar = currentUser?.avatar || (displayName ? displayName.slice(0, 2).toUpperCase() : 'U');
 
   return (
     <aside className="sidebar">
@@ -133,7 +127,16 @@ export default function Sidebar({
           return (
             <div
               key={item.id}
+              role="button"
+              tabIndex={0}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => onNavigate(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onNavigate(item.id);
+                }
+              }}
               className={`nav-item ${isActive ? 'active' : ''}`}
             >
               <Icon size={16} color={isActive ? 'var(--primary-blue)' : 'var(--text-secondary)'} />
@@ -149,7 +152,16 @@ export default function Sidebar({
 
         {/* AI Assistant shortcut */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="Open GMRIT AI Assistant"
           onClick={onOpenRag}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenRag();
+            }
+          }}
           className="nav-item"
           style={{
             color: 'var(--pastel-blue-text)',
@@ -174,7 +186,16 @@ export default function Sidebar({
         </div>
 
         <div
+          role="button"
+          tabIndex={0}
+          aria-current={currentView === 'settings' ? 'page' : undefined}
           onClick={() => onNavigate('settings')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigate('settings');
+            }
+          }}
           className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
         >
           <Settings size={16} color="var(--text-secondary)" />
@@ -182,7 +203,15 @@ export default function Sidebar({
         </div>
 
         <div
+          role="button"
+          tabIndex={0}
           onClick={() => alert("GMRIT Academic Helpdesk: helpdesk@gmrit.edu.in • Ext: 4402")}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              alert("GMRIT Academic Helpdesk: helpdesk@gmrit.edu.in • Ext: 4402");
+            }
+          }}
           className="nav-item"
         >
           <LifeBuoy size={16} color="var(--text-secondary)" />

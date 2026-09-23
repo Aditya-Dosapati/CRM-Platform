@@ -12,8 +12,11 @@ import {
   FileCheck,
   ChevronRight
 } from 'lucide-react';
+import useEscapeKey from '../../hooks/useEscapeKey.js';
 
 export default function CodingAssessmentResultModal({ assessment, onClose }) {
+  useEscapeKey(onClose, Boolean(assessment));
+
   if (!assessment) return null;
 
   const score = assessment.score ?? 82;

@@ -1,23 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart2, TrendingUp, Cpu, Users, Building, Activity, Sparkles, FileText, CheckCircle2 } from 'lucide-react';
+import academicDataService from '../../services/academicDataService';
+import ragDocumentService from '../../services/ragDocumentService';
+import authService from '../../services/authService';
+import EmptyState from '../common/EmptyState';
 
 export default function AdminAnalytics({ onOpenRagQuery }) {
-  const deptStats = [
-    { name: 'CSE', students: 2480, avgMarks: 81.2, att: 89.4, aiQueries: 14200 },
-    { name: 'IT', students: 1240, avgMarks: 79.8, att: 88.2, aiQueries: 8400 },
-    { name: 'ECE', students: 1820, avgMarks: 77.4, att: 86.8, aiQueries: 9100 },
-    { name: 'EEE', students: 1100, avgMarks: 75.2, att: 85.0, aiQueries: 5200 },
-    { name: 'MECH', students: 980, avgMarks: 73.8, att: 84.6, aiQueries: 3800 },
-    { name: 'CIVIL', students: 872, avgMarks: 74.5, att: 85.2, aiQueries: 3100 }
-  ];
+  const [departments, setDepartments] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const topRagDocs = [
-    { doc: 'GMRIT_R20_CSE_ML_Unit3.pdf', subject: 'Machine Learning', queries: 2840, citedRatio: '94%' },
-    { doc: 'GMRIT_DBMS_SEE_2025_AnswerKey.pdf', subject: 'DBMS', queries: 2180, citedRatio: '91%' },
-    { doc: 'DSA_AVL_Trees_Prof_Ramesh.pdf', subject: 'Data Structures', queries: 1950, citedRatio: '88%' },
-    { doc: 'OS_VirtualMemory_Paging.pdf', subject: 'Operating Systems', queries: 1620, citedRatio: '84%' },
-    { doc: 'CN_SocketProgramming_Lab.pdf', subject: 'Computer Networks', queries: 1340, citedRatio: '82%' }
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const [deptRes, docRes, userList] = await Promise.all([
+          academicDataService.getDepartments(),
+          ragDocumentService.getDocuments(),
+          Promise.resolve(authService.getAllUsers())
+        ]);
+        if (isMounted) {
+          setDepartments(deptRes?.data || []);
+          setDocuments(docRes?.data || []);
+          setUsers(Array.isArray(userList) ? userList : []);
+        }
+      } catch (err) {
+        console.warn('Error loading admin analytics:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    loadData();
+    return () => { isMounted = false; };
+  }, []);
+
+  const studentCount = users.filter(u => u.role === 'student').length;
+  const facultyCount = users.filter(u => u.role === 'faculty').length;
+  const indexedDocs = documents.filter(d => (d.rawStatus || d.status) === 'indexed');
 
   return (
     <div className="page-content">
@@ -31,16 +52,16 @@ export default function AdminAnalytics({ onOpenRagQuery }) {
         gap: '16px'
       }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.5px' }}>
             Institution-Level Academic & AI Telemetry
           </h1>
-          <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+          <p style={{ fontSize: '13.5px', color: 'var(--color-text)', opacity: 0.75, marginTop: '4px' }}>
             Cross-departmental performance metrics, RAG semantic utilization, and campus learning velocity
           </p>
         </div>
 
         <button
-          onClick={() => onOpenRagQuery("Synthesize an institution-wide academic diagnostic across all 6 engineering departments")}
+          onClick={() => onOpenRagQuery("Synthesize an institution-wide academic diagnostic across engineering departments")}
           className="btn btn-primary"
         >
           <Sparkles size={15} />
@@ -48,50 +69,114 @@ export default function AdminAnalytics({ onOpenRagQuery }) {
         </button>
       </div>
 
-      {/* Pastel KPI Cards - Compact & Vibrant */}
+      {/* KPI Cards - 6-Color System */}
       <div className="kpi-grid" style={{ marginBottom: '20px' }}>
-        <div className="kpi-card kpi-blue">
-          <div className="kpi-top">
-            <span className="kpi-label">TOTAL STUDENTS</span>
-            <div className="kpi-icon-wrap">
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              TOTAL ENROLLED STUDENTS
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               <Users size={16} />
             </div>
           </div>
-          <div className="kpi-value">8,492</div>
-          <div className="kpi-trend neutral">Across 6 B.Tech Depts</div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)' }}>
+            {isLoading ? '...' : studentCount}
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px' }}>
+            Across {departments.length} Engineering Depts
+          </div>
         </div>
 
-        <div className="kpi-card kpi-green">
-          <div className="kpi-top">
-            <span className="kpi-label">CAMPUS ATTENDANCE</span>
-            <div className="kpi-icon-wrap">
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              TEACHING FACULTY
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value" style={{ color: '#059669' }}>87.1%</div>
-          <div className="kpi-trend positive">↑ 1.4% vs last semester</div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)' }}>
+            {isLoading ? '...' : facultyCount}
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px' }}>
+            Active Faculty Accounts
+          </div>
         </div>
 
-        <div className="kpi-card kpi-purple">
-          <div className="kpi-top">
-            <span className="kpi-label">MONTHLY AI QUERIES</span>
-            <div className="kpi-icon-wrap">
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              RAG VECTOR ASSETS
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               <Cpu size={16} />
             </div>
           </div>
-          <div className="kpi-value" style={{ color: '#7C3AED' }}>43,800</div>
-          <div className="kpi-trend neutral" style={{ color: '#7C3AED' }}>↑ 34% Student Adoption</div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)' }}>
+            {isLoading ? '...' : indexedDocs.length}
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px' }}>
+            Indexed Knowledge Documents
+          </div>
         </div>
 
-        <div className="kpi-card kpi-orange">
-          <div className="kpi-top">
-            <span className="kpi-label">ASSESSMENT COMPLETION</span>
-            <div className="kpi-icon-wrap">
+        <div className="card" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              DEPARTMENTS ACTIVE
+            </span>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               <CheckCircle2 size={16} />
             </div>
           </div>
-          <div className="kpi-value">93.4%</div>
-          <div className="kpi-trend neutral">Across all CIE Quizzes</div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)' }}>
+            {isLoading ? '...' : departments.length}
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px' }}>
+            Autonomous Regulations
+          </div>
         </div>
       </div>
 
@@ -107,97 +192,90 @@ export default function AdminAnalytics({ onOpenRagQuery }) {
           <div className="card-header">
             <div>
               <h3 className="card-title">
-                <Building size={16} color="var(--primary-blue)" />
-                <span>Department Performance & RAG Utilization</span>
+                <Building size={16} color="var(--color-primary)" />
+                <span>Academic Departments</span>
               </h3>
-              <p className="card-subtitle">Comparing academic marks against AI engagement</p>
+              <p className="card-subtitle">Active academic department directory</p>
             </div>
-            <span className="badge badge-blue">6 Departments</span>
+            <span className="badge badge-blue">{departments.length} Departments</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-            {deptStats.map((d, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{d.name}</span>
-                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>({d.students} Students)</span>
+          {departments.length === 0 ? (
+            <div style={{ padding: '20px' }}>
+              <EmptyState
+                icon={Building}
+                title="No Departments Configured"
+                message="No academic department records found in database."
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+              {departments.map((d) => (
+                <div key={d.id} style={{
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <span style={{ fontWeight: 700, color: 'var(--color-text)', fontSize: '13.5px' }}>{d.name}</span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.6, display: 'block' }}>Code: {d.code}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--primary-blue)', fontWeight: 600 }}>{d.aiQueries.toLocaleString()} AI Queries</span>
-                    <strong style={{ color: d.avgMarks >= 80 ? 'var(--primary-blue)' : '#059669', fontFamily: 'JetBrains Mono, monospace' }}>
-                      {d.avgMarks}% Avg
-                    </strong>
-                  </div>
+                  <span className="badge badge-purple">Active</span>
                 </div>
-
-                <div className="progress-bar-container" style={{ height: '8px', background: '#F1F5F9', borderRadius: '4px' }}>
-                  <div
-                    className="progress-bar-fill"
-                    style={{
-                      width: `${d.avgMarks}%`,
-                      background: d.name === 'CSE' ? 'linear-gradient(90deg, #2563EB, #60A5FA)' : 'linear-gradient(90deg, #3B82F6, #10B981)',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* AI Query Velocity Over Time */}
+        {/* Vector DB Architecture Info */}
         <div className="card" style={{ gridColumn: 'span 5' }}>
           <div className="card-header">
             <div>
               <h3 className="card-title">
-                <Activity size={16} color="var(--purple)" />
-                <span>AI Queries Over Time (Weekly)</span>
+                <Activity size={16} color="var(--color-accent)" />
+                <span>Vector DB Pipeline Telemetry</span>
               </h3>
-              <p className="card-subtitle">Surges correlate with Mid Exam schedules</p>
+              <p className="card-subtitle">pgvector embeddings & RLS storage policies</p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '140px', padding: '20px 10px 0', borderBottom: '1px solid var(--border-light)' }}>
-            {[
-              { week: 'W1', queries: 4800, ht: 40 },
-              { week: 'W2', queries: 6200, ht: 55 },
-              { week: 'W3 (Mid 1)', queries: 14200, ht: 110, peak: true },
-              { week: 'W4', queries: 7400, ht: 65 },
-              { week: 'W5 (Current)', queries: 11200, ht: 95 }
-            ].map((w, wIdx) => (
-              <div key={wIdx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: w.peak ? 'var(--primary-blue)' : 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {(w.queries / 1000).toFixed(1)}k
-                </span>
-                <div style={{
-                  width: '32px',
-                  height: `${w.ht}px`,
-                  background: w.peak ? 'linear-gradient(180deg, #2563EB, #60A5FA)' : 'linear-gradient(180deg, #8B5CF6, #C4B5FD)',
-                  borderRadius: '6px 6px 0 0',
-                  boxShadow: w.peak ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none'
-                }} />
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{w.week}</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '14px' }}>
+            <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>EMBEDDING MODEL</span>
+              <p style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-text)', marginTop: '2px' }}>
+                intfloat/multilingual-e5-small (384 dim)
+              </p>
+            </div>
+            <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>STORAGE BUCKET</span>
+              <p style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '2px' }}>
+                rag-documents (Private, Strict RLS)
+              </p>
+            </div>
+            <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>SEARCH RPC</span>
+              <p style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-text)', marginTop: '2px' }}>
+                match_rag_chunks() (Cosine Distance)
+              </p>
+            </div>
           </div>
-
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '14px', lineHeight: 1.4 }}>
-            Peak surge of 14,200 queries during Mid 1 exam week. 0 downtime recorded on Qdrant cluster.
-          </p>
         </div>
       </div>
 
-      {/* Top Queried RAG Documents */}
+      {/* Queried RAG Documents */}
       <div className="card">
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <FileText size={18} color="var(--primary-blue)" />
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Most Queried Knowledge Documents & Citation Grounding
+            <FileText size={18} color="var(--color-primary)" />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)' }}>
+              RAG Knowledge Assets Repository
             </h3>
           </div>
-          <span className="badge badge-blue">RAG Metrics</span>
+          <span className="badge badge-blue">{documents.length} Total Documents</span>
         </div>
 
         <div className="table-container">
@@ -206,27 +284,39 @@ export default function AdminAnalytics({ onOpenRagQuery }) {
               <tr>
                 <th>Document Name</th>
                 <th>Subject</th>
-                <th>Monthly Queries</th>
-                <th>Citation Grounding Accuracy</th>
+                <th>Type</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {topRagDocs.map((doc, idx) => (
-                <tr key={idx}>
-                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{doc.doc}</td>
-                  <td>{doc.subject}</td>
-                  <td style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--primary-blue)', fontWeight: 600 }}>
-                    {doc.queries.toLocaleString()} times
-                  </td>
-                  <td>
-                    <span className="badge badge-green">{doc.citedRatio} Accuracy</span>
-                  </td>
-                  <td>
-                    <span className="badge badge-blue">Active Vector</span>
-                  </td>
-                </tr>
-              ))}
+              {documents.length === 0 ? (
+                <EmptyState
+                  icon={FileText}
+                  title="No Documents Registered"
+                  message="No knowledge documents currently ingested in RAG vector database."
+                  isTableRow={true}
+                  colSpan={4}
+                />
+              ) : (
+                documents.map((doc) => (
+                  <tr key={doc.id}>
+                    <td style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                      {doc.title || doc.document || doc.fileName}
+                    </td>
+                    <td>{doc.subject || 'Institutional'}</td>
+                    <td>
+                      <span className="badge badge-purple" style={{ textTransform: 'capitalize' }}>
+                        {doc.documentType || 'Document'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge badge-green">
+                        {doc.status || 'Active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

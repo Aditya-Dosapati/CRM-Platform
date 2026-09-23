@@ -17,7 +17,11 @@ class CodeExecutionService {
     await new Promise(r => setTimeout(r, 380));
 
     let problemId, language, code;
-    if (typeof arg1 === 'string' && (arg1.startsWith('prob-') || codingProblemsList.some(p => p.id === arg1))) {
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      code = arg1.code || '';
+      language = arg1.language || 'python';
+      problemId = arg1.problemId || 'prob-1';
+    } else if (typeof arg1 === 'string' && (arg1.startsWith('prob-') || codingProblemsList.some(p => p.id === arg1))) {
       problemId = arg1;
       language = arg2 || 'python';
       code = arg3 || '';
@@ -65,6 +69,26 @@ class CodeExecutionService {
       };
     }
 
+    // SQL syntax check for MySQL and Oracle
+    if (language === 'mysql' || language === 'oracle') {
+      const upperCode = cleanCode.toUpperCase();
+      const hasSqlKeyword = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH', 'CREATE', 'ALTER', 'SHOW', 'DESC'].some(k => upperCode.includes(k));
+      if (!hasSqlKeyword) {
+        const errOutput = `[${language.toUpperCase()} Engine] Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your ${language === 'mysql' ? 'MySQL' : 'Oracle'} server version.`;
+        return {
+          status: 'Syntax Error',
+          compilerOutput: errOutput,
+          compileOutput: errOutput,
+          testResults: [],
+          testCasesResults: [],
+          allPassed: false,
+          totalTime: '18 ms',
+          executionTime: '18 ms',
+          totalMemory: '22 MB'
+        };
+      }
+    }
+
     // Time Limit Exceeded check for intentional infinite loops
     if (cleanCode.includes('while True:') || cleanCode.includes('while(true)') || cleanCode.includes('while (1)')) {
       if (!cleanCode.includes('break') && !cleanCode.includes('return')) {
@@ -109,8 +133,8 @@ class CodeExecutionService {
 
     return {
       status: allPassed ? 'Accepted' : 'Wrong Answer',
-      compilerOutput: '',
-      compileOutput: '',
+      compilerOutput: language === 'mysql' || language === 'oracle' ? `Query executed successfully. 4 rows affected (${totalRuntime} ms).` : '',
+      compileOutput: language === 'mysql' || language === 'oracle' ? `Query executed successfully. 4 rows affected (${totalRuntime} ms).` : '',
       testResults,
       testCasesResults: testResults,
       allPassed,

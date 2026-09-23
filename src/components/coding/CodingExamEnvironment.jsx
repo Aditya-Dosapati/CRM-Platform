@@ -38,15 +38,25 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   const activeProblem = examQuestions[currentQuestionIndex] || codingProblemsList[0];
 
   // Allowed languages
-  const allowedLanguages = assessment?.allowedLanguages || ['Python', 'C++', 'Java', 'C'];
-  const initialLang = allowedLanguages.includes('Python') ? 'python' : allowedLanguages[0]?.toLowerCase() || 'python';
-  const [selectedLanguage, setSelectedLanguage] = useState(initialLang);
+  const allowedLanguages = assessment?.allowedLanguages || ['Python', 'C++', 'Java', 'C', 'JavaScript', 'MySQL', 'Oracle'];
+  const defaultInitialLang = allowedLanguages.includes('Python') ? 'python' : allowedLanguages[0]?.toLowerCase() || 'python';
+
+  // Per-question language selections
+  const [questionLanguages, setQuestionLanguages] = useState(() => {
+    const initial = {};
+    examQuestions.forEach((q) => {
+      initial[q.id] = defaultInitialLang;
+    });
+    return initial;
+  });
+
+  const selectedLanguage = questionLanguages[activeProblem.id] || defaultInitialLang;
 
   // Per-question code states & answered status
   const [questionCodes, setQuestionCodes] = useState(() => {
     const initial = {};
-    examQuestions.forEach((q, idx) => {
-      initial[q.id] = q.starterCode?.[initialLang] || `// Solution for ${q.title}\n`;
+    examQuestions.forEach((q) => {
+      initial[q.id] = q.starterCode?.[defaultInitialLang] || `// Solution for ${q.title}\n`;
     });
     return initial;
   });
@@ -55,9 +65,10 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   const [lastSavedTime, setLastSavedTime] = useState('Just now');
   const [activeBottomTab, setActiveBottomTab] = useState('tests'); // 'tests' | 'output'
 
-  // Execution states
+  // Per-question execution results
   const [isRunning, setIsRunning] = useState(false);
-  const [executionResult, setExecutionResult] = useState(null);
+  const [executionResultsByQuestion, setExecutionResultsByQuestion] = useState({});
+  const executionResult = executionResultsByQuestion[activeProblem.id] || null;
   const [activeTestCaseTab, setActiveTestCaseTab] = useState(0);
 
   // Countdown timer in seconds (e.g. 90 mins = 5400s)
@@ -105,7 +116,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const currentCode = questionCodes[activeProblem.id] || activeProblem.starterCode?.[selectedLanguage] || '';
+  const currentCode = questionCodes[activeProblem.id] ?? (activeProblem.starterCode?.[selectedLanguage] || '');
 
   const handleCodeChange = (newCode) => {
     setQuestionCodes(prev => ({
@@ -115,12 +126,20 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   };
 
   const handleLanguageChange = (newLang) => {
-    setSelectedLanguage(newLang);
-    const starter = activeProblem.starterCode?.[newLang] || `// Code for ${activeProblem.title} in ${newLang}\n`;
+    setQuestionLanguages(prev => ({
+      ...prev,
+      [activeProblem.id]: newLang
+    }));
+    const starter = activeProblem.starterCode?.[newLang] || `// Solution for ${activeProblem.title} in ${newLang}\n`;
     setQuestionCodes(prev => ({
       ...prev,
       [activeProblem.id]: starter
     }));
+  };
+
+  const handleQuestionSwitch = (newIdx) => {
+    setCurrentQuestionIndex(newIdx);
+    setActiveTestCaseTab(0);
   };
 
   const handleSaveQuestion = () => {
@@ -146,13 +165,19 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
         selectedLanguage,
         currentCode
       );
-      setExecutionResult(res);
+      setExecutionResultsByQuestion(prev => ({
+        ...prev,
+        [activeProblem.id]: res
+      }));
     } catch (e) {
-      setExecutionResult({
-        status: 'Compilation Error',
-        compileOutput: 'Internal execution error.',
-        testCasesResults: []
-      });
+      setExecutionResultsByQuestion(prev => ({
+        ...prev,
+        [activeProblem.id]: {
+          status: 'Compilation Error',
+          compileOutput: 'Internal execution error.',
+          testCasesResults: []
+        }
+      }));
     } finally {
       setIsRunning(false);
     }
@@ -260,7 +285,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
               return (
                 <button
                   key={q.id}
-                  onClick={() => setCurrentQuestionIndex(idx)}
+                  onClick={() => handleQuestionSwitch(idx)}
                   style={{
                     width: '36px',
                     height: '32px',
@@ -523,7 +548,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
             }}
           >
             <button
-              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+              onClick={() => handleQuestionSwitch(Math.max(0, currentQuestionIndex - 1))}
               disabled={currentQuestionIndex === 0}
               style={{
                 display: 'flex',
@@ -545,7 +570,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
               Q{currentQuestionIndex + 1} of {examQuestions.length}
             </span>
             <button
-              onClick={() => setCurrentQuestionIndex(prev => Math.min(examQuestions.length - 1, prev + 1))}
+              onClick={() => handleQuestionSwitch(Math.min(examQuestions.length - 1, currentQuestionIndex + 1))}
               disabled={currentQuestionIndex === examQuestions.length - 1}
               style={{
                 display: 'flex',

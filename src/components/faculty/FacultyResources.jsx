@@ -1,40 +1,55 @@
-import React, { useState } from 'react';
-import { facultyResourcesList } from '../../data/mockData';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FolderArchive, Plus, FileText, Download, Trash2, Edit3, CheckCircle2, X, Upload } from 'lucide-react';
+import ragDocumentService from '../../services/ragDocumentService';
+import academicDataService from '../../services/academicDataService';
+import useEscapeKey from '../../hooks/useEscapeKey';
+import EmptyState from '../common/EmptyState';
 
 export default function FacultyResources({ onOpenPdf }) {
-  const [resources, setResources] = useState(facultyResourcesList);
+  const [resources, setResources] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [subjects, setSubjects] = useState([]);
+
+  useEscapeKey(() => setShowUploadModal(false), showUploadModal);
 
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('Machine Learning');
-  const [unit, setUnit] = useState('Unit III');
-  const [fileType, setFileType] = useState('PDF Document');
-  const [visibility, setVisibility] = useState('Public to Students');
+  const [subjectId, setSubjectId] = useState('');
+  const [fileType, setFileType] = useState('notes');
 
-  const handleUpload = (e) => {
-    e.preventDefault();
-    const newRes = {
-      id: `res_${Date.now()}`,
-      title,
-      subject,
-      unit,
-      fileType,
-      size: '3.4 MB',
-      uploadedDate: 'Just now',
-      visibility,
-      ragStatus: 'Indexed (56 chunks)',
-      downloads: 0
-    };
-    setResources([newRes, ...resources]);
-    setShowUploadModal(false);
-    setTitle('');
-    alert(`Resource "${title}" successfully uploaded and vectorized into GMRIT RAG Knowledge Base.`);
-  };
+  const loadResources = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [resData, subData] = await Promise.all([
+        ragDocumentService.getDocuments(),
+        academicDataService.getSubjects()
+      ]);
+      setResources(resData?.data || []);
+      const subs = subData?.data || [];
+      setSubjects(subs);
+      if (subs.length > 0 && !subjectId) {
+        setSubjectId(subs[0].id);
+      }
+    } catch (e) {
+      console.warn('Error loading faculty resources:', e);
+      setResources([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [subjectId]);
 
-  const handleDelete = (id) => {
-    if (confirm("Delete this academic resource from course repository and RAG index?")) {
-      setResources(resources.filter(r => r.id !== id));
+  useEffect(() => {
+    loadResources();
+  }, [loadResources]);
+
+  const handleDelete = async (doc) => {
+    if (confirm(`Delete "${doc.title || doc.document || 'resource'}" from course repository?`)) {
+      try {
+        await ragDocumentService.deleteDocument(doc.id, doc.storagePath);
+        setResources(prev => prev.filter(r => r.id !== doc.id));
+      } catch (err) {
+        alert(`Failed to delete resource: ${err.message}`);
+      }
     }
   };
 
@@ -50,10 +65,10 @@ export default function FacultyResources({ onOpenPdf }) {
         gap: '16px'
       }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' }}>
             Faculty Resources
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+          <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
             Upload and manage lecture notes, handouts, PYQs, and reference PDFs
           </p>
         </div>
@@ -70,170 +85,137 @@ export default function FacultyResources({ onOpenPdf }) {
           <thead>
             <tr>
               <th>Resource Name</th>
-              <th>Subject & Unit</th>
-              <th>Type</th>
-              <th>Uploaded Date</th>
-              <th>Visibility</th>
-              <th>RAG Status</th>
+              <th>Subject</th>
+              <th>Document Type</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {resources.map((res) => (
-              <tr key={res.id}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'var(--pastel-blue-bg)',
-                      color: 'var(--primary-blue)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <FileText size={16} />
-                    </div>
-                    <div>
-                      <span style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>{res.title}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{res.size} • {res.downloads} Downloads</span>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span style={{ fontWeight: 600 }}>{res.subject}</span>
-                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'block' }}>{res.unit}</span>
-                </td>
-                <td>{res.fileType}</td>
-                <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{res.uploadedDate}</td>
-                <td>
-                  <span className="badge badge-green">{res.visibility}</span>
-                </td>
-                <td>
-                  <span className="badge badge-blue">
-                    <CheckCircle2 size={11} />
-                    {res.ragStatus}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      onClick={() => onOpenPdf({ title: res.title, doc: `${res.title.replace(/\s+/g, '_')}.pdf`, page: 1 })}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => handleDelete(res.id)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ color: 'var(--error)' }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text)' }}>
+                  Loading academic resources...
                 </td>
               </tr>
-            ))}
+            ) : resources.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No Academic Resources"
+                message="No lecture notes or course resources have been uploaded yet. Click '+ Upload Resource' to add one."
+                isTableRow={true}
+                colSpan={5}
+                actionText="Upload Resource"
+                onAction={() => setShowUploadModal(true)}
+              />
+            ) : (
+              resources.map((res) => (
+                <tr key={res.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <FileText size={16} />
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 700, color: 'var(--color-text)', display: 'block' }}>
+                          {res.title || res.document || res.fileName}
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6 }}>
+                          {res.fileName || 'document.pdf'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span style={{ fontWeight: 600 }}>{res.subject || 'Academic Resource'}</span>
+                  </td>
+                  <td>
+                    <span className="badge badge-purple" style={{ textTransform: 'capitalize' }}>
+                      {res.documentType || 'Document'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge ${
+                      (res.rawStatus || res.status) === 'indexed' ? 'badge-green' :
+                      (res.rawStatus || res.status) === 'processing' ? 'badge-orange' : 'badge-blue'
+                    }`}>
+                      <CheckCircle2 size={11} />
+                      {res.status || 'Active'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => onOpenPdf({ title: res.title || res.fileName, doc: res.storagePath || res.fileName, page: 1 })}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleDelete(res)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: 'var(--error)' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Upload Modal with Clean Drag-and-Drop */}
+      {/* Upload Info Note Modal */}
       {showUploadModal && (
         <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
                 Upload Academic Resource
               </h3>
-              <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleUpload}>
-              <div className="modal-body">
-                <div className="input-group">
-                  <label className="input-label">Resource Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Convolutional Neural Networks Architecture Notes"
-                    className="input-field"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="input-group">
-                    <label className="input-label">Subject</label>
-                    <select className="input-field" value={subject} onChange={(e) => setSubject(e.target.value)}>
-                      <option value="Machine Learning">Machine Learning (20CS401)</option>
-                      <option value="Data Structures">Data Structures (20CS402)</option>
-                      <option value="DBMS">Database Systems (20CS403)</option>
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Unit</label>
-                    <select className="input-field" value={unit} onChange={(e) => setUnit(e.target.value)}>
-                      <option value="Unit I">Unit I</option>
-                      <option value="Unit II">Unit II</option>
-                      <option value="Unit III">Unit III</option>
-                      <option value="Unit IV">Unit IV</option>
-                      <option value="Unit V">Unit V</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="input-group">
-                    <label className="input-label">Resource Type</label>
-                    <select className="input-field" value={fileType} onChange={(e) => setFileType(e.target.value)}>
-                      <option value="PDF Document">PDF Document</option>
-                      <option value="Lecture Notes">Lecture Notes</option>
-                      <option value="PYQ Solutions">PYQ Solutions</option>
-                      <option value="Infographic / Cheat Sheet">Infographic / Cheat Sheet</option>
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Visibility</label>
-                    <select className="input-field" value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-                      <option value="Public to Students">Public to Students</option>
-                      <option value="Faculty Only">Faculty Only</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Clean Drag-and-Drop Area */}
-                <div style={{
-                  padding: '24px',
-                  border: '2px dashed var(--border-medium)',
-                  borderRadius: 'var(--radius-lg)',
-                  textAlign: 'center',
-                  backgroundColor: '#F8FAFC',
-                  marginTop: '10px'
-                }}>
-                  <Upload size={24} color="var(--primary-blue)" style={{ margin: '0 auto 8px' }} />
-                  <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Choose a file or drag & drop it here
-                  </p>
-                  <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    PDF, PPTX, or DOCX up to 50MB. Auto-indexed into RAG.
-                  </p>
-                </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.8, marginBottom: '16px' }}>
+                To upload and index documents directly into the Supabase RAG storage pipeline, please use the centralized RAG upload interface.
+              </p>
+              <div style={{
+                padding: '24px',
+                border: '2px dashed var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                textAlign: 'center',
+                backgroundColor: 'var(--color-bg)'
+              }}>
+                <Upload size={24} color="var(--color-primary)" style={{ margin: '0 auto 8px' }} />
+                <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' }}>
+                  Supabase RAG Document Ingestion
+                </p>
+                <p style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.6, marginTop: '2px' }}>
+                  Documents uploaded are securely stored in the private rag-documents storage bucket and mapped with strict subject-level RLS.
+                </p>
               </div>
+            </div>
 
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowUploadModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary btn-sm">
-                  Upload Resource
-                </button>
-              </div>
-            </form>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowUploadModal(false)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

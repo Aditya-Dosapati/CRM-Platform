@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   X,
   Play,
@@ -11,7 +11,7 @@ import {
   HelpCircle,
   Lightbulb,
   CheckCircle2,
-  AlertCircle,
+  AlertTriangle,
   Clock,
   HardDrive,
   Code2,
@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { supportedLanguagesList } from '../../data/codingData.js';
 import codeExecutionService from '../../services/codeExecutionService.js';
+import useEscapeKey from '../../hooks/useEscapeKey.js';
+import useSafeTimeout from '../../hooks/useSafeTimeout.js';
 
 export default function CodingWorkspaceModal({
   isOpen,
@@ -37,6 +39,16 @@ export default function CodingWorkspaceModal({
   assessmentTimer = null
 }) {
   if (!isOpen || !problem) return null;
+
+  const setSafeTimeout = useSafeTimeout();
+
+  useEscapeKey(() => {
+    if (isFullscreen) {
+      setIsFullscreen(false);
+    } else {
+      onClose();
+    }
+  }, isOpen);
 
   // Editor State
   const [selectedLanguage, setSelectedLanguage] = useState('python');
@@ -103,7 +115,7 @@ export default function CodingWorkspaceModal({
       const end = e.target.selectionEnd;
       const spaces = '    ';
       setCode(code.substring(0, start) + spaces + code.substring(end));
-      setTimeout(() => {
+      setSafeTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
         }
@@ -165,7 +177,7 @@ export default function CodingWorkspaceModal({
     setIsAiThinking(true);
     setAiAnalysis(null);
 
-    setTimeout(() => {
+    setSafeTimeout(() => {
       let analysisText = "";
       if (actionType === 'explain') {
         analysisText = `### Problem Analysis: ${problem.title}\n\nThe goal is to find elements or structures satisfying the given constraints. Notice the input boundaries: \`${problem.constraints?.[0] || 'N <= 10^4'}\`. A linear or logarithmic approach is required to pass within the 2.0s sandbox limit.`;
@@ -195,9 +207,11 @@ export default function CodingWorkspaceModal({
     problem.difficulty === 'Easy' ? 'var(--pastel-green-border)' :
     problem.difficulty === 'Medium' ? 'var(--pastel-orange-border)' : '#FECDD3';
 
-  // Line numbers calculation
-  const lineCount = Math.max(code.split('\n').length, 18);
-  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+  // Line numbers calculation memoized
+  const lineNumbers = useMemo(() => {
+    const lineCount = Math.max(code.split('\n').length, 18);
+    return Array.from({ length: lineCount }, (_, i) => i + 1);
+  }, [code]);
 
   return (
     <div

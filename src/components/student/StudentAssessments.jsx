@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { assessmentsList } from '../../data/mockData';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CheckSquare, Clock, Play, Sparkles, X, ChevronRight, CheckCircle, Award } from 'lucide-react';
+import useEscapeKey from '../../hooks/useEscapeKey';
+import EmptyState from '../common/EmptyState';
 
 export default function StudentAssessments({ onOpenRagQuery }) {
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [assessments, setAssessments] = useState([]);
   const [activeQuiz, setActiveQuiz] = useState(null);
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
@@ -11,20 +13,43 @@ export default function StudentAssessments({ onOpenRagQuery }) {
   const [quizScore, setQuizScore] = useState(null);
   const [timeLeft, setTimeLeft] = useState(1800);
 
-  const filteredAssessments = assessmentsList.filter(a => {
-    if (activeTab === 'upcoming') return a.status === 'upcoming';
-    if (activeTab === 'completed') return a.status === 'completed';
-    if (activeTab === 'missed') return a.status === 'missed';
-    return true;
-  });
+  useEscapeKey(() => setActiveQuiz(null), Boolean(activeQuiz));
+
+  const filteredAssessments = useMemo(() => {
+    return assessments.filter(a => {
+      if (activeTab === 'upcoming') return a.status === 'upcoming';
+      if (activeTab === 'completed') return a.status === 'completed';
+      if (activeTab === 'missed') return a.status === 'missed';
+      return true;
+    });
+  }, [assessments, activeTab]);
+
+  const handleSubmitQuiz = useCallback(() => {
+    if (!activeQuiz) return;
+    let score = 0;
+    activeQuiz.questions.forEach((q, idx) => {
+      if (selectedAnswers[idx] === q.correctAnswer) {
+        score += 1;
+      }
+    });
+    setQuizScore(score);
+    setQuizSubmitted(true);
+  }, [activeQuiz, selectedAnswers]);
 
   useEffect(() => {
-    let timer;
-    if (activeQuiz && !quizSubmitted && timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    }
+    if (!activeQuiz || quizSubmitted) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleSubmitQuiz();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     return () => clearInterval(timer);
-  }, [activeQuiz, quizSubmitted, timeLeft]);
+  }, [activeQuiz, quizSubmitted, handleSubmitQuiz]);
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);
@@ -53,18 +78,6 @@ export default function StudentAssessments({ onOpenRagQuery }) {
     }));
   };
 
-  const handleSubmitQuiz = () => {
-    if (!activeQuiz) return;
-    let score = 0;
-    activeQuiz.questions.forEach((q, idx) => {
-      if (selectedAnswers[idx] === q.correctAnswer) {
-        score += 1;
-      }
-    });
-    setQuizScore(score);
-    setQuizSubmitted(true);
-  };
-
   return (
     <div className="page-content">
       {/* Header */}
@@ -77,16 +90,16 @@ export default function StudentAssessments({ onOpenRagQuery }) {
         gap: '16px'
       }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' }}>
             Academic Assessments
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
             Continuous internal evaluations (CIE), lab quizzes, and online practice assessments
           </p>
         </div>
 
         <button
-          onClick={() => onOpenRagQuery("What topics should I study before my upcoming Machine Learning quiz?")}
+          onClick={() => onOpenRagQuery("What topics should I study before my upcoming academic assessments?")}
           className="btn btn-primary"
         >
           <Sparkles size={14} />
@@ -97,9 +110,9 @@ export default function StudentAssessments({ onOpenRagQuery }) {
       {/* Tabs */}
       <div className="tabs-nav">
         {[
-          { id: 'upcoming', label: 'Upcoming (2)' },
-          { id: 'completed', label: 'Completed (2)' },
-          { id: 'missed', label: 'Missed (1)' }
+          { id: 'upcoming', label: `Upcoming (${assessments.filter(a => a.status === 'upcoming').length})` },
+          { id: 'completed', label: `Completed (${assessments.filter(a => a.status === 'completed').length})` },
+          { id: 'missed', label: `Missed (${assessments.filter(a => a.status === 'missed').length})` }
         ].map(tab => (
           <button
             key={tab.id}
@@ -111,60 +124,69 @@ export default function StudentAssessments({ onOpenRagQuery }) {
         ))}
       </div>
 
-      {/* Assessment Cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {filteredAssessments.map((item, idx) => (
-          <div key={item.id} className="card card-interactive" style={{ padding: '20px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span className="badge badge-blue">{item.subject}</span>
-                  <span className={`badge ${item.status === 'upcoming' ? 'badge-yellow' : item.status === 'completed' ? 'badge-green' : 'badge-danger'}`} style={{ textTransform: 'capitalize' }}>
-                    {item.status}
-                  </span>
-                  <span className="badge badge-gray">Due: {item.dueDate}</span>
+      {/* Assessment Cards or EmptyState */}
+      {filteredAssessments.length === 0 ? (
+        <EmptyState
+          icon={CheckSquare}
+          title="No Assessments Scheduled"
+          description={`No ${activeTab} evaluations recorded for this semester.`}
+        />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {filteredAssessments.map((item) => (
+            <div key={item.id} className="card card-interactive" style={{ padding: '20px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span className="badge">{item.subject}</span>
+                    <span className="badge" style={{ textTransform: 'capitalize' }}>
+                      {item.status}
+                    </span>
+                    <span className="badge">Due: {item.dueDate}</span>
+                  </div>
+
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
+                    {item.title}
+                  </h3>
+                  <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                    {item.subtitle} • Faculty: {item.faculty}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '18px', marginTop: '12px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    <span>Questions: <strong>{item.questionCount}</strong></span>
+                    <span>Duration: <strong>{item.duration}</strong></span>
+                    {item.score && (
+                      <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
+                        Score: {item.score} ({item.marksObtained})
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {item.title}
-                </h3>
-                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  {item.subtitle} • Faculty: {item.faculty}
-                </p>
-
-                <div style={{ display: 'flex', gap: '18px', marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                  <span>Questions: <strong>{item.questionCount}</strong></span>
-                  <span>Duration: <strong>{item.duration}</strong></span>
-                  {item.score && (
-                    <span style={{ color: 'var(--success)', fontWeight: 700 }}>
-                      Score: {item.score} ({item.marksObtained})
-                    </span>
+                <div>
+                  {item.status === 'upcoming' ? (
+                    <button
+                      onClick={() => handleStartQuiz(item)}
+                      className="btn btn-primary"
+                    >
+                      <Play size={14} />
+                      <span>Start Assessment</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => alert(`Reviewing results for ${item.title}`)}
+                      className="btn btn-secondary"
+                    >
+                      <span>View Performance</span>
+                    </button>
                   )}
                 </div>
               </div>
-
-              <div>
-                {item.status === 'upcoming' ? (
-                  <button
-                    onClick={() => handleStartQuiz(item)}
-                    className="btn btn-primary"
-                  >
-                    <Play size={14} />
-                    <span>Start Assessment</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => alert(`Reviewing results for ${item.title}`)}
-                    className="btn btn-secondary"
-                  >
-                    <span>View Performance</span>
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
 
       {/* Clean White Quiz Simulator Modal */}
       {activeQuiz && (

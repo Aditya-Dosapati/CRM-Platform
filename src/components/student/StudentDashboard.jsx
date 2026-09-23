@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   UserCheck,
@@ -13,110 +13,125 @@ import {
   BookOpen,
   Code2,
   Terminal,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
-import { academicSubjects } from '../../data/mockData';
+import academicDataService from '../../services/academicDataService';
+import EmptyState from '../common/EmptyState';
 
 export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
   const [selectedSemester, setSelectedSemester] = useState('Sem 4');
+  const [subjects, setSubjects] = useState([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
 
-  // Academic Performance Subject Scores (Current vs Previous)
-  const performanceData = [
-    { subject: 'Machine Learning', current: 91, previous: 84 },
-    { subject: 'Data Structures', current: 86, previous: 80 },
-    { subject: 'DBMS', current: 78, previous: 72 },
-    { subject: 'Operating Systems', current: 76, previous: 70 },
-    { subject: 'Computer Networks', current: 84, previous: 79 }
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDashboardSubjects = async () => {
+      setLoadingSubjects(true);
+      try {
+        const res = await academicDataService.getSubjects();
+        if (isMounted && res.data) {
+          setSubjects(res.data);
+        }
+      } catch (err) {
+        console.warn('StudentDashboard: could not load dynamic subjects:', err);
+      } finally {
+        if (isMounted) setLoadingSubjects(false);
+      }
+    };
+    fetchDashboardSubjects();
+    return () => { isMounted = false; };
+  }, []);
+
+  const hasSubjects = subjects && subjects.length > 0;
 
   return (
     <div className="page-content">
-      {/* 5 Vibrant Pastel KPI Cards */}
+      {/* 5 Minimal Academic KPI Cards */}
       <div className="kpi-grid">
         {/* Overall Performance */}
-        <div className="kpi-card kpi-blue">
+        <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Overall Performance</span>
             <div className="kpi-icon-wrap">
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value">82.4%</div>
+          <div className="kpi-value">{hasSubjects ? '82.4%' : '—'}</div>
           <div className="kpi-trend positive">
-            <span>↑ 6.2% this semester</span>
+            <span>{hasSubjects ? '↑ Active Semester' : 'No graded evaluations yet'}</span>
           </div>
         </div>
 
         {/* Attendance */}
-        <div className="kpi-card kpi-green">
+        <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Attendance</span>
             <div className="kpi-icon-wrap">
               <UserCheck size={16} />
             </div>
           </div>
-          <div className="kpi-value">91%</div>
+          <div className="kpi-value">{hasSubjects ? '91%' : '—'}</div>
           <div className="kpi-trend positive">
-            <span>Good Standing</span>
+            <span>{hasSubjects ? 'Good Standing' : 'Tracking pending'}</span>
           </div>
         </div>
 
         {/* Assessments */}
-        <div className="kpi-card kpi-purple">
+        <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Assessments</span>
             <div className="kpi-icon-wrap">
               <CheckSquare size={16} />
             </div>
           </div>
-          <div className="kpi-value">18 / 22</div>
-          <div className="kpi-trend neutral" style={{ color: 'var(--pastel-purple-text)' }}>
-            <span>Completed</span>
+          <div className="kpi-value">{hasSubjects ? '0 / 0' : '0'}</div>
+          <div className="kpi-trend neutral">
+            <span>Scheduled</span>
           </div>
         </div>
 
         {/* Current CGPA */}
-        <div className="kpi-card kpi-orange">
+        <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Current CGPA</span>
             <div className="kpi-icon-wrap">
               <Award size={16} />
             </div>
           </div>
-          <div className="kpi-value">8.42</div>
-          <div className="kpi-trend positive" style={{ color: 'var(--pastel-orange-text)' }}>
-            <span>↑ +0.34 Growth</span>
+          <div className="kpi-value">{hasSubjects ? '8.42' : '—'}</div>
+          <div className="kpi-trend positive">
+            <span>{hasSubjects ? 'Institutional Scale' : 'Cumulative'}</span>
           </div>
         </div>
 
         {/* Learning Progress */}
-        <div className="kpi-card kpi-cyan">
+        <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Learning Progress</span>
             <div className="kpi-icon-wrap">
               <Sparkles size={16} />
             </div>
           </div>
-          <div className="kpi-value">78%</div>
-          <div className="kpi-trend neutral" style={{ color: 'var(--pastel-cyan-text)' }}>
-            <span>This semester</span>
+          <div className="kpi-value">{hasSubjects ? `${subjects.length} Subjects` : '0 Courses'}</div>
+          <div className="kpi-trend neutral">
+            <span>R20 Regulation</span>
           </div>
         </div>
       </div>
 
-      {/* Quick Actions Section (Prominent Colorful Cards) */}
+      {/* Quick Actions Section */}
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', letterSpacing: '-0.2px' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '12px', letterSpacing: '-0.2px' }}>
           Quick Actions
         </h2>
         <div className="quick-actions-grid">
           {/* View Syllabus */}
           <div
             className="quick-action-card"
-            style={{ backgroundColor: 'var(--pastel-blue-bg)', borderColor: 'var(--pastel-blue-border)' }}
             onClick={() => onNavigate('syllabus')}
           >
-            <div className="quick-action-icon" style={{ color: 'var(--primary-blue)' }}>
+            <div className="quick-action-icon">
               <FileText size={18} />
             </div>
             <div>
@@ -128,10 +143,9 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
           {/* Practice PYQs */}
           <div
             className="quick-action-card"
-            style={{ backgroundColor: 'var(--pastel-purple-bg)', borderColor: 'var(--pastel-purple-border)' }}
             onClick={() => onNavigate('pyqs')}
           >
-            <div className="quick-action-icon" style={{ color: 'var(--pastel-purple-text)' }}>
+            <div className="quick-action-icon">
               <HelpCircle size={18} />
             </div>
             <div>
@@ -143,25 +157,23 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
           {/* Take Assessment */}
           <div
             className="quick-action-card"
-            style={{ backgroundColor: 'var(--pastel-green-bg)', borderColor: 'var(--pastel-green-border)' }}
             onClick={() => onNavigate('assessments')}
           >
-            <div className="quick-action-icon" style={{ color: 'var(--success)' }}>
+            <div className="quick-action-icon">
               <CheckSquare size={18} />
             </div>
             <div>
-              <div className="quick-action-title">Take Assessment</div>
-              <div className="quick-action-desc">Check your upcoming assessments</div>
+              <div className="quick-action-title">Assessments</div>
+              <div className="quick-action-desc">Check your course evaluations</div>
             </div>
           </div>
 
           {/* Ask GMRIT AI */}
           <div
             className="quick-action-card"
-            style={{ backgroundColor: 'var(--pastel-orange-bg)', borderColor: 'var(--pastel-orange-border)' }}
-            onClick={() => onOpenRagQuery("What should I study next to prepare for my upcoming Machine Learning quiz?")}
+            onClick={() => onOpenRagQuery("What should I study next to prepare for my upcoming academic assessments?")}
           >
-            <div className="quick-action-icon" style={{ color: 'var(--gmr-orange)' }}>
+            <div className="quick-action-icon">
               <Sparkles size={18} />
             </div>
             <div>
@@ -172,7 +184,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         </div>
       </div>
 
-      {/* Main Content Area: Large Analytics Card + Right Sidebar (Recent Activity + Upcoming) */}
+      {/* Main Content Area: Large Analytics Card + Right Sidebar */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(12, 1fr)',
@@ -186,7 +198,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               <h3 className="card-title">
                 <span>Academic Performance</span>
               </h3>
-              <p className="card-subtitle">Your performance across subjects (Current vs Previous Evaluation)</p>
+              <p className="card-subtitle">Enrolled subject mastery & evaluation benchmarks</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <select
@@ -202,29 +214,36 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
             </div>
           </div>
 
-          {/* Clean Bar Visualization */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
-            {performanceData.map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px' }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.subject}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Previous: {item.previous}%</span>
-                    <span style={{ fontWeight: 700, color: 'var(--primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>
-                      Current: {item.current}%
-                    </span>
+          {!hasSubjects ? (
+            <EmptyState
+              icon={BookOpen}
+              title="No Performance Metrics Available"
+              description="Subject evaluations will appear here once academic scores are posted."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
+              {subjects.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{item.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Code: {item.code}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
+                        {item.progress || 0}% Progress
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="progress-bar-container" style={{ height: '7px' }}>
+                    <div
+                      className="progress-bar-fill"
+                      style={{ width: `${item.progress || 0}%`, backgroundColor: 'var(--color-primary)' }}
+                    />
                   </div>
                 </div>
-
-                <div className="progress-bar-container" style={{ height: '7px' }}>
-                  <div
-                    className="progress-bar-fill"
-                    style={{ width: `${item.current}%`, backgroundColor: 'var(--primary-blue)' }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div style={{
             display: 'flex',
@@ -232,18 +251,14 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
             justifyContent: 'space-between',
             marginTop: '18px',
             paddingTop: '12px',
-            borderTop: '1px solid var(--border-subtle)',
+            borderTop: '1px solid var(--color-border)',
             fontSize: '12px',
-            color: 'var(--text-secondary)'
+            color: 'var(--color-text-muted)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <div style={{ width: '9px', height: '9px', borderRadius: '2px', backgroundColor: 'var(--primary-blue)' }} />
-                <span>Current Score</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <div style={{ width: '9px', height: '9px', borderRadius: '2px', backgroundColor: '#CBD5E1' }} />
-                <span>Previous Benchmark</span>
+                <div style={{ width: '9px', height: '9px', borderRadius: '2px', backgroundColor: 'var(--color-primary)' }} />
+                <span>Curriculum Progress</span>
               </div>
             </div>
             <button
@@ -262,17 +277,16 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
           <div className="card">
             <div className="card-header" style={{ marginBottom: '12px' }}>
               <h3 className="card-title" style={{ fontSize: '13.5px' }}>
-                <Clock size={15} color="var(--primary-blue)" />
+                <Clock size={15} color="var(--color-primary)" />
                 <span>Recent Activity</span>
               </h3>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
-                { icon: FileText, color: 'var(--primary-blue)', bg: 'var(--pastel-blue-bg)', text: 'Machine Learning Unit 3 syllabus viewed', time: '5m ago' },
-                { icon: CheckSquare, color: 'var(--success)', bg: 'var(--pastel-green-bg)', text: 'DBMS Assessment completed', time: '1h ago' },
-                { icon: BookOpen, color: 'var(--pastel-purple-text)', bg: 'var(--pastel-purple-bg)', text: 'New PYQ uploaded for Operating Systems', time: '3h ago' },
-                { icon: Sparkles, color: 'var(--gmr-orange)', bg: 'var(--pastel-orange-bg)', text: 'Asked GMRIT AI about Neural Networks', time: 'Yesterday' }
+                { icon: Sparkles, text: 'GMRIT AI Knowledge Base active', time: 'Online' },
+                { icon: FileText, text: 'R20 Academic Regulation curriculum loaded', time: 'Active' },
+                { icon: BookOpen, text: 'Digital course library connected', time: 'Ready' }
               ].map((act, aIdx) => {
                 const Icon = act.icon;
                 return (
@@ -287,35 +301,27 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
                       transition: 'all 0.16s ease',
                       cursor: 'default'
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F8FAFC';
-                      e.currentTarget.style.transform = 'translateX(2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.transform = 'none';
-                    }}
                   >
                     <div style={{
                       width: '26px',
                       height: '26px',
                       borderRadius: 'var(--radius-xs)',
-                      backgroundColor: act.bg,
-                      color: act.color,
+                      backgroundColor: 'var(--color-bg)',
+                      color: 'var(--color-primary)',
+                      border: '1px solid var(--color-border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      marginTop: '1px',
-                      transition: 'transform 0.2s var(--ease-spring)'
+                      marginTop: '1px'
                     }}>
                       <Icon size={13} />
                     </div>
                     <div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.3, fontWeight: 500 }}>
+                      <p style={{ fontSize: '12px', color: 'var(--color-text)', lineHeight: 1.3, fontWeight: 500, margin: 0 }}>
                         {act.text}
                       </p>
-                      <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>
                         {act.time}
                       </span>
                     </div>
@@ -329,57 +335,16 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
           <div className="card">
             <div className="card-header" style={{ marginBottom: '12px' }}>
               <h3 className="card-title" style={{ fontSize: '13.5px' }}>
-                <Calendar size={15} color="var(--gmr-orange)" />
+                <Calendar size={15} color="var(--color-primary)" />
                 <span>Upcoming</span>
               </h3>
-              <span className="badge badge-orange" style={{ fontSize: '10px' }}>3 Pending</span>
+              <span className="badge" style={{ fontSize: '10px' }}>0 Pending</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-              {[
-                { title: 'Machine Learning Quiz', time: 'Tomorrow — 10:00 AM', badge: 'Quiz', badgeColor: 'badge-purple' },
-                { title: 'DBMS Assignment', time: 'Sep 14', badge: 'Assignment', badgeColor: 'badge-blue' },
-                { title: 'Operating Systems Mid Exam', time: 'Sep 18', badge: 'Exam', badgeColor: 'badge-orange' }
-              ].map((up, uIdx) => (
-                <div
-                  key={uIdx}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: '#F8FAFC',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    transition: 'all 0.18s var(--ease-spring)',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
-                    e.currentTarget.style.borderColor = 'var(--pastel-blue-border)';
-                    e.currentTarget.style.transform = 'translateX(2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F8FAFC';
-                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    e.currentTarget.style.transform = 'none';
-                  }}
-                  onMouseDown={(e) => {
-                    e.currentTarget.style.transform = 'scale(0.985)';
-                  }}
-                  onMouseUp={(e) => {
-                    e.currentTarget.style.transform = 'translateX(2px)';
-                  }}
-                >
-                  <div>
-                    <h5 style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{up.title}</h5>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{up.time}</span>
-                  </div>
-                  <span className={`badge ${up.badgeColor}`} style={{ fontSize: '9.5px' }}>
-                    {up.badge}
-                  </span>
-                </div>
-              ))}
+            <div style={{ padding: '12px 0', textAlign: 'center' }}>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
+                No pending assessments or submission deadlines.
+              </p>
             </div>
           </div>
         </div>
@@ -389,19 +354,16 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
       <div
         className="card-interactive"
         style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-md, 14px)',
-          border: '1px solid #E2E8F0',
+          border: '1px solid var(--color-border)',
           padding: '1.25rem 1.5rem',
           marginBottom: '20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '1rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-          background: 'linear-gradient(to right, #EFF6FF, #FFFFFF)',
-          transition: 'all 0.2s var(--ease-spring)'
+          gap: '1rem'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -410,30 +372,26 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               width: '42px',
               height: '42px',
               borderRadius: '10px',
-              backgroundColor: '#2563EB',
-              color: '#FFFFFF',
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-surface)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.25)'
+              justifyContent: 'center'
             }}
           >
             <Code2 size={22} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Coding Hub
               </span>
-              <span style={{ fontSize: '0.75rem', backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.45rem', borderRadius: '9999px', fontWeight: '700' }}>
-                🔥 12-Day Streak Active
-              </span>
             </div>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#0F172A' }}>
-              Solve Today's Coding Practice Challenges (128 Solved • 16 Topics)
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--color-text)' }}>
+              Interactive Coding & Algorithm Practice
             </h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-              Practice DSA with real-time test evaluations in Python, C++, Java, C, JS, R, &amp; Ruby
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              Practice DSA in Python, C++, Java, C, and JS with automated test evaluation
             </p>
           </div>
         </div>
@@ -462,10 +420,10 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
       <div style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>
+            <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.2px' }}>
               Subject Performance & Enrolled Courses
             </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
               Comprehensive curriculum tracking and assessment velocity
             </p>
           </div>
@@ -474,93 +432,104 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
           </button>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '14px'
-        }}>
-          {academicSubjects.slice(0, 3).map((sub, idx) => (
-            <div
-              key={sub.id}
-              className={`card card-interactive stagger-${idx + 1}`}
-              style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: sub.id === 'sub_ml' ? 'var(--pastel-blue-bg)' : sub.id === 'sub_ds' ? 'var(--pastel-green-bg)' : 'var(--pastel-orange-bg)',
-                      color: sub.id === 'sub_ml' ? 'var(--primary-blue)' : sub.id === 'sub_ds' ? 'var(--success)' : 'var(--gmr-orange)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      transition: 'transform 0.2s var(--ease-spring)'
-                    }}>
-                      <BookOpen size={16} />
+        {!hasSubjects ? (
+          <EmptyState
+            icon={BookOpen}
+            title="No Courses Enrolled"
+            description="No course subjects registered for this semester yet."
+            actionText="Browse Curriculum"
+            onAction={() => onNavigate('syllabus')}
+          />
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '14px'
+          }}>
+            {subjects.slice(0, 3).map((sub, idx) => (
+              <div
+                key={sub.id || idx}
+                className={`card card-interactive stagger-${idx + 1}`}
+                style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--color-bg)',
+                        color: 'var(--color-primary)',
+                        border: '1px solid var(--color-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700
+                      }}>
+                        <BookOpen size={16} />
+                      </div>
+                      <div>
+                        <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text)' }}>{sub.name}</h4>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{sub.code} • {sub.faculty || 'Department Faculty'}</span>
+                      </div>
+                    </div>
+                    <span className="badge">
+                      {sub.progress || 0}%
+                    </span>
+                  </div>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '8px',
+                    padding: '10px',
+                    backgroundColor: 'var(--color-bg)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '11.5px',
+                    margin: '10px 0 14px'
+                  }}>
+                    <div>
+                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Progress</span>
+                      <strong style={{ color: 'var(--color-text)' }}>{sub.progress || 0}%</strong>
                     </div>
                     <div>
-                      <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{sub.name}</h4>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{sub.code} • {sub.faculty}</span>
+                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Credits</span>
+                      <strong style={{ color: 'var(--color-text)' }}>{sub.credits || 3}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Syllabus</span>
+                      <strong style={{ color: 'var(--color-text)' }}>R20 Regulation</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Status</span>
+                      <strong style={{ color: 'var(--color-primary)' }}>Active</strong>
                     </div>
                   </div>
-                  <span className="badge badge-blue">
-                    {sub.score}%
-                  </span>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '8px',
-                  padding: '10px',
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '11.5px',
-                  margin: '10px 0 14px'
-                }}>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10.5px' }}>Progress</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{sub.progress}%</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10.5px' }}>Assessments</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{sub.assessmentsCompleted}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10.5px' }}>Syllabus</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{sub.syllabusProgress}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10.5px' }}>PYQs</span>
-                    <strong style={{ color: 'var(--success)' }}>Available</strong>
-                  </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => onNavigate('subjects')}
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1 }}
+                  >
+                    View Subject
+                  </button>
+                  <button
+                    onClick={() => onNavigate('syllabus')}
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1 }}
+                  >
+                    View Syllabus
+                  </button>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => onNavigate('subjects')}
-                  className="btn btn-secondary btn-sm"
-                  style={{ flex: 1 }}
-                >
-                  View Subject
-                </button>
-                <button
-                  onClick={() => onNavigate('syllabus')}
-                  className="btn btn-secondary btn-sm"
-                  style={{ flex: 1 }}
-                >
-                  View Syllabus
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
