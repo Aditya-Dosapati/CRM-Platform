@@ -69,7 +69,7 @@ The **GMRIT Academic Hub** is designed to unify fragmented university services i
 * **Framework:** React 18.3.1
 * **Bundler & Dev Server:** Vite 6.2.0
 * **Icons:** `lucide-react`
-* **Styling:** Custom Vanilla CSS design tokens (`src/index.css`) with responsive sidebar, command palette, and dark glassmorphism.
+* **Styling:** Custom Vanilla CSS design tokens (`frontend/src/index.css`) with responsive sidebar, command palette, and dark glassmorphism.
 * **State & Navigation:** View-state router with persistent session storage.
 
 ### 🐍 Target Backend Tech Stack (Python)
@@ -104,12 +104,12 @@ The **GMRIT Academic Hub** is designed to unify fragmented university services i
 * **Platform Health Metrics:** Active sessions, token usage, API latency, and system resource monitors.
 
 ### 4. AI RAG Knowledge Assistant
-* Located in `src/components/ai/RagChatbot.jsx`.
+* Located in `frontend/src/components/ai/RagChatbot.jsx`.
 * Semantic retrieval over university regulations (e.g., R20/R23 attendance rules, re-evaluation policies).
 * **Transparent Citations:** Displays retrieval steps, matched documents, and page references for academic integrity.
 
 ### 5. Institutional Coding Sandbox
-* Located in `src/components/coding/CodingPracticeView.jsx`.
+* Located in `frontend/src/components/coding/CodingPracticeView.jsx`.
 * Multi-language support (C, C++, Java, Python, JavaScript).
 * Validates code against public test cases and hidden test cases with execution time and memory limits.
 
@@ -144,6 +144,7 @@ The platform includes preconfigured institutional roles for immediate demonstrat
 
 2. **Install frontend dependencies:**
    ```bash
+   cd frontend
    npm install
    ```
 
@@ -170,7 +171,7 @@ To connect this frontend to a production Python backend:
 * **PostgreSQL** with `pgvector` enabled
 
 #### Backend Directory Setup
-Create a `backend/` directory alongside the frontend:
+Supabase infrastructure is stored in `backend/supabase/`. The FastAPI setup below remains a future integration target and is separate from the current Supabase backend:
 
 ```bash
 mkdir backend && cd backend
@@ -228,35 +229,20 @@ Interactive API documentation will be available at:
 
 ```
 CRM-Platform/
-├── dist/                     # Production build output
-├── node_modules/             # Node packages
-├── public/                   # Static public assets
-├── src/
-│   ├── App.jsx               # Application root & view controller
-│   ├── main.jsx              # React DOM mounting
-│   ├── index.css             # Global CSS design tokens & utilities
-│   ├── components/
-│   │   ├── admin/            # 9 Admin views (Users, RAG base, Audits, Analytics)
-│   │   ├── ai/               # RagChatbot.jsx, SourceViewerModal.jsx
-│   │   ├── auth/             # LoginView.jsx, FirstLoginModal.jsx
-│   │   ├── coding/           # CodingPracticeView.jsx, CodingAssessmentsView.jsx
-│   │   ├── common/           # Header, Sidebar, CommandPalette, Notifications
-│   │   ├── faculty/          # 5 Faculty views (Dashboard, Analytics, Students)
-│   │   ├── profile/          # UserProfileModal.jsx
-│   │   └── student/          # 6 Student views (Syllabus, PYQs, Grades, Infographics)
-│   ├── data/
-│   │   ├── codingData.js     # Coding problems, test cases, starter code
-│   │   ├── mockData.js       # Student records, faculty rosters, departments
-│   │   └── ragKnowledge.js   # RAG vector chunks, documents & query engine
-│   └── services/
-│       ├── accessControl.js  # Role-permission mapping & guards
-│       ├── auditService.js   # Audit trail logger
-│       ├── authService.js    # Authentication & session persistence
-│       └── codeExecutionService.js # Code runner simulation / execution service
-├── index.html                # HTML template with Google Fonts
-├── package.json              # Project manifest and scripts
-├── vite.config.js            # Vite build configuration
-└── README.md                 # Project documentation
+├── frontend/
+│   ├── src/                  # React application, client services, hooks, data, and Supabase client
+│   ├── index.html            # Vite HTML entry point
+│   ├── package.json          # Frontend dependencies and scripts
+│   ├── package-lock.json
+│   ├── vite.config.js        # Vite build configuration
+│   └── .env.example          # Frontend VITE_* configuration template
+├── backend/
+│   └── supabase/
+│       ├── migrations/       # Database schema, policies, and seed migrations
+│       └── functions/        # Supabase Edge Functions
+├── scratch/                  # Ignored local verification utility
+├── .gitignore
+└── README.md
 ```
 
 ---

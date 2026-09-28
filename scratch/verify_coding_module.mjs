@@ -11,9 +11,9 @@ const createStorageMock = () => {
 global.sessionStorage = createStorageMock();
 global.localStorage = createStorageMock();
 
-const { supportedLanguagesList, codingTopicCategories, codingProblemsList, codingAssessmentsList, facultyStruggleAnalytics, adminExecutionSettings, adminCodingAnalytics } = await import('../src/data/codingData.js');
-const { default: codeExecutionService } = await import('../src/services/codeExecutionService.js');
-const { default: accessControl } = await import('../src/services/accessControl.js');
+const { supportedLanguagesList, codingTopicCategories, codingProblemsList, codingAssessmentsList, facultyStruggleAnalytics, adminExecutionSettings, adminCodingAnalytics } = await import('../frontend/src/data/codingData.js');
+const { default: codeExecutionService } = await import('../frontend/src/services/codeExecutionService.js');
+const { default: accessControl } = await import('../frontend/src/services/accessControl.js');
 
 console.log('=== VERIFYING GMRIT CODING MODULE ===\n');
 
