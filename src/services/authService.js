@@ -34,6 +34,7 @@ class AuthService {
                     role: finalRole,
                     status: profile.status || 'Active',
                     department: profile.department || '',
+                    mustChangePassword: Boolean(profile.must_change_password || profile.mustChangePassword),
                     avatar: (profile.name || profile.full_name || 'U').slice(0, 2).toUpperCase()
                   };
 
@@ -43,6 +44,7 @@ class AuthService {
                     role: userObj.role,
                     name: userObj.name,
                     email: userObj.email,
+                    mustChangePassword: userObj.mustChangePassword,
                     loginTimestamp: new Date().toISOString()
                   };
                   this.saveSession(updatedSession);
@@ -102,7 +104,8 @@ class AuthService {
           if (parsed && parsed.userId && parsed.role && ['admin', 'faculty', 'student'].includes(parsed.role.toLowerCase())) {
             return {
               ...parsed,
-              role: parsed.role.toLowerCase()
+              role: parsed.role.toLowerCase(),
+              mustChangePassword: Boolean(parsed.mustChangePassword)
             };
           }
         }
@@ -142,7 +145,7 @@ class AuthService {
       if (userId) {
         const { data, error } = await supabase
           .from('users')
-          .select('id, email, full_name, role, status, created_at, last_login')
+          .select('id, email, full_name, role, status, created_at, last_login, must_change_password')
           .eq('id', userId)
           .maybeSingle();
 
@@ -155,7 +158,8 @@ class AuthService {
             userId: data.id,
             name: data.full_name || (data.email ? data.email.split('@')[0] : 'User'),
             role: (data.role || '').toLowerCase().trim(),
-            status: data.status || 'Active'
+            status: data.status || 'Active',
+            mustChangePassword: Boolean(data.must_change_password)
           };
         }
       }
@@ -164,7 +168,7 @@ class AuthService {
       if (email) {
         const { data, error } = await supabase
           .from('users')
-          .select('id, email, full_name, role, status, created_at, last_login')
+          .select('id, email, full_name, role, status, created_at, last_login, must_change_password')
           .eq('email', email.toLowerCase().trim())
           .maybeSingle();
 
@@ -185,7 +189,8 @@ class AuthService {
             userId: data.id,
             name: data.full_name || (data.email ? data.email.split('@')[0] : 'User'),
             role: (data.role || '').toLowerCase().trim(),
-            status: data.status || 'Active'
+            status: data.status || 'Active',
+            mustChangePassword: Boolean(data.must_change_password)
           };
         }
       }
@@ -271,7 +276,7 @@ class AuthService {
     // Diagnostic Step 5: Perform profile query using the authenticated session
     const { data: profileData, error: profileError } = await supabase
       .from('users')
-      .select('id, email, full_name, role, status')
+      .select('id, email, full_name, role, status, must_change_password')
       .eq('id', activeAuthUid)
       .maybeSingle();
 
@@ -281,6 +286,7 @@ class AuthService {
       dataEmail: profileData?.email || null,
       dataRole: profileData?.role || null,
       dataStatus: profileData?.status || null,
+      mustChangePassword: profileData?.must_change_password ?? false,
       errorCode: profileError?.code || null,
       errorMessage: profileError?.message || null
     });
@@ -291,7 +297,7 @@ class AuthService {
     if (!profile && activeAuthEmail) {
       const { data: emailData, error: emailError } = await supabase
         .from('users')
-        .select('id, email, full_name, role, status')
+        .select('id, email, full_name, role, status, must_change_password')
         .eq('email', activeAuthEmail.toLowerCase().trim())
         .maybeSingle();
 
@@ -301,6 +307,7 @@ class AuthService {
         dataEmail: emailData?.email || null,
         dataRole: emailData?.role || null,
         dataStatus: emailData?.status || null,
+        mustChangePassword: emailData?.must_change_password ?? false,
         errorCode: emailError?.code || null,
         errorMessage: emailError?.message || null
       });
@@ -343,6 +350,8 @@ class AuthService {
       throw new Error("Your account has been deactivated. Please contact administrator.");
     }
 
+    const mustChangePassword = Boolean(profile.must_change_password);
+
     const userObj = {
       userId: profile.id || authData.user.id,
       id: profile.id || authData.user.id,
@@ -351,6 +360,7 @@ class AuthService {
       role: finalRole,
       status: accountStatus.charAt(0).toUpperCase() + accountStatus.slice(1),
       department: profile.department || '',
+      mustChangePassword: mustChangePassword,
       avatar: (profile.name || profile.full_name || 'U').slice(0, 2).toUpperCase()
     };
 
@@ -360,6 +370,7 @@ class AuthService {
       role: userObj.role,
       name: userObj.name,
       email: userObj.email,
+      mustChangePassword: mustChangePassword,
       loginTimestamp: new Date().toISOString()
     };
 
@@ -372,14 +383,123 @@ class AuthService {
       action: "User Login",
       resource: `/${userObj.role}/dashboard`,
       result: "Success",
-      details: `Supabase authenticated session established for role [${userObj.role.toUpperCase()}].`
+      details: `Supabase authenticated session established for role [${userObj.role.toUpperCase()}]. Must change password: ${mustChangePassword}.`
     });
 
     return {
       user: userObj,
       session,
-      isFirstLogin: false
+      isFirstLogin: mustChangePassword,
+      mustChangePassword: mustChangePassword
     };
+  }
+
+  /**
+   * Securely update password for the authenticated user and clear must_change_password flag
+   */
+  async changePassword(currentPassword, newPassword, confirmPassword) {
+    const cleanCurrent = (currentPassword || '').trim();
+    const cleanNew = (newPassword || '').trim();
+    const cleanConfirm = (confirmPassword || '').trim();
+
+    if (!cleanNew) {
+      throw new Error("New password is required.");
+    }
+
+    if (cleanNew.length < 8) {
+      throw new Error("New password must be at least 8 characters long.");
+    }
+
+    if (cleanNew !== cleanConfirm) {
+      throw new Error("New password and confirm password do not match.");
+    }
+
+    if (cleanCurrent && cleanNew === cleanCurrent) {
+      throw new Error("New password must be different from your current temporary password.");
+    }
+
+    // Password policy checks
+    const hasUpper = /[A-Z]/.test(cleanNew);
+    const hasLower = /[a-z]/.test(cleanNew);
+    const hasNum = /[0-9]/.test(cleanNew);
+    const hasSpecial = /[^A-Za-z0-9]/.test(cleanNew);
+
+    if (!hasUpper || !hasLower || !hasNum || !hasSpecial) {
+      throw new Error("Password must include uppercase, lowercase, a number, and a special character.");
+    }
+
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    // Verify session
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const activeUser = userData?.user;
+    if (userError || !activeUser) {
+      throw new Error("Authentication session required to change password. Please sign in again.");
+    }
+
+    // If current password provided, verify it first against Supabase Auth
+    if (cleanCurrent) {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: activeUser.email,
+        password: cleanCurrent
+      });
+      if (signInErr) {
+        throw new Error("Current temporary password is incorrect. Please verify and try again.");
+      }
+    }
+
+    // Update password in Supabase Auth
+    const { data: updateData, error: updateErr } = await supabase.auth.updateUser({
+      password: cleanNew
+    });
+
+    if (updateErr) {
+      throw new Error(updateErr.message || "Failed to update password in authentication system.");
+    }
+
+    // Clear must_change_password flag via secure RPC
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_password_change');
+    if (rpcErr) {
+      console.warn('[AuthService] RPC complete_password_change notice:', rpcErr.message);
+      // Fallback update under RLS
+      await supabase.from('users').update({ must_change_password: false }).eq('id', activeUser.id);
+    }
+
+    // Update local session state
+    if (this.currentSession) {
+      this.currentSession.mustChangePassword = false;
+      this.saveSession(this.currentSession);
+    }
+
+    auditService.logAction({
+      user: activeUser.email,
+      role: this.currentSession?.role || 'user',
+      userId: activeUser.id,
+      action: "Password Change",
+      resource: "/auth/change-password",
+      result: "Success",
+      details: "Temporary password successfully updated to permanent password."
+    });
+
+    return {
+      success: true,
+      message: "Password changed successfully."
+    };
+  }
+
+  /**
+   * Backwards-compatible wrapper for first login completion
+   */
+  async completeFirstLogin(userId, currentPassword, newPassword, profileUpdates = {}) {
+    await this.changePassword(currentPassword, newPassword, newPassword);
+
+    const currentUser = this.getCurrentUser();
+    if (currentUser) {
+      currentUser.mustChangePassword = false;
+    }
+    return currentUser;
   }
 
   /**
@@ -666,6 +786,7 @@ class AuthService {
       name: this.currentSession.name,
       email: this.currentSession.email,
       role: this.currentSession.role,
+      mustChangePassword: Boolean(this.currentSession.mustChangePassword),
       status: 'Active'
     };
   }

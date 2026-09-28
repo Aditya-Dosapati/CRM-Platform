@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, X, Send, Bot, FileText, Cpu, CheckCircle } from 'lucide-react';
 import { queryRagEngine } from '../../data/ragKnowledge';
+import { ragChatService } from '../../services/ragChatService';
+import { isSupabaseConfigured } from '../../lib/supabaseClient';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import useSafeTimeout from '../../hooks/useSafeTimeout';
 
@@ -57,7 +59,7 @@ What would you like to explore today?`,
     scrollToBottom();
   }, [messages, isThinking]);
 
-  const handleSend = useCallback((textToSend = inputVal) => {
+  const handleSend = useCallback(async (textToSend = inputVal) => {
     const query = typeof textToSend === 'string' ? textToSend.trim() : inputVal.trim();
     if (!query || isThinking) return;
 
@@ -72,9 +74,44 @@ What would you like to explore today?`,
     setIsThinking(true);
     setActiveStep('Scanning GMRIT Academic Knowledge Base...');
 
+    try {
+      if (isSupabaseConfigured()) {
+        setActiveStep('Retrieving authorized course documents & syllabus chunks...');
+        const ragRes = await ragChatService.askQuestionWithAnswer(query);
+
+        if (ragRes.success) {
+          const formattedSources = (ragRes.sources || []).map(s => ({
+            title: s.title || 'Academic Document',
+            doc: s.fileName || 'document.pdf',
+            page: s.page || 1,
+            documentId: s.documentId,
+            similarity: s.similarity
+          }));
+
+          const botMsg = {
+            id: `bot_${Date.now()}`,
+            sender: 'bot',
+            text: ragRes.answer || "I couldn't find enough information in the available documents to answer that question.",
+            sources: formattedSources,
+            retrievalSteps: [
+              "Connected to GMRIT Vector Store",
+              `Retrieved ${ragRes.retrieval?.chunkCount || 0} authorized chunks (Top Similarity: ${ragRes.retrieval?.topSimilarity ? Math.round(ragRes.retrieval.topSimilarity * 100) + '%' : 'N/A'})`,
+              ragRes.retrieval?.model ? `Generated with Groq (${ragRes.retrieval.model})` : "Grounded answer synthesized"
+            ]
+          };
+          setMessages(prev => [...prev, botMsg]);
+          setIsThinking(false);
+          setActiveStep('');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[RagChatbot] Live RAG query notice, using fallback:', e);
+    }
+
     setSafeTimeout(() => {
       setActiveStep('Matching query vectors with course syllabi & notes...');
-    }, 600);
+    }, 400);
 
     setSafeTimeout(() => {
       const ragResult = queryRagEngine(query, activeRole, currentUser);
@@ -88,7 +125,7 @@ What would you like to explore today?`,
       setMessages(prev => [...prev, botMsg]);
       setIsThinking(false);
       setActiveStep('');
-    }, 1400);
+    }, 800);
   }, [inputVal, isThinking, activeRole, currentUser, setSafeTimeout]);
 
   useEffect(() => {

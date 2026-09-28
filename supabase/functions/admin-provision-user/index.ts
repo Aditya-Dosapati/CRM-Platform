@@ -68,6 +68,79 @@ serve(async (req: Request) => {
     const action = body.action || 'single'; // 'single' | 'bulk'
 
     // =========================================================================
+    // ACTION 0: APPLY MIGRATION (DB ALTER / RPC)
+    // =========================================================================
+    if (action === 'migrate_must_change_password') {
+      const dbUrl = Deno.env.get('SUPABASE_DB_URL') || '';
+      console.log('[admin-provision-user] SUPABASE_DB_URL present:', !!dbUrl);
+
+      if (!dbUrl) {
+        return new Response(
+          JSON.stringify({ error: 'SUPABASE_DB_URL is not set in environment.', dbUrlExists: false }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Connect via postgres
+      const { default: postgres } = await import("https://deno.land/x/postgresjs@v3.4.4/mod.js");
+      const sql = postgres(dbUrl);
+
+      try {
+        await sql`
+          ALTER TABLE public.users 
+          ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;
+        `;
+
+        await sql`
+          CREATE OR REPLACE FUNCTION public.complete_password_change()
+          RETURNS JSONB
+          LANGUAGE plpgsql
+          SECURITY DEFINER
+          SET search_path = public
+          AS $$
+          DECLARE
+              v_uid UUID := auth.uid();
+          BEGIN
+              IF v_uid IS NULL THEN
+                  RAISE EXCEPTION '401 Unauthorized: Valid authentication session required.';
+              END IF;
+
+              UPDATE public.users
+              SET must_change_password = false
+              WHERE id = v_uid;
+
+              IF NOT FOUND THEN
+                  RAISE EXCEPTION 'User record not found for authenticated ID %', v_uid;
+              END IF;
+
+              RETURN jsonb_build_object(
+                  'success', true,
+                  'userId', v_uid,
+                  'mustChangePassword', false,
+                  'message', 'Temporary password flag successfully cleared.'
+              );
+          END;
+          $$;
+        `;
+
+        await sql`GRANT EXECUTE ON FUNCTION public.complete_password_change() TO authenticated;`;
+
+        await sql.end();
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Migration applied successfully.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (sqlErr: any) {
+        await sql.end();
+        return new Response(
+          JSON.stringify({ error: sqlErr.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // =========================================================================
     // ACTION 1: SINGLE USER PROVISIONING
     // =========================================================================
     if (action === 'single') {
@@ -131,17 +204,18 @@ serve(async (req: Request) => {
 
         targetUserId = newAuth.user.id;
 
-        // Insert into public.users
+        // Insert into public.users with must_change_password = true for initial temporary credentials
         await supabaseAdmin.from('users').insert([{
           id: targetUserId,
           email: cleanEmail,
           full_name: cleanName,
           role: cleanRole,
           status: cleanStatus,
+          must_change_password: true,
           created_at: new Date().toISOString()
         }]);
       } else {
-        // Update existing user profile
+        // Update existing user profile (preserve existing must_change_password state)
         await supabaseAdmin.from('users').update({
           full_name: cleanName,
           role: cleanRole,
@@ -210,6 +284,7 @@ serve(async (req: Request) => {
           role: cleanRole,
           status: cleanStatus,
           tempPass: cleanPassword,
+          mustChangePassword: true,
           message: `Account for ${cleanName} successfully provisioned and activated.`
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -265,12 +340,14 @@ serve(async (req: Request) => {
             if (aErr) throw aErr;
             uid = newAuth.user.id;
 
+            // Insert into public.users with must_change_password = true
             await supabaseAdmin.from('users').insert([{
               id: uid,
               email: cleanEmail,
               full_name: cleanName,
               role: bulkRole,
               status: 'active',
+              must_change_password: true,
               created_at: new Date().toISOString()
             }]);
           }
