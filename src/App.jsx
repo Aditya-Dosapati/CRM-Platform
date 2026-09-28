@@ -138,7 +138,11 @@ export default function App() {
   const [session, setSession] = useState(() => authService.getCurrentSession());
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
   const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(authService.getCurrentSession()));
-  const [isFirstLogin, setIsFirstLogin] = useState(false);
+  const [isFirstLogin, setIsFirstLogin] = useState(() => {
+    const user = authService.getCurrentUser();
+    const sess = authService.getCurrentSession();
+    return Boolean(sess?.isFirstLogin || user?.mustChangePassword);
+  });
   const [currentView, setCurrentView] = useState('dashboard');
 
   // Modals & Panels State
@@ -163,7 +167,7 @@ export default function App() {
     setSession(sessionData);
     setCurrentUser(user);
     setIsLoggedIn(true);
-    setIsFirstLogin(Boolean(firstLoginFlag));
+    setIsFirstLogin(Boolean(firstLoginFlag || user?.mustChangePassword || sessionData?.isFirstLogin));
     setCurrentView('dashboard');
   };
 
@@ -223,12 +227,14 @@ export default function App() {
         setSession(null);
         setCurrentUser(null);
         setIsLoggedIn(false);
+        setIsFirstLogin(false);
         setCurrentView('dashboard');
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (sessionData && user) {
           setSession(sessionData);
           setCurrentUser(user);
           setIsLoggedIn(true);
+          setIsFirstLogin(Boolean(sessionData.isFirstLogin || user.mustChangePassword));
         }
       }
     });
@@ -385,6 +391,7 @@ export default function App() {
         <FirstLoginModal
           user={currentUser}
           onComplete={handleFirstLoginComplete}
+          onLogout={handleLogout}
         />
       )}
 
