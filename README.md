@@ -269,8 +269,6 @@ CRM-Platform/
 - [ ] Connect FastAPI endpoints for `/api/auth/login` and `/api/auth/refresh`
 - [ ] Ingest live PDF files into `PostgreSQL + pgvector` via background Celery/FastAPI workers
 - [ ] Connect production Docker/Judge0 sandbox for real-time remote code execution
-- [ ] Live WebSocket notifications for assessment publish events and grading updates
-
 ---
 
 ## 📄 License
