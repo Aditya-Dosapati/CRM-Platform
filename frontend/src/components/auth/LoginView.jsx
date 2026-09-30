@@ -9,6 +9,12 @@ import authService from '../../services/authService';
 import academicDataService from '../../services/academicDataService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
+const REGISTRATION_DEPARTMENT_FALLBACKS = [
+  { id: 'CSE', code: 'CSE', name: 'Computer Science and Engineering' },
+  { id: 'AIDS', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science' },
+  { id: 'AIML', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning' }
+];
+
 export default function LoginView({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'register'
   
@@ -43,14 +49,19 @@ export default function LoginView({ onLoginSuccess }) {
       setLoadingDepartments(true);
       try {
         const res = await academicDataService.getDepartments();
-        if (isMounted && res.data && res.data.length > 0) {
-          setDepartments(res.data);
-          if (!regDepartment) {
-            setRegDepartment(res.data[0].id || res.data[0].name);
-          }
+        if (isMounted) {
+          const availableDepartments = res.data?.length > 0
+            ? res.data
+            : REGISTRATION_DEPARTMENT_FALLBACKS;
+          setDepartments(availableDepartments);
+          setRegDepartment(current => current || availableDepartments[0].id);
         }
       } catch (e) {
         console.warn('Could not fetch departments from database:', e);
+        if (isMounted) {
+          setDepartments(REGISTRATION_DEPARTMENT_FALLBACKS);
+          setRegDepartment(current => current || REGISTRATION_DEPARTMENT_FALLBACKS[0].id);
+        }
       } finally {
         if (isMounted) setLoadingDepartments(false);
       }

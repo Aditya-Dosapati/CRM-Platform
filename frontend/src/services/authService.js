@@ -17,6 +17,9 @@ class AuthService {
       try {
         supabase.auth.onAuthStateChange(async (event, session) => {
           if (event === 'SIGNED_OUT') {
+            // Do not let a stale sign-out event clear the session just established by login.
+            if (this.currentSession) return;
+
             this.saveSession(null);
             this.clearStaleStorage();
             this.notifyListeners('SIGNED_OUT', null, null);
