@@ -136,7 +136,7 @@ class RagDocumentService {
     const { data: authData, error: authErr } = await supabase.auth.getUser();
     const authUser = authData?.user;
     if (authErr || !authUser) {
-      throw new Error('Authentication Required: No active Supabase session found. Please log in with your verified Administrator account.');
+      throw new Error('Authentication Required: No active Supabase session found. Please log in with your verified Faculty or Administrator account.');
     }
 
     const uploadedBy = authUser.id;
@@ -302,7 +302,7 @@ class RagDocumentService {
   /**
    * Fetch all RAG documents from Supabase rag_documents
    */
-  async getDocuments() {
+  async getDocuments(filters = {}) {
     if (!isSupabaseConfigured()) {
       return {
         data: [],
@@ -312,15 +312,31 @@ class RagDocumentService {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rag_documents')
         .select(`
           *,
           departments:department_id (id, name, code),
           subjects:subject_id (id, name, code),
           rag_ingestion_jobs (id, status, chunks_created, started_at, completed_at, error_message)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      if (filters?.uploadedBy) {
+        query = query.eq('uploaded_by', filters.uploadedBy);
+      }
+      if (filters?.documentType) {
+        query = query.eq('document_type', filters.documentType);
+      }
+      if (filters?.subjectId) {
+        query = query.eq('subject_id', filters.subjectId);
+      }
+      if (filters?.departmentId) {
+        query = query.eq('department_id', filters.departmentId);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
 
       if (error) {
         console.warn('[RagDocumentService] Error fetching rag_documents:', error.message);
@@ -385,6 +401,8 @@ class RagDocumentService {
           status: statusLabel,
           rawStatus: item.status,
           statusType,
+          uploadedBy: item.uploaded_by,
+          uploaded_by: item.uploaded_by,
           fileSizeFormatted: item.metadata?.file_size 
             ? `${(item.metadata.file_size / (1024 * 1024)).toFixed(2)} MB`
             : 'PDF Document',

@@ -17,6 +17,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import academicDataService from '../../services/academicDataService';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
+import authService from '../../services/authService';
 import EmptyState from '../common/EmptyState';
 
 export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
@@ -24,14 +26,17 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
   const [subjects, setSubjects] = useState([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
 
+  const currentUser = authService.getCurrentUser();
+
   useEffect(() => {
     let isMounted = true;
     const fetchDashboardSubjects = async () => {
       setLoadingSubjects(true);
       try {
-        const res = await academicDataService.getSubjects();
-        if (isMounted && res.data) {
-          setSubjects(res.data);
+        const studentId = currentUser?.id || currentUser?.userId;
+        const loadedSubjects = await facultyAssignmentService.getStudentAssignedSubjects(studentId);
+        if (isMounted && loadedSubjects) {
+          setSubjects(loadedSubjects);
         }
       } catch (err) {
         console.warn('StudentDashboard: could not load dynamic subjects:', err);
@@ -41,7 +46,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
     };
     fetchDashboardSubjects();
     return () => { isMounted = false; };
-  }, []);
+  }, [currentUser?.id, currentUser?.userId]);
 
   const hasSubjects = subjects && subjects.length > 0;
 
@@ -224,9 +229,12 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
               {subjects.map((item, idx) => (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', flexWrap: 'wrap', gap: '6px' }}>
                     <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{item.name}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>
+                        Faculty: <strong>{item.faculty || 'Assigned'}</strong>
+                      </span>
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Code: {item.code}</span>
                       <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
                         {item.progress || 0}% Progress

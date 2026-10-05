@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Filter, AlertTriangle, X, Send, Sparkles, UserX, Users } from 'lucide-react';
-import academicDataService from '../../services/academicDataService';
+import { Search, Filter, AlertTriangle, X, Send, Sparkles, UserX, Users, BookOpen } from 'lucide-react';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
 import authService from '../../services/authService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import useSafeTimeout from '../../hooks/useSafeTimeout';
@@ -8,6 +8,7 @@ import EmptyState from '../common/EmptyState';
 
 export default function FacultyStudents({ onOpenRagQuery }) {
   const [students, setStudents] = useState([]);
+  const [assignedClasses, setAssignedClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterAtRiskOnly, setFilterAtRiskOnly] = useState(false);
   const [sectionFilter, setSectionFilter] = useState('All');
@@ -17,18 +18,26 @@ export default function FacultyStudents({ onOpenRagQuery }) {
   const [noteSent, setNoteSent] = useState(false);
   const setSafeTimeout = useSafeTimeout();
 
+  const currentUser = authService.getCurrentUser();
+
   useEscapeKey(() => {
     setSelectedStudent(null);
   }, Boolean(selectedStudent));
 
   useEffect(() => {
     let isMounted = true;
-    async function loadStudents() {
+    async function loadData() {
       setIsLoading(true);
       try {
-        const res = await academicDataService.getStudents();
+        const facultyId = currentUser?.id || currentUser?.userId;
+        const [classes, stdList] = await Promise.all([
+          facultyAssignmentService.getFacultyAssignedClasses(facultyId),
+          facultyAssignmentService.getFacultyAssignedStudents(facultyId)
+        ]);
+
         if (isMounted) {
-          setStudents(res?.data || []);
+          setAssignedClasses(classes || []);
+          setStudents(stdList || []);
         }
       } catch (err) {
         console.warn('Failed to load students:', err);
@@ -36,15 +45,21 @@ export default function FacultyStudents({ onOpenRagQuery }) {
         if (isMounted) setIsLoading(false);
       }
     }
-    loadStudents();
+    loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [currentUser?.id, currentUser?.userId]);
+
+  // Distinct sections assigned to this faculty
+  const availableSections = useMemo(() => {
+    const secSet = new Set(assignedClasses.map(c => c.section).filter(Boolean));
+    return Array.from(secSet).sort();
+  }, [assignedClasses]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const name = (s.user?.full_name || s.name || '').toLowerCase();
       const roll = (s.roll_number || s.rollNumber || s.user_id || '').toLowerCase();
-      const section = s.section || 'A';
+      const section = (s.section || 'A').toUpperCase();
       
       if (filterAtRiskOnly && !s.isAtRisk) return false;
       if (sectionFilter !== 'All' && section !== sectionFilter) return false;
@@ -84,7 +99,7 @@ export default function FacultyStudents({ onOpenRagQuery }) {
             Students Management
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
-            Monitor student attendance, continuous marks, and assign interventions
+            Monitor student attendance, continuous marks, and assign interventions for your assigned sections
           </p>
         </div>
 
@@ -117,11 +132,12 @@ export default function FacultyStudents({ onOpenRagQuery }) {
               className="input-field"
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              style={{ width: '140px', paddingBlock: '7px' }}
+              style={{ width: '160px', paddingBlock: '7px' }}
             >
-              <option value="All">All Sections</option>
-              <option value="A">Section A</option>
-              <option value="B">Section B</option>
+              <option value="All">All Assigned Sections</option>
+              {availableSections.map(sec => (
+                <option key={sec} value={sec}>Section {sec}</option>
+              ))}
             </select>
           </div>
 
@@ -145,25 +161,34 @@ export default function FacultyStudents({ onOpenRagQuery }) {
               <th>Student</th>
               <th>Roll Number</th>
               <th>Department</th>
-              <th>Year / Sem</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th style={{ textAlign: 'center' }}>Section</th>
+              <th style={{ textAlign: 'center' }}>Year / Sem</th>
+              <th style={{ textAlign: 'center' }}>Status</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text)' }}>
-                  Loading enrolled students...
+                <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text)' }}>
+                  Loading enrolled students from assigned sections...
                 </td>
               </tr>
+            ) : assignedClasses.length === 0 ? (
+              <EmptyState
+                icon={BookOpen}
+                title="No Assigned Classes"
+                message="You do not have any active subject or section assignments. Student rosters will appear once classes are assigned by the administrator."
+                isTableRow={true}
+                colSpan={7}
+              />
             ) : filteredStudents.length === 0 ? (
               <EmptyState
                 icon={UserX}
                 title="No Students Found"
-                message="No enrolled students match your search query or selected filters."
+                message="No enrolled students match your search query or selected section filter."
                 isTableRow={true}
-                colSpan={6}
+                colSpan={7}
                 actionText="Reset Filters"
                 onAction={() => {
                   setFilterAtRiskOnly(false);
@@ -177,7 +202,7 @@ export default function FacultyStudents({ onOpenRagQuery }) {
                 const roll = std.roll_number || std.rollNumber || std.user_id || '—';
                 const initials = stdName.split(' ').map(n => n[0]).join('').slice(0, 2);
                 return (
-                  <tr key={std.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedStudent(std)}>
+                  <tr key={std.id || std.user_id} style={{ cursor: 'pointer' }} onClick={() => setSelectedStudent(std)}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
@@ -195,18 +220,28 @@ export default function FacultyStudents({ onOpenRagQuery }) {
                         }}>
                           {initials}
                         </div>
-                        <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>{stdName}</span>
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--color-text)' }}>{stdName}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6 }}>{std.email}</div>
+                        </div>
                       </div>
                     </td>
                     <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>{roll}</td>
-                    <td>{std.department?.name || std.department_name || 'CSE'}</td>
-                    <td>{std.academic_year || 'III Year'} • Sem {std.current_semester || '5'}</td>
-                    <td>
+                    <td>{std.department || 'CSE'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className="badge badge-purple" style={{ fontWeight: 800, fontSize: '11px' }}>
+                        Sec {std.section || 'A'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {std.year || 3} Year • Sem {std.semester || 5}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
                       <span className="badge badge-green">
                         Active
                       </span>
                     </td>
-                    <td>
+                    <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedStudent(std); }}
                         className="btn btn-secondary btn-sm"
@@ -222,46 +257,46 @@ export default function FacultyStudents({ onOpenRagQuery }) {
         </table>
       </div>
 
-      {/* Student Drawer */}
+      {/* Student Profile & Advisory Drawer */}
       {selectedStudent && (
         <div className="modal-overlay" onClick={() => setSelectedStudent(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
                   {selectedStudent.user?.full_name || selectedStudent.name || 'Student Profile'}
                 </h3>
-                <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>
-                  {selectedStudent.roll_number || selectedStudent.rollNumber || '—'} • {selectedStudent.department?.name || 'Computer Science & Engineering'}
+                <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7, margin: '2px 0 0' }}>
+                  {selectedStudent.roll_number || selectedStudent.rollNumber || '—'} • Section {selectedStudent.section || 'A'} • {selectedStudent.department || 'CSE'}
                 </p>
               </div>
-              <button onClick={() => setSelectedStudent(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: 'pointer' }}>
-                <X size={18} />
+              <button onClick={() => setSelectedStudent(null)} className="modal-close-btn">
+                <X size={16} />
               </button>
             </div>
 
-            <div className="modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
-                <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>ACADEMIC YEAR</span>
-                  <p style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
-                    {selectedStudent.academic_year || 'III Year'}
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.65, textTransform: 'uppercase', fontWeight: 600 }}>ACADEMIC YEAR</span>
+                  <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text)', margin: '4px 0 0' }}>
+                    {selectedStudent.year || 3} Year
                   </p>
                 </div>
-                <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>CURRENT SEMESTER</span>
-                  <p style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-primary)' }}>
-                    Semester {selectedStudent.current_semester || '5'}
+                <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.65, textTransform: 'uppercase', fontWeight: 600 }}>ENROLLED SECTION</span>
+                  <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-primary)', margin: '4px 0 0' }}>
+                    Section {selectedStudent.section || 'A'}
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="input-label">Dispatch Faculty Advisory Note:</label>
+                <label className="input-label" style={{ fontWeight: 700, fontSize: '12px' }}>Dispatch Faculty Advisory Note:</label>
                 <textarea
                   className="input-field"
                   rows={3}
-                  placeholder={`Write an advisory note or remedial assignment for ${selectedStudent.user?.full_name || selectedStudent.name || 'this student'}...`}
+                  placeholder={`Write an advisory note or remedial feedback for ${selectedStudent.user?.full_name || selectedStudent.name || 'this student'}...`}
                   value={counselingNote}
                   onChange={(e) => setCounselingNote(e.target.value)}
                 />

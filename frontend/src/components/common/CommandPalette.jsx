@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, BookOpen, FileText, HelpCircle, User, Cpu, X, ArrowRight, Sparkles, Code2, Terminal } from 'lucide-react';
+import { Search, BookOpen, FileText, HelpCircle, User, Cpu, X, ArrowRight, Sparkles, Code2, Terminal, UserCheck } from 'lucide-react';
 import academicDataService from '../../services/academicDataService';
 import ragDocumentService from '../../services/ragDocumentService';
 import authService from '../../services/authService';
@@ -123,15 +123,29 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
       });
     }
 
-    if (!query || 'coding assessments exams test quiz practical'.includes(query) || query.includes('assess')) {
+    if (activeRole !== 'faculty' && (!query || 'coding assessments exams test quiz practical'.includes(query) || query.includes('assess'))) {
       items.push({
         id: 'nav_coding_assessments',
         type: 'Academic Module',
         title: 'Coding Assessments & Examinations',
-        subtitle: activeRole === 'faculty' ? 'Assessment Studio & Authoring' : 'Autonomous Semester Exam Environment',
+        subtitle: 'Autonomous Semester Exam Environment',
         icon: Terminal,
         action: () => {
           onNavigate('coding-assessments');
+          onClose();
+        }
+      });
+    }
+
+    if (activeRole === 'admin' && (!query || 'faculty assignments classes sections scheduler teaching'.includes(query) || query.includes('fac') || query.includes('assign'))) {
+      items.push({
+        id: 'nav_faculty_assignments',
+        type: 'Admin Management',
+        title: 'Faculty Assignments',
+        subtitle: 'Assign faculty members to subjects, classes, and sections',
+        icon: UserCheck,
+        action: () => {
+          onNavigate('faculty-assignments');
           onClose();
         }
       });

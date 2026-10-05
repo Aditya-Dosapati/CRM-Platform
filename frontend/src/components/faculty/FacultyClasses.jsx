@@ -1,34 +1,37 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, BookOpen, Clock, Calendar, CheckCircle2, 
-  Sparkles, Award, ArrowUpRight, Search, FileText, Plus, AlertCircle 
+  Sparkles, Award, ArrowUpRight, Search, FileText, Plus, AlertCircle, Layers
 } from 'lucide-react';
-import academicDataService from '../../services/academicDataService';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
 import authService from '../../services/authService';
 import EmptyState from '../common/EmptyState';
 
 export default function FacultyClasses({ onOpenRagQuery }) {
-  const [subjects, setSubjects] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+  const [selectedClassId, setSelectedClassId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  const currentUser = authService.getCurrentUser();
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       setIsLoading(true);
       try {
-        const [subRes, stdRes] = await Promise.all([
-          academicDataService.getSubjects(),
-          academicDataService.getStudents()
+        const facultyId = currentUser?.id || currentUser?.userId;
+        const [assignedClasses, assignedStudents] = await Promise.all([
+          facultyAssignmentService.getFacultyAssignedClasses(facultyId),
+          facultyAssignmentService.getFacultyAssignedStudents(facultyId)
         ]);
+
         if (isMounted) {
-          const loadedSubs = subRes?.data || [];
-          setSubjects(loadedSubs);
-          setStudents(stdRes?.data || []);
-          if (loadedSubs.length > 0) {
-            setSelectedSubjectId(loadedSubs[0].id);
+          setClasses(assignedClasses || []);
+          setStudents(assignedStudents || []);
+          if (assignedClasses && assignedClasses.length > 0) {
+            setSelectedClassId(assignedClasses[0].assignmentId || assignedClasses[0].id);
           }
         }
       } catch (err) {
@@ -39,20 +42,32 @@ export default function FacultyClasses({ onOpenRagQuery }) {
     }
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [currentUser?.id, currentUser?.userId]);
 
-  const currentSubject = subjects.find(s => s.id === selectedSubjectId) || subjects[0] || null;
+  const currentClass = classes.find(c => (c.assignmentId || c.id) === selectedClassId) || classes[0] || null;
+
+  // Filter students for the selected class section
+  const sectionStudents = useMemo(() => {
+    if (!students || students.length === 0 || !currentClass) return [];
+    return students.filter(s => {
+      const sSec = (s.section || 'A').toUpperCase().trim();
+      const cSec = (currentClass.section || 'A').toUpperCase().trim();
+      const sYear = Number(s.year) || 1;
+      const cYear = Number(currentClass.year) || 1;
+      return sSec === cSec && sYear === cYear;
+    });
+  }, [students, currentClass]);
 
   const filteredStudents = useMemo(() => {
-    if (!students || students.length === 0) return [];
-    return students.filter(s => {
+    if (!sectionStudents || sectionStudents.length === 0) return [];
+    return sectionStudents.filter(s => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       const name = (s.name || s.user?.full_name || '').toLowerCase();
       const roll = (s.roll_number || s.rollNumber || s.user_id || '').toLowerCase();
       return name.includes(q) || roll.includes(q);
     });
-  }, [students, searchQuery]);
+  }, [sectionStudents, searchQuery]);
 
   return (
     <div className="page-content">
@@ -67,16 +82,16 @@ export default function FacultyClasses({ onOpenRagQuery }) {
       }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px' }}>
-            My Assigned Classes & Subjects
+            My Subjects
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
-            Manage course sections, class attendance registries, syllabus schedules, and student rosters
+            Manage assigned course sections, syllabus coverage, and student rosters
           </p>
         </div>
 
-        {currentSubject && (
+        {currentClass && (
           <button
-            onClick={() => onOpenRagQuery(`Provide attendance and syllabus performance summary for ${currentSubject.name || currentSubject.code}`)}
+            onClick={() => onOpenRagQuery(`Provide attendance and syllabus performance summary for ${currentClass.name || currentClass.code} Section ${currentClass.section}`)}
             className="btn btn-primary"
           >
             <Sparkles size={14} />
@@ -87,15 +102,15 @@ export default function FacultyClasses({ onOpenRagQuery }) {
 
       {/* Class Section Cards */}
       {isLoading ? (
-        <div style={{ padding: '30px', textAlign: 'center', color: 'var(--color-text)' }}>
-          Loading course roster...
+        <div style={{ padding: '30px', textAlign: 'center', color: 'var(--color-text)', opacity: 0.7 }}>
+          Loading your assigned courses from the database...
         </div>
-      ) : subjects.length === 0 ? (
+      ) : classes.length === 0 ? (
         <div className="card" style={{ marginBottom: '22px' }}>
           <EmptyState
             icon={BookOpen}
             title="No Assigned Classes"
-            message="There are no academic subjects or classes currently assigned to your faculty profile."
+            description="There are no academic subjects or classes currently assigned to your faculty profile. Contact your department administrator to schedule your subjects."
           />
         </div>
       ) : (
@@ -105,34 +120,41 @@ export default function FacultyClasses({ onOpenRagQuery }) {
           gap: '14px',
           marginBottom: '22px'
         }}>
-          {subjects.map((sub) => {
-            const isSelected = sub.id === selectedSubjectId;
+          {classes.map((cls) => {
+            const isSelected = (cls.assignmentId || cls.id) === selectedClassId;
+            const clsStudentCount = students.filter(s => (s.section || 'A').toUpperCase() === (cls.section || 'A').toUpperCase() && Number(s.year) === Number(cls.year)).length;
+
             return (
               <div
-                key={sub.id}
-                onClick={() => setSelectedSubjectId(sub.id)}
+                key={cls.assignmentId || cls.id}
+                onClick={() => setSelectedClassId(cls.assignmentId || cls.id)}
                 className="card"
                 style={{
                   padding: '18px 20px',
                   cursor: 'pointer',
                   border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                  backgroundColor: isSelected ? 'var(--color-surface)' : 'var(--color-surface)',
+                  backgroundColor: 'var(--color-surface)',
                   boxShadow: isSelected ? '0 4px 12px rgba(198, 93, 46, 0.12)' : 'none',
                   transition: 'all 0.15s ease'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span className="badge badge-blue">{sub.code}</span>
-                  <span className="badge badge-purple" style={{ fontWeight: 700 }}>
-                    {sub.department_code || sub.department?.code || 'CSE'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="badge badge-blue">{cls.code}</span>
+                    <span className="badge badge-purple" style={{ fontWeight: 800 }}>
+                      Sec {cls.section}
+                    </span>
+                  </div>
+                  <span className="badge badge-green" style={{ fontWeight: 700 }}>
+                    Active
                   </span>
                 </div>
 
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)', marginBottom: '4px' }}>
-                  {sub.name}
+                <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text)', marginBottom: '4px' }}>
+                  {cls.name}
                 </h3>
-                <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7, marginBottom: '12px' }}>
-                  Credits: {sub.credits || 3} • Regulation: {sub.regulation || 'R20'}
+                <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.75, marginBottom: '12px' }}>
+                  {cls.formattedClass || `${cls.year} Year • Sem ${cls.semester} • Section ${cls.section}`}
                 </p>
 
                 <div style={{
@@ -144,15 +166,15 @@ export default function FacultyClasses({ onOpenRagQuery }) {
                   fontSize: '11.5px'
                 }}>
                   <div>
-                    <span style={{ color: 'var(--color-text)', opacity: 0.6 }}>Enrolled</span>
+                    <span style={{ color: 'var(--color-text)', opacity: 0.6 }}>Enrolled Students</span>
                     <div style={{ fontWeight: 800, color: 'var(--color-text)', fontSize: '13px' }}>
-                      {students.length} Students
+                      {clsStudentCount} Students
                     </div>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--color-text)', opacity: 0.6 }}>Semester</span>
+                    <span style={{ color: 'var(--color-text)', opacity: 0.6 }}>Credits & Reg</span>
                     <div style={{ fontWeight: 800, color: 'var(--color-primary)', fontSize: '13px' }}>
-                      Sem {sub.semester || 'V'}
+                      {cls.credits || 3} Cr • {cls.regulation || 'AR23'}
                     </div>
                   </div>
                 </div>
@@ -163,19 +185,20 @@ export default function FacultyClasses({ onOpenRagQuery }) {
       )}
 
       {/* Selected Class Deep-Dive Workspace */}
-      {currentSubject && (
+      {currentClass && (
         <div className="card" style={{ padding: '20px 24px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '18px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="badge badge-blue">{currentSubject.code}</span>
-                <span className="badge badge-green">Active Course</span>
+                <span className="badge badge-blue">{currentClass.code}</span>
+                <span className="badge badge-purple" style={{ fontWeight: 800 }}>Section {currentClass.section}</span>
+                <span className="badge badge-green">Active Class</span>
               </div>
-              <h2 style={{ fontSize: '19px', fontWeight: 800, color: 'var(--color-text)', marginTop: '6px' }}>
-                {currentSubject.name} — Student Roster
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', marginTop: '6px' }}>
+                {currentClass.name} — Class Student Roster
               </h2>
               <p style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px' }}>
-                Academic Course Roster • Regulation {currentSubject.regulation || 'R20'}
+                {currentClass.formattedClass} • {currentClass.departmentName || currentClass.departmentCode} • Academic Year {currentClass.academicYear}
               </p>
             </div>
 
@@ -200,37 +223,46 @@ export default function FacultyClasses({ onOpenRagQuery }) {
                   <th>Student Name</th>
                   <th>Roll Number</th>
                   <th>Department</th>
-                  <th>Year / Semester</th>
-                  <th>Status</th>
+                  <th style={{ textAlign: 'center' }}>Section</th>
+                  <th style={{ textAlign: 'center' }}>Year / Sem</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStudents.length === 0 ? (
                   <EmptyState
                     icon={Users}
-                    title="No Students Enrolled"
-                    message="No student records match the active subject or search criteria."
+                    title="No Students in this Section"
+                    message={`No student records currently enrolled in Section ${currentClass.section} for this subject.`}
                     isTableRow={true}
-                    colSpan={5}
+                    colSpan={6}
                   />
                 ) : (
                   filteredStudents.map((std) => (
-                    <tr key={std.id}>
+                    <tr key={std.id || std.user_id}>
                       <td>
                         <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>
-                          {std.user?.full_name || std.name || 'Student'}
+                          {std.name || std.user?.full_name || 'Student'}
                         </span>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6 }}>
+                          {std.email}
+                        </div>
                       </td>
                       <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>
-                        {std.roll_number || std.rollNumber || std.user?.user_metadata?.roll_number || '—'}
+                        {std.roll_number || std.rollNumber || '—'}
                       </td>
                       <td>
-                        {std.department?.name || std.department_name || currentSubject.department_code || 'CSE'}
+                        {std.department || currentClass.departmentCode || 'CSE'}
                       </td>
-                      <td>
-                        {std.academic_year || 'III Year'} • Sem {std.current_semester || currentSubject.semester || '5'}
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="badge badge-purple" style={{ fontWeight: 800, fontSize: '11px' }}>
+                          Sec {std.section || currentClass.section}
+                        </span>
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'center' }}>
+                        {std.year || currentClass.year} Year • Sem {std.semester || currentClass.semester}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
                         <span className="badge badge-green">
                           Enrolled
                         </span>
