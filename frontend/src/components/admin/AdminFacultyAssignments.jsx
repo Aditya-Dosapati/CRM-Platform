@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
 import userManagementService from '../../services/userManagementService';
-import academicDataService from '../../services/academicDataService';
+import academicDataService, { MASTER_DEPARTMENTS } from '../../services/academicDataService';
 import authService from '../../services/authService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import EmptyState from '../common/EmptyState';
@@ -37,6 +37,8 @@ export default function AdminFacultyAssignments() {
   const [departments, setDepartments] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [subjectsError, setSubjectsError] = useState(null);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,6 +97,8 @@ export default function AdminFacultyAssignments() {
   // Load all Faculty, Assignments, Departments, and Subjects from Database
   const loadData = useCallback(async () => {
     setLoading(true);
+    setSubjectsLoading(true);
+    setSubjectsError(null);
     try {
       const [assignRes, usersData, deptsRes, subsRes] = await Promise.all([
         facultyAssignmentService.getAssignments(),
@@ -111,7 +115,12 @@ export default function AdminFacultyAssignments() {
       setFacultyList(facultyUsers);
 
       if (deptsRes?.data) setDepartments(deptsRes.data);
-      if (subsRes?.data) setSubjects(subsRes.data);
+      if (subsRes?.error) {
+        setSubjectsError(subsRes.error?.message || 'Unable to load subjects');
+      } else if (subsRes?.data) {
+        setSubjects(subsRes.data);
+        setSubjectsError(null);
+      }
 
       // If a faculty is currently open in modal, refresh their reference
       setSelectedFaculty(prev => {
@@ -120,8 +129,10 @@ export default function AdminFacultyAssignments() {
       });
     } catch (err) {
       console.error('[AdminFacultyAssignments] Error loading faculty data:', err);
+      setSubjectsError('Unable to load subjects');
     } finally {
       setLoading(false);
+      setSubjectsLoading(false);
     }
   }, []);
 
@@ -129,15 +140,25 @@ export default function AdminFacultyAssignments() {
     loadData();
   }, [loadData]);
 
-  // Map assignments per faculty for O(1) lookup
+  // Map assignments per faculty for multi-key lookup
   const facultyAssignmentsMap = useMemo(() => {
     const map = new Map();
     assignments.forEach(a => {
-      const fId = a.facultyUserId || a.facultyId;
-      if (!map.has(fId)) {
-        map.set(fId, []);
-      }
-      map.get(fId).push(a);
+      const keys = [
+        a.facultyUserId,
+        a.facultyId,
+        a.facultyEmployeeId,
+        a.facultyEmail
+      ].filter(Boolean);
+
+      keys.forEach(k => {
+        if (!map.has(k)) {
+          map.set(k, []);
+        }
+        if (!map.get(k).some(existing => existing.id === a.id)) {
+          map.get(k).push(a);
+        }
+      });
     });
     return map;
   }, [assignments]);
@@ -146,17 +167,25 @@ export default function AdminFacultyAssignments() {
   const enrichedFacultyList = useMemo(() => {
     return facultyList.map(f => {
       const fId = f.id || f.userId;
-      const facAssignments = facultyAssignmentsMap.get(fId) || [];
-      const activeAssignments = facAssignments.filter(a => a.isActive);
+      const fEmp = f.employeeId;
+      const fEmail = f.email;
+
+      const facAssignments = [
+        ...(facultyAssignmentsMap.get(fId) || []),
+        ...(fEmp ? (facultyAssignmentsMap.get(fEmp) || []) : []),
+        ...(fEmail ? (facultyAssignmentsMap.get(fEmail) || []) : [])
+      ];
+      const uniqueAssignments = Array.from(new Map(facAssignments.map(a => [a.id, a])).values());
+      const activeAssignments = uniqueAssignments.filter(a => a.isActive);
       const isAssigned = activeAssignments.length > 0;
 
       return {
         ...f,
         assignments: activeAssignments,
-        allAssignments: facAssignments,
+        allAssignments: uniqueAssignments,
         assignmentCount: activeAssignments.length,
         isAssigned,
-        statusLabel: isAssigned ? 'Assigned' : 'Unassigned'
+        statusLabel: isAssigned ? `${activeAssignments.length} Assignment${activeAssignments.length === 1 ? '' : 's'}` : 'Unassigned'
       };
     });
   }, [facultyList, facultyAssignmentsMap]);
@@ -251,8 +280,8 @@ export default function AdminFacultyAssignments() {
     setFormError(null);
     setEditingAssignmentId(null);
     
-    // Find department match for selected faculty
-    const facDeptId = selectedFaculty?.departmentId || departments[0]?.id || '';
+    // Find department match for selected faculty or default to CSE
+    const facDeptId = selectedFaculty?.departmentId || (departments.find(d => (d.code || '').toUpperCase() === 'CSE')?.id) || departments[0]?.id || 'dept-cse';
     
     setFormData({
       departmentId: facDeptId,
@@ -274,8 +303,8 @@ export default function AdminFacultyAssignments() {
       departmentId: assignment.departmentId,
       regulation: assignment.regulation || 'AR23',
       academicYear: assignment.academicYear || '2025-2026',
-      year: assignment.year || 3,
-      semester: assignment.semester || 5,
+      year: Number(assignment.year) || 3,
+      semester: Number(assignment.semester) || 5,
       section: assignment.section || 'A',
       subjectId: assignment.subjectId
     });
@@ -287,7 +316,7 @@ export default function AdminFacultyAssignments() {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       if (field === 'year') {
-        const numYear = Number(value) || 1;
+        const numYear = Number(String(value).replace(/\D/g, '')) || 1;
         updated.semester = (numYear * 2) - 1; // e.g. Year 3 -> Semester 5
       }
       return updated;
@@ -296,19 +325,108 @@ export default function AdminFacultyAssignments() {
 
   // Smart subjects filtered by Department, Semester, and Regulation
   const availableSubjectsForForm = useMemo(() => {
+    if (subjectsError) return [];
+    if (!subjects || subjects.length === 0) return [];
+
+    // Resolve the selected department record
+    const selectedDept = departments.find(d => 
+      d.id === formData.departmentId || 
+      d.code === formData.departmentId ||
+      d.name === formData.departmentId
+    ) || MASTER_DEPARTMENTS.find(d => 
+      d.id === formData.departmentId || 
+      d.code === formData.departmentId ||
+      d.name === formData.departmentId
+    );
+
+    const selectedDeptCode = (selectedDept?.code || formData.departmentId || '').toUpperCase();
+    const selectedDeptId = String(selectedDept?.id || formData.departmentId || '').toLowerCase();
+    const selectedDeptName = (selectedDept?.name || '').toLowerCase();
+    
+    const isCse = 
+      selectedDeptCode === 'CSE' ||
+      selectedDeptCode === 'AIML' ||
+      selectedDeptCode === 'AIDS' ||
+      selectedDeptCode.includes('CSE') ||
+      selectedDeptCode.includes('AIML') ||
+      selectedDeptCode.includes('AIDS') ||
+      selectedDeptCode.includes('CS') ||
+      selectedDeptName.includes('cse') ||
+      selectedDeptName.includes('computer') ||
+      selectedDeptName.includes('artificial intelligence') ||
+      selectedDeptName.includes('machine learning') ||
+      selectedDeptName.includes('data science') ||
+      selectedDeptId.includes('cse') ||
+      selectedDeptId.includes('aiml') ||
+      selectedDeptId.includes('aids');
+
+    // Normalize Form Filters
+    const formSem = Number(String(formData.semester || '').replace(/\D/g, '')) || null;
+    const formYear = Number(String(formData.year || '').replace(/\D/g, '')) || (formSem ? Math.ceil(formSem / 2) : null);
+    const formReg = String(formData.regulation || '').toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
+
     return subjects.filter(s => {
-      if (formData.departmentId && s.departmentId && s.departmentId !== formData.departmentId) {
-        return false;
+      // 1. Department Filter (Matches department ID, code, or CSE curriculum)
+      if (formData.departmentId && formData.departmentId !== 'All') {
+        const sDeptId = String(s.departmentId || s.department_id || '').toLowerCase();
+        const sDeptCode = String(s.departmentCode || s.deptCode || '').toUpperCase();
+        const sDeptName = String(s.department || s.departmentName || '').toLowerCase();
+
+        const directIdMatch = sDeptId && (sDeptId === selectedDeptId || sDeptId === String(formData.departmentId).toLowerCase());
+        const codeMatch = sDeptCode && (sDeptCode === selectedDeptCode);
+        const nameMatch = sDeptName && selectedDeptName && (sDeptName.includes(selectedDeptName) || selectedDeptName.includes(sDeptName));
+
+        // In GMRIT CSE syllabus, subjects include CORE CSE & approved curriculum electives
+        const cseDeptMatch = isCse && (
+          sDeptId === 'dept-cse' ||
+          sDeptId === 'dept-aiml' ||
+          sDeptId === 'dept-aids' ||
+          sDeptId.includes('cse') ||
+          sDeptId.includes('aiml') ||
+          sDeptId.includes('aids') ||
+          sDeptCode === 'CSE' ||
+          sDeptCode === 'AIML' ||
+          sDeptCode === 'AIDS' ||
+          (!s.departmentId && !s.department_id && !s.department)
+        );
+
+        if (!directIdMatch && !codeMatch && !nameMatch && !cseDeptMatch) {
+          return false;
+        }
       }
-      if (formData.semester && s.semester && Number(s.semester) !== Number(formData.semester)) {
-        return false;
+
+      // 2. Semester Filter (Numeric normalized: "Semester 5" / "5" / 5)
+      if (formSem) {
+        const sSem = Number(String(s.semester || '').replace(/\D/g, '')) || null;
+        if (sSem && sSem !== formSem) {
+          return false;
+        }
       }
-      if (formData.regulation && s.regulation && s.regulation !== formData.regulation) {
-        return false;
+
+      // 3. Year Filter (If subject explicitly defines a year field)
+      if (formYear && s.year) {
+        const sYear = Number(String(s.year).replace(/\D/g, '')) || null;
+        if (sYear && sYear !== formYear) {
+          return false;
+        }
       }
+
+      // 4. Regulation Filter (Normalized: AR23, R20, R23)
+      if (formReg && s.regulation) {
+        const sReg = String(s.regulation).toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
+        if (sReg) {
+          const directRegMatch = sReg === formReg;
+          const both23 = formReg.includes('23') && sReg.includes('23');
+          const both20 = formReg.includes('20') && sReg.includes('20');
+          if (!directRegMatch && !both23 && !both20) {
+            return false;
+          }
+        }
+      }
+
       return true;
     });
-  }, [subjects, formData.departmentId, formData.semester, formData.regulation]);
+  }, [subjects, departments, formData.departmentId, formData.semester, formData.year, formData.regulation, subjectsError]);
 
   // Submit Add or Edit Assignment Form
   const handleSaveAssignment = async (e) => {
@@ -440,8 +558,16 @@ export default function AdminFacultyAssignments() {
   const activeModalFacultyAssignments = useMemo(() => {
     if (!selectedFaculty) return [];
     const fId = selectedFaculty.id || selectedFaculty.userId;
-    const facAssignments = facultyAssignmentsMap.get(fId) || [];
-    return facAssignments.filter(a => a.isActive);
+    const fEmp = selectedFaculty.employeeId;
+    const fEmail = selectedFaculty.email;
+
+    const facAssignments = [
+      ...(facultyAssignmentsMap.get(fId) || []),
+      ...(fEmp ? (facultyAssignmentsMap.get(fEmp) || []) : []),
+      ...(fEmail ? (facultyAssignmentsMap.get(fEmail) || []) : [])
+    ];
+    const uniqueAssignments = Array.from(new Map(facAssignments.map(a => [a.id, a])).values());
+    return uniqueAssignments.filter(a => a.isActive);
   }, [selectedFaculty, facultyAssignmentsMap]);
 
   return (
@@ -1226,22 +1352,45 @@ export default function AdminFacultyAssignments() {
                         </div>
 
                         <div className="input-group">
-                          <label className="input-label" style={{ fontSize: '12px', fontWeight: 700 }}>
-                            Subject / Course * <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6, fontWeight: 400 }}>({availableSubjectsForForm.length} available)</span>
-                          </label>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label className="input-label" style={{ fontSize: '12px', fontWeight: 700, margin: 0 }}>
+                              Subject / Course *
+                            </label>
+                            <span style={{ 
+                              fontSize: '11px', 
+                              color: subjectsError ? '#ef4444' : 'var(--color-text)', 
+                              opacity: subjectsError ? 1 : 0.6, 
+                              fontWeight: subjectsError ? 600 : 400 
+                            }}>
+                              {subjectsLoading 
+                                ? '(Loading...)' 
+                                : subjectsError 
+                                  ? '(Unable to load subjects)' 
+                                  : `(${availableSubjectsForForm.length} available)`}
+                            </span>
+                          </div>
                           <select
                             className="input-field"
                             value={formData.subjectId}
                             onChange={(e) => handleFormChange('subjectId', e.target.value)}
                             required
-                            style={{ fontSize: '12.5px', height: '38px' }}
+                            disabled={subjectsLoading || Boolean(subjectsError)}
+                            style={{ fontSize: '12.5px', height: '38px', borderColor: subjectsError ? '#ef4444' : undefined }}
                           >
-                            <option value="" disabled>Select Subject</option>
-                            {availableSubjectsForForm.map(s => (
-                              <option key={s.id} value={s.id}>
-                                {s.code} — {s.name} ({s.credits || 3} Credits)
-                              </option>
-                            ))}
+                            {subjectsLoading ? (
+                              <option value="" disabled>Loading subjects...</option>
+                            ) : subjectsError ? (
+                              <option value="" disabled>Unable to load subjects</option>
+                            ) : (
+                              <>
+                                <option value="" disabled>Select Subject</option>
+                                {availableSubjectsForForm.map(s => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.code} — {s.name} ({s.credits || 3} Credits)
+                                  </option>
+                                ))}
+                              </>
+                            )}
                           </select>
                         </div>
                       </div>

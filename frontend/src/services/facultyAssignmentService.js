@@ -10,9 +10,9 @@ const LOCAL_STORAGE_KEY = 'gmrit_faculty_assignments_store';
 
 export const DEFAULT_ASSIGNMENTS = [
   {
-    id: 'assign-anand-ai',
+    id: 'assign-anand-nlp-a',
     faculty_id: 'fac-anand',
-    subject_id: 'sub-ai-7',
+    subject_id: 'sub-nlp-7',
     department_id: 'dept-cse',
     academic_year: '2025-2026',
     regulation: 'AR23',
@@ -23,6 +23,36 @@ export const DEFAULT_ASSIGNMENTS = [
     is_active: true,
     created_at: new Date('2025-06-01T09:00:00Z').toISOString(),
     updated_at: new Date('2025-06-01T09:00:00Z').toISOString()
+  },
+  {
+    id: 'assign-anand-ai-a',
+    faculty_id: 'fac-anand',
+    subject_id: 'sub-ai-7',
+    department_id: 'dept-cse',
+    academic_year: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'A',
+    assigned_by: 'user-admin',
+    is_active: true,
+    created_at: new Date('2025-06-01T09:30:00Z').toISOString(),
+    updated_at: new Date('2025-06-01T09:30:00Z').toISOString()
+  },
+  {
+    id: 'assign-anand-ml-b',
+    faculty_id: 'fac-anand',
+    subject_id: 'sub-ml-5',
+    department_id: 'dept-cse',
+    academic_year: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'B',
+    assigned_by: 'user-admin',
+    is_active: true,
+    created_at: new Date('2025-06-01T10:00:00Z').toISOString(),
+    updated_at: new Date('2025-06-01T10:00:00Z').toISOString()
   },
   {
     id: 'assign-sudhakar-cloud',
@@ -36,8 +66,8 @@ export const DEFAULT_ASSIGNMENTS = [
     section: 'A',
     assigned_by: 'user-admin',
     is_active: true,
-    created_at: new Date('2025-06-01T09:00:00Z').toISOString(),
-    updated_at: new Date('2025-06-01T09:00:00Z').toISOString()
+    created_at: new Date('2025-06-01T10:30:00Z').toISOString(),
+    updated_at: new Date('2025-06-01T10:30:00Z').toISOString()
   },
   {
     id: 'assign-ravi-ml',
@@ -51,8 +81,8 @@ export const DEFAULT_ASSIGNMENTS = [
     section: 'A',
     assigned_by: 'user-admin',
     is_active: true,
-    created_at: new Date('2025-06-01T09:00:00Z').toISOString(),
-    updated_at: new Date('2025-06-01T09:00:00Z').toISOString()
+    created_at: new Date('2025-06-01T11:00:00Z').toISOString(),
+    updated_at: new Date('2025-06-01T11:00:00Z').toISOString()
   },
   {
     id: 'assign-priya-dbms',
@@ -66,14 +96,26 @@ export const DEFAULT_ASSIGNMENTS = [
     section: 'A',
     assigned_by: 'user-admin',
     is_active: true,
-    created_at: new Date('2025-06-01T09:00:00Z').toISOString(),
-    updated_at: new Date('2025-06-01T09:00:00Z').toISOString()
+    created_at: new Date('2025-06-01T11:30:00Z').toISOString(),
+    updated_at: new Date('2025-06-01T11:30:00Z').toISOString()
   }
 ];
 
 class FacultyAssignmentService {
   constructor() {
     this._memoryFallback = this._loadLocalStore();
+  }
+
+  _notifyChange() {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      try {
+        window.dispatchEvent(new CustomEvent('gmrit_assignments_updated', {
+          detail: { timestamp: Date.now() }
+        }));
+      } catch (e) {
+        console.warn('[FacultyAssignmentService] Could not dispatch update event:', e);
+      }
+    }
   }
 
   _loadLocalStore() {
@@ -90,7 +132,7 @@ class FacultyAssignmentService {
     } catch (e) {
       console.warn('[FacultyAssignmentService] Could not load local assignments store:', e);
     }
-    return DEFAULT_ASSIGNMENTS;
+    return (this._memoryFallback && this._memoryFallback.length > 0) ? this._memoryFallback : DEFAULT_ASSIGNMENTS;
   }
 
   _saveLocalStore(data) {
@@ -102,11 +144,13 @@ class FacultyAssignmentService {
     } catch (e) {
       console.warn('[FacultyAssignmentService] Could not save local assignments store:', e);
     }
+    this._notifyChange();
   }
 
   /**
    * Fetch all faculty assignments joined with Faculty, Subject, Department, and User details.
    * Resolves relations dynamically with Master Catalogues to eliminate any placeholder fallbacks.
+   * Supports one-to-many: one faculty can have multiple distinct subject assignments.
    */
   async getAssignments(filters = {}) {
     let rawAssignments = [];
@@ -207,7 +251,7 @@ class FacultyAssignmentService {
         (u.id && u.id === rawFacId) ||
         (u.userId && u.userId === rawFacId) ||
         (u.employeeId && u.employeeId === rawFacId) ||
-        (rawFacId === 'fac-anand' && u.email === 'faculty@gmrit.edu.in') ||
+        (rawFacId === 'fac-anand' && (u.email === 'faculty@gmrit.edu.in' || u.name?.includes('Anand'))) ||
         (rawFacId === 'fac-sudhakar' && (u.employeeId === '52413' || u.name?.includes('Sudhakar'))) ||
         (rawFacId === 'fac-ravi' && (u.employeeId === 'FAC552' || u.name?.includes('Ravi'))) ||
         (rawFacId === 'fac-priya' && (u.employeeId === 'FAC553' || u.name?.includes('Priya Rao')))
@@ -227,16 +271,17 @@ class FacultyAssignmentService {
         (s.name && s.name.toLowerCase() === String(rawSubId || '').toLowerCase()) ||
         (s.code && subObj.code && s.code === subObj.code) ||
         (s.name && subObj.name && s.name === subObj.name) ||
+        (rawSubId === 'sub-nlp-7' && s.code === '23CSC13') ||
         (rawSubId === 'sub-ai-7' && s.code === '23ML302') ||
         (rawSubId === 'sub-ml-5' && s.code === '23CS502') ||
         (rawSubId === 'sub-dbms-4' && s.code === '23IT304') ||
         (rawSubId === 'sub-cloud-devops-7' && s.code === '23CS701')
       ) || MASTER_SUBJECTS.find(s => s.id === rawSubId || s.code === rawSubId);
 
-      const subjectName = subObj.name || matchedSubject?.name || a.subjectName || (rawSubId === 'sub-ai-7' ? 'Artificial Intelligence' : 'Artificial Intelligence');
-      const subjectCode = subObj.code || matchedSubject?.code || a.subjectCode || (rawSubId === 'sub-ai-7' ? '23ML302' : '23ML302');
-      const subjectCredits = Number(subObj.credits || matchedSubject?.credits || a.subjectCredits) || 3;
-      const subjectType = subObj.subject_type || matchedSubject?.subjectType || a.subjectType || 'CORE';
+      const subjectName = matchedSubject?.name || subObj.name || a.subjectName || (rawSubId === 'sub-nlp-7' ? 'Natural Language Processing' : rawSubId === 'sub-ai-7' ? 'Artificial Intelligence' : 'Course Subject');
+      const subjectCode = matchedSubject?.code || subObj.code || a.subjectCode || (rawSubId === 'sub-nlp-7' ? '23CSC13' : rawSubId === 'sub-ai-7' ? '23ML302' : 'SUB');
+      const subjectCredits = Number(matchedSubject?.credits || subObj.credits || a.subjectCredits) || 3;
+      const subjectType = matchedSubject?.subjectType || subObj.subject_type || a.subjectType || 'CORE';
 
       // 3. Resolve Department
       const matchedDept = deptsList.find(d => 
@@ -245,8 +290,8 @@ class FacultyAssignmentService {
         (d.name && d.name.toLowerCase() === String(rawDeptId || '').toLowerCase())
       ) || MASTER_DEPARTMENTS.find(d => d.id === rawDeptId || d.code === rawDeptId);
 
-      const departmentName = deptObj.name || matchedDept?.name || a.departmentName || 'Computer Science and Engineering';
-      const departmentCode = deptObj.code || matchedDept?.code || a.departmentCode || 'CSE';
+      const departmentName = matchedDept?.name || deptObj.name || a.departmentName || 'Computer Science and Engineering';
+      const departmentCode = matchedDept?.code || deptObj.code || a.departmentCode || 'CSE';
 
       return {
         id: a.id,
@@ -355,7 +400,7 @@ class FacultyAssignmentService {
     const conflict = allAssignments.find(a => 
       a.isActive &&
       (a.subjectId === subjectId || a.subjectCode === subjectId) &&
-      (a.departmentId === departmentId || a.departmentCode === departmentId) &&
+      (a.departmentId === departmentId || a.departmentCode === departmentId || departmentId === 'dept-cse') &&
       a.year === numYear &&
       a.semester === numSem &&
       a.section === cleanSec &&
@@ -381,6 +426,7 @@ class FacultyAssignmentService {
 
   /**
    * Create a new faculty assignment with duplicate conflict prevention & replace support.
+   * Inserts a distinct new record into faculty_assignments (1 Faculty -> Many Assignments).
    */
   async createAssignment(assignmentData, replaceExistingId = null, adminUser = null) {
     const {
@@ -468,7 +514,7 @@ class FacultyAssignmentService {
       }
     }
 
-    // Update local store
+    // Update local store with the new assignment added to the list (One to Many)
     const currentLocal = this._loadLocalStore();
     const updatedLocal = [createdRecord || newRecord, ...currentLocal.filter(a => a.id !== newRecordId)];
     this._saveLocalStore(updatedLocal);
@@ -613,18 +659,19 @@ class FacultyAssignmentService {
   /**
    * Get Assigned Classes for a specific Faculty user.
    * Shared Single Source of Truth for Faculty Dashboard and My Subjects page.
+   * Returns ALL active assignments for the faculty member (One to Many).
    */
   async getFacultyAssignedClasses(facultyUserIdOrId) {
     const { data: allAssignments } = await this.getAssignments();
 
     if (!facultyUserIdOrId) {
-      // Default to first active faculty assignment if unprovided
-      return allAssignments.filter(a => a.isActive).slice(0, 1);
+      // Return all active assignments for Anand Rao or first active faculty
+      return allAssignments.filter(a => a.isActive && (a.facultyId === 'fac-anand' || a.facultyName?.includes('Anand')));
     }
 
     const targetId = String(facultyUserIdOrId).trim().toLowerCase();
 
-    // Filter to active assignments matching faculty identifier
+    // Filter to ALL active assignments matching faculty identifier
     const activeAssignments = allAssignments.filter(a => {
       if (!a.isActive) return false;
       const fid = String(a.facultyId || '').toLowerCase();
@@ -639,10 +686,10 @@ class FacultyAssignmentService {
         femp === targetId ||
         femail === targetId ||
         fname.includes(targetId) ||
-        (targetId.includes('anand') && (fname.includes('anand') || femp === 'fac550' || fid === 'fac-anand')) ||
-        (targetId.includes('sudhakar') && (fname.includes('sudhakar') || femp === '52413' || fid === 'fac-sudhakar')) ||
-        (targetId.includes('ravi') && (fname.includes('ravi') || femp === 'fac552' || fid === 'fac-ravi')) ||
-        (targetId.includes('priya') && (fname.includes('priya') || femp === 'fac553' || fid === 'fac-priya'))
+        (targetId.includes('anand') && (fname.includes('anand') || femp === 'fac550' || fid === 'fac-anand' || fuid === 'fac-anand')) ||
+        (targetId.includes('sudhakar') && (fname.includes('sudhakar') || femp === '52413' || fid === 'fac-sudhakar' || fuid === 'fac-sudhakar')) ||
+        (targetId.includes('ravi') && (fname.includes('ravi') || femp === 'fac552' || fid === 'fac-ravi' || fuid === 'fac-ravi')) ||
+        (targetId.includes('priya') && (fname.includes('priya') || femp === 'fac553' || fid === 'fac-priya' || fuid === 'fac-priya'))
       );
     });
 
@@ -650,7 +697,7 @@ class FacultyAssignmentService {
       const yearSuffix = a.year === 1 ? '1st' : a.year === 2 ? '2nd' : a.year === 3 ? '3rd' : `${a.year}th`;
       return {
         assignmentId: a.id,
-        id: a.subjectId || a.id,
+        id: a.id, // Unique assignment ID
         subjectId: a.subjectId,
         name: a.subjectName,
         code: a.subjectCode,
@@ -707,7 +754,7 @@ class FacultyAssignmentService {
         const matchesSec = t.section === sSec;
         const matchesYear = t.year === sYear;
         const matchesSem = t.semester === sSem;
-        const matchesDept = !t.deptId || !sDeptId || t.deptId === sDeptId || (t.deptCode && sDeptCode && t.deptCode === sDeptCode);
+        const matchesDept = !t.deptId || !sDeptId || t.deptId === sDeptId || (t.deptCode && sDeptCode && t.deptCode === sDeptCode) || (!t.deptCode && !sDeptCode);
         return matchesSec && matchesYear && matchesSem && matchesDept;
       });
     });
@@ -778,6 +825,7 @@ class FacultyAssignmentService {
    * Get Enrolled Subjects & Assigned Faculty for a logged-in Student.
    * Derives subjects automatically from Student Academic Profile + Faculty Assignments.
    * Section isolation is strictly enforced.
+   * If one faculty teaches multiple subjects in this section, all of them appear.
    */
   async getStudentAssignedSubjects(studentUserIdOrId, studentProfile = null) {
     let studentInfo = studentProfile;
@@ -816,64 +864,77 @@ class FacultyAssignmentService {
       (!s.regulation || s.regulation === sReg)
     );
 
-    if (semesterMasterSubjects.length > 0) {
-      return semesterMasterSubjects.map(sub => {
-        const matched = matchingAssignments.find(a => 
-          a.subjectId === sub.id ||
-          a.subjectCode === sub.code ||
-          a.subjectName?.toLowerCase() === sub.name?.toLowerCase()
-        );
+    const resultList = [];
+    const processedSubjectKeys = new Set();
 
-        return {
-          id: sub.id,
-          name: sub.name,
-          code: sub.code,
-          credits: sub.credits || 3,
-          semester: sub.semester,
-          regulation: sub.regulation || sReg,
-          departmentId: sub.departmentId || sDeptId,
-          subjectType: sub.subjectType || 'CORE',
-          faculty: matched ? matched.facultyName : 'Faculty Assigned via Department',
-          facultyEmail: matched ? matched.facultyEmail : null,
-          facultyEmployeeId: matched ? matched.facultyEmployeeId : null,
-          facultyDesignation: matched ? matched.facultyDesignation : null,
+    // 1. Process standard semester curriculum subjects
+    semesterMasterSubjects.forEach(sub => {
+      const matched = matchingAssignments.find(a => 
+        a.subjectId === sub.id ||
+        a.subjectCode === sub.code ||
+        a.subjectName?.toLowerCase() === sub.name?.toLowerCase()
+      );
+
+      const key = sub.code || sub.id;
+      processedSubjectKeys.add(key);
+
+      resultList.push({
+        id: sub.id,
+        name: sub.name,
+        code: sub.code,
+        credits: sub.credits || 3,
+        semester: sub.semester,
+        regulation: sub.regulation || sReg,
+        departmentId: sub.departmentId || sDeptId,
+        subjectType: sub.subjectType || 'CORE',
+        faculty: matched ? matched.facultyName : 'Faculty Assigned via Department',
+        facultyEmail: matched ? matched.facultyEmail : null,
+        facultyEmployeeId: matched ? matched.facultyEmployeeId : null,
+        facultyDesignation: matched ? matched.facultyDesignation : null,
+        assignedSection: sSec,
+        hasAssignedFaculty: Boolean(matched),
+        progress: matched ? 68 : 0,
+        units: [
+          { unitNumber: 1, title: 'Foundational Principles and Architecture', progress: 100 },
+          { unitNumber: 2, title: 'Theoretical Models & Algorithmic Design', progress: 85 },
+          { unitNumber: 3, title: 'Practical Implementations & Case Studies', progress: 50 },
+          { unitNumber: 4, title: 'Advanced Topics & Emerging Trends', progress: 20 }
+        ]
+      });
+    });
+
+    // 2. Also append any extra assignments assigned specifically to this section that were not in semesterMasterSubjects
+    matchingAssignments.forEach(a => {
+      const key = a.subjectCode || a.subjectId;
+      if (!processedSubjectKeys.has(key)) {
+        processedSubjectKeys.add(key);
+        resultList.push({
+          id: a.subjectId || a.id,
+          name: a.subjectName,
+          code: a.subjectCode,
+          credits: a.subjectCredits || 3,
+          semester: a.semester,
+          regulation: a.regulation || sReg,
+          departmentId: a.departmentId,
+          subjectType: a.subjectType || 'CORE',
+          faculty: a.facultyName,
+          facultyEmail: a.facultyEmail,
+          facultyEmployeeId: a.facultyEmployeeId,
+          facultyDesignation: a.facultyDesignation,
           assignedSection: sSec,
-          hasAssignedFaculty: Boolean(matched),
-          progress: matched ? 68 : 0,
+          hasAssignedFaculty: true,
+          progress: 68,
           units: [
             { unitNumber: 1, title: 'Foundational Principles and Architecture', progress: 100 },
             { unitNumber: 2, title: 'Theoretical Models & Algorithmic Design', progress: 85 },
             { unitNumber: 3, title: 'Practical Implementations & Case Studies', progress: 50 },
             { unitNumber: 4, title: 'Advanced Topics & Emerging Trends', progress: 20 }
           ]
-        };
-      });
-    }
+        });
+      }
+    });
 
-    // If master subjects returned none, format matching assignments directly
-    return matchingAssignments.map(a => ({
-      id: a.subjectId,
-      name: a.subjectName,
-      code: a.subjectCode,
-      credits: a.subjectCredits || 3,
-      semester: a.semester,
-      regulation: a.regulation || sReg,
-      departmentId: a.departmentId,
-      subjectType: a.subjectType || 'CORE',
-      faculty: a.facultyName,
-      facultyEmail: a.facultyEmail,
-      facultyEmployeeId: a.facultyEmployeeId,
-      facultyDesignation: a.facultyDesignation,
-      assignedSection: sSec,
-      hasAssignedFaculty: true,
-      progress: 68,
-      units: [
-        { unitNumber: 1, title: 'Foundational Principles and Architecture', progress: 100 },
-        { unitNumber: 2, title: 'Theoretical Models & Algorithmic Design', progress: 85 },
-        { unitNumber: 3, title: 'Practical Implementations & Case Studies', progress: 50 },
-        { unitNumber: 4, title: 'Advanced Topics & Emerging Trends', progress: 20 }
-      ]
-    }));
+    return resultList;
   }
 
   /**

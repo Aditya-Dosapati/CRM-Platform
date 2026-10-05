@@ -52,6 +52,8 @@ export const MASTER_SUBJECTS = [
 
   // Semester 7 (4th Year)
   { id: 'sub-ai-7', code: '23ML302', name: 'Artificial Intelligence', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-nlp-7', code: '23CSC13', name: 'Natural Language Processing', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
+  { id: 'sub-ml-7', code: '23CS502', name: 'Machine Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
   { id: 'sub-cloud-devops-7', code: '23CS701', name: 'Cloud Computing & DevOps', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
   { id: 'sub-bda-7', code: '23CS702', name: 'Big Data Analytics', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
   { id: 'sub-dl-7', code: '23ML701', name: 'Deep Learning & Reinforcement Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
@@ -149,9 +151,17 @@ class AcademicDataService {
 
     let filtered = allDistinctSubjects;
     if (departmentIdOrCode && departmentIdOrCode !== 'All') {
-      filtered = allDistinctSubjects.filter(s => 
-        !s.departmentId || s.departmentId === departmentIdOrCode || s.departmentId === 'dept-cse'
-      );
+      const targetDept = MASTER_DEPARTMENTS.find(d => d.id === departmentIdOrCode || d.code === departmentIdOrCode) || { id: departmentIdOrCode, code: departmentIdOrCode };
+      const targetCode = String(targetDept?.code || departmentIdOrCode).toUpperCase();
+      const targetName = String(targetDept?.name || '').toLowerCase();
+      const isCseTarget = targetCode === 'CSE' || targetCode === 'AIML' || targetCode === 'AIDS' || targetName.includes('computer') || targetName.includes('cse');
+
+      filtered = allDistinctSubjects.filter(s => {
+        if (!s.departmentId) return true;
+        if (s.departmentId === departmentIdOrCode || s.departmentId === targetDept.id) return true;
+        if (isCseTarget && (s.departmentId === 'dept-cse' || s.departmentId === 'dept-aiml' || s.departmentId === 'dept-aids')) return true;
+        return false;
+      });
     }
 
     return {

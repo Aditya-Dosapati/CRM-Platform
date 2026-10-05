@@ -31,7 +31,12 @@ export default function FacultyClasses({ onOpenRagQuery }) {
           setClasses(assignedClasses || []);
           setStudents(assignedStudents || []);
           if (assignedClasses && assignedClasses.length > 0) {
-            setSelectedClassId(assignedClasses[0].assignmentId || assignedClasses[0].id);
+            setSelectedClassId(prevId => {
+              if (prevId && assignedClasses.some(c => (c.assignmentId || c.id) === prevId)) {
+                return prevId;
+              }
+              return assignedClasses[0].assignmentId || assignedClasses[0].id;
+            });
           }
         }
       } catch (err) {
@@ -41,7 +46,20 @@ export default function FacultyClasses({ onOpenRagQuery }) {
       }
     }
     loadData();
-    return () => { isMounted = false; };
+
+    const handleUpdate = () => {
+      loadData();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gmrit_assignments_updated', handleUpdate);
+    }
+
+    return () => { 
+      isMounted = false; 
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+      }
+    };
   }, [currentUser?.id, currentUser?.userId]);
 
   const currentClass = classes.find(c => (c.assignmentId || c.id) === selectedClassId) || classes[0] || null;
@@ -52,9 +70,11 @@ export default function FacultyClasses({ onOpenRagQuery }) {
     return students.filter(s => {
       const sSec = (s.section || 'A').toUpperCase().trim();
       const cSec = (currentClass.section || 'A').toUpperCase().trim();
-      const sYear = Number(s.year) || 1;
-      const cYear = Number(currentClass.year) || 1;
-      return sSec === cSec && sYear === cYear;
+      const sYear = Number(s.year) || 4;
+      const cYear = Number(currentClass.year) || 4;
+      const sSem = Number(s.semester) || 7;
+      const cSem = Number(currentClass.semester) || 7;
+      return sSec === cSec && sYear === cYear && sSem === cSem;
     });
   }, [students, currentClass]);
 

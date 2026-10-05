@@ -39,7 +39,20 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
       }
     };
     fetchClasses();
-    return () => { isMounted = false; };
+
+    const handleUpdate = () => {
+      fetchClasses();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gmrit_assignments_updated', handleUpdate);
+    }
+
+    return () => { 
+      isMounted = false; 
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+      }
+    };
   }, [currentUser?.id, currentUser?.userId]);
 
   const hasClasses = classes && classes.length > 0;

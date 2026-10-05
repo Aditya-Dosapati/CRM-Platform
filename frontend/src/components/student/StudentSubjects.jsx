@@ -49,6 +49,19 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
 
   useEffect(() => {
     fetchSubjectsData();
+
+    const handleUpdate = () => {
+      fetchSubjectsData();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gmrit_assignments_updated', handleUpdate);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+      }
+    };
   }, [fetchSubjectsData]);
 
   const selectedSubject = useMemo(() => {

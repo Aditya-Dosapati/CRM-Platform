@@ -46,7 +46,20 @@ export default function FacultyStudents({ onOpenRagQuery }) {
       }
     }
     loadData();
-    return () => { isMounted = false; };
+
+    const handleUpdate = () => {
+      loadData();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gmrit_assignments_updated', handleUpdate);
+    }
+
+    return () => { 
+      isMounted = false; 
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+      }
+    };
   }, [currentUser?.id, currentUser?.userId]);
 
   // Distinct sections assigned to this faculty
