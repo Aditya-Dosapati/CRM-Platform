@@ -20,7 +20,6 @@ export const ROLE_ROUTE_MATRIX = {
     'classes',
     'students',
     'assessments',
-    'coding-assessments',
     'performance',
     'syllabus',
     'resources',
@@ -30,6 +29,7 @@ export const ROLE_ROUTE_MATRIX = {
   admin: [
     'dashboard',
     'users',
+    'faculty-assignments',
     'syllabus',
     'pyqs',
     'coding-management',
@@ -60,6 +60,7 @@ export const VIEW_TITLES = {
   students: 'Student Roster & Monitoring',
   analytics: 'Department Academic Analytics',
   users: 'User Provisioning & Credentials',
+  'faculty-assignments': 'Faculty Assignments',
   'rag-base': 'RAG Knowledge Documents',
   'rag-settings': 'RAG Vector Infrastructure Settings',
   'audit-logs': 'Institutional Security Audit Logs'

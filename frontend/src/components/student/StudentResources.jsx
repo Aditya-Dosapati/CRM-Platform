@@ -26,7 +26,8 @@ export default function StudentResources({ onOpenPdf, onOpenRagQuery }) {
         ]);
         if (isMounted) {
           if (subRes.data) setSubjects(subRes.data);
-          if (docsRes) setResources(docsRes);
+          const rawDocs = Array.isArray(docsRes) ? docsRes : (docsRes?.data || []);
+          setResources(rawDocs);
         }
       } catch (err) {
         console.warn('StudentResources: could not fetch data:', err);

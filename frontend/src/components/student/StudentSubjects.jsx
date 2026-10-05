@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import academicDataService from '../../services/academicDataService';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
+import authService from '../../services/authService';
 import ragDocumentService from '../../services/ragDocumentService';
 import { 
   BookOpen, FileText, Sparkles, CheckCircle2, Download, Layers, 
@@ -19,33 +21,31 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
   const [pyqYearFilter, setPyqYearFilter] = useState('All');
   const [pyqExamFilter, setPyqExamFilter] = useState('All');
 
+  const currentUser = authService.getCurrentUser();
 
   const fetchSubjectsData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await academicDataService.getSubjects();
-      if (res.data && res.data.length > 0) {
-        setSubjects(res.data);
+      const studentId = currentUser?.id || currentUser?.userId;
+      const loadedSubjects = await facultyAssignmentService.getStudentAssignedSubjects(studentId);
+      if (loadedSubjects && loadedSubjects.length > 0) {
+        setSubjects(loadedSubjects);
         setSelectedSubjectId(prevId => {
-          if (prevId && res.data.some(s => s.id === prevId)) return prevId;
-          return res.data[0].id;
+          if (prevId && loadedSubjects.some(s => s.id === prevId)) return prevId;
+          return loadedSubjects[0].id;
         });
       } else {
         setSubjects([]);
       }
-      setDataSource(res.source);
-      if (res.error) {
-        // Non-blocking warning error
-        console.warn('Academic data source note:', res.error);
-      }
+      setDataSource('supabase');
     } catch (err) {
       console.error('Failed to load subjects:', err);
       setError(err.message || 'Unable to retrieve course subjects.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser?.id, currentUser?.userId]);
 
   useEffect(() => {
     fetchSubjectsData();
@@ -446,13 +446,20 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="card" style={{ padding: '18px' }}>
               <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
-                Course Coordinator Info
+                Course Faculty & Coordinator
               </h4>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <div><strong>Faculty:</strong> {selectedSubject.faculty}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                <div><strong>Assigned Faculty:</strong> {selectedSubject.faculty || 'To be assigned'}</div>
+                {selectedSubject.facultyEmployeeId && (
+                  <div><strong>Employee ID:</strong> {selectedSubject.facultyEmployeeId}</div>
+                )}
+                {selectedSubject.facultyEmail ? (
+                  <div><strong>Email:</strong> {selectedSubject.facultyEmail}</div>
+                ) : (
+                  <div><strong>Institutional Email:</strong> faculty@gmrit.edu.in</div>
+                )}
                 <div><strong>Office:</strong> Department of CSE, Block 3, Room 204</div>
                 <div><strong>Office Hours:</strong> Mon - Thu (3:30 PM - 5:00 PM)</div>
-                <div><strong>Institutional Email:</strong> faculty@gmrit.edu.in</div>
               </div>
             </div>
 

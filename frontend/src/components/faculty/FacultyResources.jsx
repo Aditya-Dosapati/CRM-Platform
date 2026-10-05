@@ -1,42 +1,56 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FolderArchive, Plus, FileText, Download, Trash2, Edit3, CheckCircle2, X, Upload } from 'lucide-react';
+import { FolderArchive, Plus, FileText, Trash2, CheckCircle2 } from 'lucide-react';
 import ragDocumentService from '../../services/ragDocumentService';
 import academicDataService from '../../services/academicDataService';
-import useEscapeKey from '../../hooks/useEscapeKey';
+import authService from '../../services/authService';
+import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import EmptyState from '../common/EmptyState';
+import RagUploadModal from '../admin/RagUploadModal';
 
 export default function FacultyResources({ onOpenPdf }) {
   const [resources, setResources] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [subjects, setSubjects] = useState([]);
-
-  useEscapeKey(() => setShowUploadModal(false), showUploadModal);
-
-  const [title, setTitle] = useState('');
-  const [subjectId, setSubjectId] = useState('');
-  const [fileType, setFileType] = useState('notes');
 
   const loadResources = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [resData, subData] = await Promise.all([
-        ragDocumentService.getDocuments(),
-        academicDataService.getSubjects()
-      ]);
-      setResources(resData?.data || []);
-      const subs = subData?.data || [];
-      setSubjects(subs);
-      if (subs.length > 0 && !subjectId) {
-        setSubjectId(subs[0].id);
+      // 1. Get authenticated user ID from Supabase auth session or authService
+      let activeUserId = null;
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          activeUserId = authData?.user?.id;
+        } catch (authErr) {
+          console.warn('[FacultyResources] Notice getting supabase auth user:', authErr);
+        }
       }
+      if (!activeUserId) {
+        const currentUser = authService.getCurrentUser();
+        activeUserId = currentUser?.userId || currentUser?.id;
+      }
+
+      // 2. Fetch resources strictly scoped by uploaded_by at the database layer
+      const resData = activeUserId
+        ? await ragDocumentService.getDocuments({ uploadedBy: activeUserId })
+        : { data: [] };
+
+      let docs = resData?.data || [];
+      // 3. Strict client-side ownership guard
+      if (activeUserId) {
+        docs = docs.filter(doc => (doc.uploadedBy === activeUserId || doc.uploaded_by === activeUserId));
+      } else {
+        docs = [];
+      }
+
+      setResources(docs);
     } catch (e) {
       console.warn('Error loading faculty resources:', e);
       setResources([]);
     } finally {
       setIsLoading(false);
     }
-  }, [subjectId]);
+  }, []);
 
   useEffect(() => {
     loadResources();
@@ -177,47 +191,15 @@ export default function FacultyResources({ onOpenPdf }) {
         </table>
       </div>
 
-      {/* Upload Info Note Modal */}
+      {/* Upload Resource Modal */}
       {showUploadModal && (
-        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
-                Upload Academic Resource
-              </h3>
-              <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.8, marginBottom: '16px' }}>
-                To upload and index documents directly into the Supabase RAG storage pipeline, please use the centralized RAG upload interface.
-              </p>
-              <div style={{
-                padding: '24px',
-                border: '2px dashed var(--color-border)',
-                borderRadius: 'var(--radius-lg)',
-                textAlign: 'center',
-                backgroundColor: 'var(--color-bg)'
-              }}>
-                <Upload size={24} color="var(--color-primary)" style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' }}>
-                  Supabase RAG Document Ingestion
-                </p>
-                <p style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.6, marginTop: '2px' }}>
-                  Documents uploaded are securely stored in the private rag-documents storage bucket and mapped with strict subject-level RLS.
-                </p>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowUploadModal(false)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <RagUploadModal
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onUploadSuccess={() => {
+            loadResources();
+          }}
+        />
       )}
     </div>
   );
