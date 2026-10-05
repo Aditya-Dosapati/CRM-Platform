@@ -308,7 +308,10 @@ class UserManagementService {
     const role = (userData.role || 'student').toLowerCase().trim();
     const email = (userData.email || '').toLowerCase().trim();
     const name = (userData.name || '').trim();
-    const password = (userData.password || userData.temporaryPassword || 'GMRIT@' + Math.floor(1000 + Math.random() * 9000)).trim();
+    const defaultPassword = role === 'student'
+      ? (userData.rollNumber || email.split('@')[0])
+      : (userData.employeeId || email.split('@')[0]);
+    const password = (userData.password || userData.temporaryPassword || defaultPassword || 'GMRIT@' + Math.floor(1000 + Math.random() * 9000)).trim();
 
     try {
       // 1. Invoke admin-provision-user Edge Function
@@ -686,13 +689,14 @@ class UserManagementService {
       const row = validRows[i];
       try {
         const deptId = row.departmentId || fallbackDeptId;
-        const tempPass = 'GMRIT@' + Math.floor(1000 + Math.random() * 9000);
+        const rollNum = (row.rollNumber || row.email?.split('@')[0] || '').trim();
+        const tempPass = rollNum || ('GMRIT@' + Math.floor(1000 + Math.random() * 9000));
 
         await this.provisionUser({
           role: 'student',
           name: row.name,
           email: row.email,
-          rollNumber: row.rollNumber,
+          rollNumber: rollNum,
           departmentId: deptId,
           year: row.year || 1,
           section: row.section || 'A',
@@ -744,13 +748,14 @@ class UserManagementService {
       const row = validRows[i];
       try {
         const deptId = row.departmentId || fallbackDeptId;
-        const tempPass = 'GMRIT@' + Math.floor(1000 + Math.random() * 9000);
+        const empId = (row.employeeId || row.email?.split('@')[0] || '').trim();
+        const tempPass = empId || ('GMRIT@' + Math.floor(1000 + Math.random() * 9000));
 
         await this.provisionUser({
           role: 'faculty',
           name: row.name,
           email: row.email,
-          employeeId: row.employeeId,
+          employeeId: empId,
           departmentId: deptId,
           designation: row.designation || 'Assistant Professor',
           temporaryPassword: tempPass,
@@ -783,6 +788,72 @@ class UserManagementService {
       failed: errors.length,
       errors
     };
+  }
+
+  /**
+   * Safe Admin-Only password repair for a specific CSV-imported account
+   */
+  async repairImportedUserPassword(emailOrUserId) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase client not configured.');
+    }
+
+    const identifier = (emailOrUserId || '').trim();
+    const isEmail = identifier.includes('@');
+
+    const { data, error } = await supabase.functions.invoke('admin-provision-user', {
+      body: {
+        action: 'repair_user_password',
+        email: isEmail ? identifier.toLowerCase() : undefined,
+        userId: !isEmail ? identifier : undefined
+      }
+    });
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    auditService.logAction({
+      user: 'Admin',
+      role: 'admin',
+      userId: identifier,
+      action: 'Repair User Password',
+      resource: '/admin/users/repair',
+      result: 'Success',
+      details: `Repaired temporary password to roll/employee ID for ${identifier}.`
+    });
+
+    return data;
+  }
+
+  /**
+   * Safe Admin-Only bulk password repair for all existing CSV-imported accounts
+   */
+  async repairAllImportedPasswords() {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase client not configured.');
+    }
+
+    const { data, error } = await supabase.functions.invoke('admin-provision-user', {
+      body: {
+        action: 'repair_bulk_passwords',
+        allImported: true
+      }
+    });
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    auditService.logAction({
+      user: 'Admin',
+      role: 'admin',
+      userId: 'ALL_IMPORTED',
+      action: 'Bulk Repair Passwords',
+      resource: '/admin/users/repair-all',
+      result: 'Success',
+      details: `Repaired ${data.repairedCount} imported account passwords to JNTU/roll numbers.`
+    });
+
+    return data;
   }
 }
 

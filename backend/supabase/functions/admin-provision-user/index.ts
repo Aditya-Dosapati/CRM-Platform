@@ -162,7 +162,14 @@ serve(async (req: Request) => {
       const cleanEmail = (email || '').trim().toLowerCase();
       const cleanName = (name || '').trim();
       const cleanRole = (rawRole || 'student').trim().toLowerCase();
-      const cleanPassword = (password || 'GMRIT@' + Math.floor(1000 + Math.random() * 9000)).trim();
+      const cleanRollNumber = rollNumber ? String(rollNumber).trim().toUpperCase() : (cleanRole === 'student' ? cleanEmail.split('@')[0].toUpperCase() : null);
+      const cleanEmployeeId = employeeId ? String(employeeId).trim().toUpperCase() : (cleanRole === 'faculty' ? cleanEmail.split('@')[0].toUpperCase() : null);
+
+      const defaultPassword = cleanRole === 'student'
+        ? (cleanRollNumber || cleanEmail.split('@')[0])
+        : (cleanEmployeeId || cleanEmail.split('@')[0]);
+
+      const cleanPassword = (password || defaultPassword || 'GMRIT@' + Math.floor(1000 + Math.random() * 9000)).trim();
       const cleanStatus = (status || 'active').trim().toLowerCase();
 
       if (!cleanName || !cleanEmail || !cleanEmail.includes('@')) {
@@ -215,64 +222,39 @@ serve(async (req: Request) => {
           created_at: new Date().toISOString()
         }]);
       } else {
-        // Update existing user profile (preserve existing must_change_password state)
+        // Update existing user profile and update Supabase Auth password if temporary password reset requested
+        await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+          password: cleanPassword,
+          email_confirm: true
+        });
+
         await supabaseAdmin.from('users').update({
           full_name: cleanName,
           role: cleanRole,
-          status: cleanStatus
+          status: cleanStatus,
+          must_change_password: true
         }).eq('id', targetUserId);
       }
 
       // Insert or Update students / faculty
       if (cleanRole === 'student') {
         const numYear = year ? (isNaN(Number(year)) ? 1 : Number(year)) : 1;
-        const { data: existingStudent } = await supabaseAdmin
-          .from('students')
-          .select('id')
-          .eq('user_id', targetUserId)
-          .maybeSingle();
-
-        if (existingStudent) {
-          await supabaseAdmin.from('students').update({
-            roll_number: rollNumber ? rollNumber.trim().toUpperCase() : undefined,
-            department_id: departmentId || undefined,
-            year: numYear,
-            semester: numYear * 2 - 1,
-            section: section || 'A',
-            program: program || 'B.Tech'
-          }).eq('user_id', targetUserId);
-        } else {
-          await supabaseAdmin.from('students').insert([{
-            user_id: targetUserId,
-            roll_number: rollNumber ? rollNumber.trim().toUpperCase() : null,
-            department_id: departmentId || null,
-            year: numYear,
-            semester: numYear * 2 - 1,
-            section: section || 'A',
-            program: program || 'B.Tech'
-          }]);
-        }
+        await supabaseAdmin.from('students').upsert([{
+          user_id: targetUserId,
+          roll_number: cleanRollNumber,
+          department_id: departmentId || null,
+          year: numYear,
+          semester: numYear * 2 - 1,
+          section: (section || 'A').trim().toUpperCase(),
+          program: (program || 'B.Tech').trim()
+        }], { onConflict: 'user_id' });
       } else if (cleanRole === 'faculty') {
-        const { data: existingFaculty } = await supabaseAdmin
-          .from('faculty')
-          .select('id')
-          .eq('user_id', targetUserId)
-          .maybeSingle();
-
-        if (existingFaculty) {
-          await supabaseAdmin.from('faculty').update({
-            employee_id: employeeId ? employeeId.trim().toUpperCase() : undefined,
-            department_id: departmentId || undefined,
-            designation: designation || 'Assistant Professor'
-          }).eq('user_id', targetUserId);
-        } else {
-          await supabaseAdmin.from('faculty').insert([{
-            user_id: targetUserId,
-            employee_id: employeeId ? employeeId.trim().toUpperCase() : null,
-            department_id: departmentId || null,
-            designation: designation || 'Assistant Professor'
-          }]);
-        }
+        await supabaseAdmin.from('faculty').upsert([{
+          user_id: targetUserId,
+          employee_id: cleanEmployeeId,
+          department_id: departmentId || null,
+          designation: (designation || 'Assistant Professor').trim()
+        }], { onConflict: 'user_id' });
       }
 
       return new Response(
@@ -312,7 +294,15 @@ serve(async (req: Request) => {
         const cleanEmail = (row.email || '').trim().toLowerCase();
         const cleanName = (row.name || '').trim();
         const deptId = row.departmentId || fallbackDeptId || null;
-        const tempPass = 'GMRIT@' + Math.floor(1000 + Math.random() * 9000);
+
+        const rollNum = row.rollNumber ? String(row.rollNumber).trim().toUpperCase() : (bulkRole === 'student' ? cleanEmail.split('@')[0].toUpperCase() : null);
+        const empId = row.employeeId ? String(row.employeeId).trim().toUpperCase() : (bulkRole === 'faculty' ? cleanEmail.split('@')[0].toUpperCase() : null);
+
+        const initialPassword = bulkRole === 'student'
+          ? (rollNum || cleanEmail.split('@')[0])
+          : (empId || cleanEmail.split('@')[0]);
+
+        const tempPass = (initialPassword || 'GMRIT@' + Math.floor(1000 + Math.random() * 9000)).trim();
 
         try {
           // Check if already in auth/users
@@ -350,13 +340,25 @@ serve(async (req: Request) => {
               must_change_password: true,
               created_at: new Date().toISOString()
             }]);
+          } else {
+            // Update existing user's password in Auth to roll number and ensure active status
+            await supabaseAdmin.auth.admin.updateUserById(uid, {
+              password: tempPass,
+              email_confirm: true
+            });
+
+            await supabaseAdmin.from('users').update({
+              full_name: cleanName || undefined,
+              status: 'active',
+              must_change_password: true
+            }).eq('id', uid);
           }
 
           if (bulkRole === 'student') {
             const numYear = row.year ? Number(row.year) : 1;
             await supabaseAdmin.from('students').upsert([{
               user_id: uid,
-              roll_number: row.rollNumber ? String(row.rollNumber).trim().toUpperCase() : null,
+              roll_number: rollNum,
               department_id: deptId,
               year: numYear,
               semester: numYear * 2 - 1,
@@ -366,7 +368,7 @@ serve(async (req: Request) => {
           } else {
             await supabaseAdmin.from('faculty').upsert([{
               user_id: uid,
-              employee_id: row.employeeId ? String(row.employeeId).trim().toUpperCase() : null,
+              employee_id: empId,
               department_id: deptId,
               designation: (row.designation || 'Assistant Professor').trim()
             }], { onConflict: 'user_id' });
@@ -387,6 +389,116 @@ serve(async (req: Request) => {
           succeeded,
           failed,
           results
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // =========================================================================
+    // ACTION 3: REPAIR CSV-IMPORTED USER PASSWORD / ROSTER
+    // =========================================================================
+    if (action === 'repair_user_password' || action === 'repair_bulk_passwords') {
+      const { email: targetEmail, userId: targetId, allImported = false } = body;
+
+      const repaired = [];
+      const errors = [];
+
+      let candidateUsers = [];
+
+      if (targetEmail || targetId) {
+        let query = supabaseAdmin.from('users').select('id, email, full_name, role, status');
+        if (targetId) query = query.eq('id', targetId);
+        else if (targetEmail) query = query.eq('email', targetEmail.trim().toLowerCase());
+
+        const { data, error: qErr } = await query;
+        if (qErr) throw qErr;
+        candidateUsers = data || [];
+      } else if (allImported) {
+        // Find all student / faculty users
+        const { data, error: qErr } = await supabaseAdmin
+          .from('users')
+          .select('id, email, full_name, role, status')
+          .in('role', ['student', 'faculty']);
+        if (qErr) throw qErr;
+        candidateUsers = data || [];
+      }
+
+      for (const u of candidateUsers) {
+        try {
+          const userEmail = (u.email || '').toLowerCase().trim();
+          const userRole = (u.role || 'student').toLowerCase().trim();
+          let resolvedPassword = '';
+          let resolvedRollOrEmp = '';
+
+          if (userRole === 'student') {
+            // Find student record or derive from email prefix
+            const { data: stRow } = await supabaseAdmin
+              .from('students')
+              .select('roll_number, department_id, year, semester, section, program')
+              .eq('user_id', u.id)
+              .maybeSingle();
+
+            resolvedRollOrEmp = stRow?.roll_number || userEmail.split('@')[0].toUpperCase();
+            resolvedPassword = resolvedRollOrEmp;
+
+            // Upsert / repair students record to link to this user id
+            await supabaseAdmin.from('students').upsert([{
+              user_id: u.id,
+              roll_number: resolvedRollOrEmp,
+              department_id: stRow?.department_id || null,
+              year: stRow?.year || 4,
+              semester: stRow?.semester || 7,
+              section: stRow?.section || 'A',
+              program: stRow?.program || 'B.Tech'
+            }], { onConflict: 'user_id' });
+
+          } else if (userRole === 'faculty') {
+            const { data: facRow } = await supabaseAdmin
+              .from('faculty')
+              .select('employee_id, department_id, designation')
+              .eq('user_id', u.id)
+              .maybeSingle();
+
+            resolvedRollOrEmp = facRow?.employee_id || userEmail.split('@')[0].toUpperCase();
+            resolvedPassword = resolvedRollOrEmp;
+
+            await supabaseAdmin.from('faculty').upsert([{
+              user_id: u.id,
+              employee_id: resolvedRollOrEmp,
+              department_id: facRow?.department_id || null,
+              designation: facRow?.designation || 'Assistant Professor'
+            }], { onConflict: 'user_id' });
+          }
+
+          if (resolvedPassword) {
+            // Update Supabase Auth Password
+            const { error: authUpErr } = await supabaseAdmin.auth.admin.updateUserById(u.id, {
+              password: resolvedPassword,
+              email_confirm: true
+            });
+
+            if (authUpErr) throw authUpErr;
+
+            // Ensure status = active and must_change_password = true
+            await supabaseAdmin.from('users').update({
+              status: 'active',
+              must_change_password: true
+            }).eq('id', u.id);
+
+            repaired.push({ id: u.id, email: userEmail, role: userRole, rollNumber: resolvedRollOrEmp });
+          }
+        } catch (err: any) {
+          errors.push({ id: u.id, email: u.email, error: err.message });
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          repairedCount: repaired.length,
+          failedCount: errors.length,
+          repaired,
+          errors
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
