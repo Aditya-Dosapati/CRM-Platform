@@ -2,16 +2,18 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Filter, AlertTriangle, X, Send, Sparkles, UserX, Users, BookOpen } from 'lucide-react';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
 import authService from '../../services/authService';
+import { extractCanonicalCohort, matchesCohort, normalizeSection } from '../../services/academicCohortService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import useSafeTimeout from '../../hooks/useSafeTimeout';
 import EmptyState from '../common/EmptyState';
 
-export default function FacultyStudents({ onOpenRagQuery }) {
+export default function FacultyStudents({ onOpenRagQuery, initialAssignmentId = null, initialSection = null }) {
   const [students, setStudents] = useState([]);
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterAtRiskOnly, setFilterAtRiskOnly] = useState(false);
-  const [sectionFilter, setSectionFilter] = useState('All');
+  const [assignmentFilter, setAssignmentFilter] = useState(initialAssignmentId || 'All');
+  const [sectionFilter, setSectionFilter] = useState(initialSection || 'All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [counselingNote, setCounselingNote] = useState('');
@@ -23,6 +25,15 @@ export default function FacultyStudents({ onOpenRagQuery }) {
   useEscapeKey(() => {
     setSelectedStudent(null);
   }, Boolean(selectedStudent));
+
+  useEffect(() => {
+    if (initialAssignmentId) {
+      setAssignmentFilter(initialAssignmentId);
+    }
+    if (initialSection) {
+      setSectionFilter(initialSection);
+    }
+  }, [initialAssignmentId, initialSection]);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +73,12 @@ export default function FacultyStudents({ onOpenRagQuery }) {
     };
   }, [currentUser?.id, currentUser?.userId]);
 
+  // Active assignment object if filtered
+  const activeSelectedAssignment = useMemo(() => {
+    if (!assignmentFilter || assignmentFilter === 'All') return null;
+    return assignedClasses.find(c => (c.assignmentId || c.id) === assignmentFilter) || null;
+  }, [assignedClasses, assignmentFilter]);
+
   // Distinct sections assigned to this faculty
   const availableSections = useMemo(() => {
     const secSet = new Set(assignedClasses.map(c => c.section).filter(Boolean));
@@ -72,17 +89,27 @@ export default function FacultyStudents({ onOpenRagQuery }) {
     return students.filter(s => {
       const name = (s.user?.full_name || s.name || '').toLowerCase();
       const roll = (s.roll_number || s.rollNumber || s.user_id || '').toLowerCase();
-      const section = (s.section || 'A').toUpperCase();
+      const sCohort = extractCanonicalCohort(s);
       
       if (filterAtRiskOnly && !s.isAtRisk) return false;
-      if (sectionFilter !== 'All' && section !== sectionFilter) return false;
+      if (sectionFilter !== 'All') {
+        const cleanTargetSec = normalizeSection(sectionFilter);
+        if (sCohort.section !== cleanTargetSec) return false;
+      }
+
+      // Filter strictly by active assignment canonical cohort
+      if (activeSelectedAssignment) {
+        const aCohort = extractCanonicalCohort(activeSelectedAssignment);
+        if (!matchesCohort(s, aCohort)) return false;
+      }
+
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return name.includes(q) || roll.includes(q);
       }
       return true;
     });
-  }, [students, filterAtRiskOnly, sectionFilter, searchQuery]);
+  }, [students, filterAtRiskOnly, sectionFilter, assignmentFilter, activeSelectedAssignment, searchQuery]);
 
   const handleSendNote = useCallback(() => {
     if (!counselingNote.trim() || !selectedStudent) return;
@@ -112,7 +139,7 @@ export default function FacultyStudents({ onOpenRagQuery }) {
             Students Management
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
-            Monitor student attendance, continuous marks, and assign interventions for your assigned sections
+            Monitor student attendance, continuous marks, and assign interventions for your assigned cohorts
           </p>
         </div>
 
@@ -128,8 +155,8 @@ export default function FacultyStudents({ onOpenRagQuery }) {
       {/* Filter Bar */}
       <div className="card" style={{ padding: '14px 20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '260px' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '260px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
               <input
                 type="text"
                 placeholder="Search student or roll no..."
@@ -141,13 +168,35 @@ export default function FacultyStudents({ onOpenRagQuery }) {
               <Search size={15} color="var(--color-text)" style={{ position: 'absolute', left: '12px', top: '10px', opacity: 0.6 }} />
             </div>
 
+            {/* Assignment / Subject Filter */}
+            <select
+              className="input-field"
+              value={assignmentFilter}
+              onChange={(e) => {
+                setAssignmentFilter(e.target.value);
+                if (e.target.value !== 'All') {
+                  const match = assignedClasses.find(c => (c.assignmentId || c.id) === e.target.value);
+                  if (match) setSectionFilter(match.section);
+                }
+              }}
+              style={{ minWidth: '220px', paddingBlock: '7px' }}
+            >
+              <option value="All">All Assigned Classes ({assignedClasses.length})</option>
+              {assignedClasses.map(c => (
+                <option key={c.assignmentId || c.id} value={c.assignmentId || c.id}>
+                  {c.name} ({c.departmentCode || 'CSE'} • Sec {c.section})
+                </option>
+              ))}
+            </select>
+
+            {/* Section Filter */}
             <select
               className="input-field"
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              style={{ width: '160px', paddingBlock: '7px' }}
+              style={{ width: '140px', paddingBlock: '7px' }}
             >
-              <option value="All">All Assigned Sections</option>
+              <option value="All">All Sections</option>
               {availableSections.map(sec => (
                 <option key={sec} value={sec}>Section {sec}</option>
               ))}
@@ -164,6 +213,32 @@ export default function FacultyStudents({ onOpenRagQuery }) {
             </button>
           </div>
         </div>
+
+        {/* Active Class Context Banner */}
+        {activeSelectedAssignment && (
+          <div style={{
+            marginTop: '12px',
+            padding: '8px 14px',
+            backgroundColor: 'rgba(198, 93, 46, 0.08)',
+            border: '1px solid rgba(198, 93, 46, 0.2)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: '12px',
+            color: 'var(--color-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div>
+              <strong>Cohort Context:</strong> {activeSelectedAssignment.name} ({activeSelectedAssignment.code}) • <strong>{activeSelectedAssignment.departmentCode || 'CSE'}</strong> • {activeSelectedAssignment.year}th Year Sem {activeSelectedAssignment.semester} • <strong>Section {activeSelectedAssignment.section}</strong> ({filteredStudents.length} Students)
+            </div>
+            <button
+              onClick={() => { setAssignmentFilter('All'); setSectionFilter('All'); }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+            >
+              Clear Filter ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}

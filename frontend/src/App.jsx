@@ -149,6 +149,12 @@ export default function App() {
     return Boolean(sess?.isFirstLogin || user?.mustChangePassword);
   });
   const [currentView, setCurrentView] = useState('dashboard');
+  const [currentViewProps, setCurrentViewProps] = useState(null);
+
+  const handleNavigate = (view, props = null) => {
+    setCurrentView(view);
+    setCurrentViewProps(props);
+  };
 
   // Modals & Panels State
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -174,6 +180,7 @@ export default function App() {
     setIsLoggedIn(true);
     setIsFirstLogin(Boolean(firstLoginFlag || user?.mustChangePassword || sessionData?.isFirstLogin));
     setCurrentView('dashboard');
+    setCurrentViewProps(null);
   };
 
   // Handle first-login password reset completion
@@ -181,6 +188,7 @@ export default function App() {
     setCurrentUser(updatedUser);
     setIsFirstLogin(false);
     setCurrentView('dashboard');
+    setCurrentViewProps(null);
   };
 
   // Handle secure logout
@@ -195,6 +203,7 @@ export default function App() {
     setIsLoggedIn(false);
     setIsFirstLogin(false);
     setCurrentView('dashboard');
+    setCurrentViewProps(null);
   };
 
   const handleOpenRagQuery = (queryText) => {
@@ -262,7 +271,7 @@ export default function App() {
         <AccessRestricted
           currentUser={currentUser}
           attemptedView={currentView}
-          onReturn={() => setCurrentView('dashboard')}
+          onReturn={() => handleNavigate('dashboard')}
         />
       );
     }
@@ -271,7 +280,7 @@ export default function App() {
     if (activeRole === 'student') {
       switch (currentView) {
         case 'dashboard':
-          return <StudentDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return <StudentDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
         case 'subjects':
         case 'syllabus':
         case 'pyqs':
@@ -291,7 +300,7 @@ export default function App() {
         case 'settings':
           return <StudentSettings />;
         default:
-          return <StudentDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return <StudentDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
       }
     }
 
@@ -299,14 +308,32 @@ export default function App() {
     if (activeRole === 'faculty') {
       switch (currentView) {
         case 'dashboard':
-          return <FacultyDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return <FacultyDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
         case 'classes':
-          return <FacultyClasses onOpenRagQuery={handleOpenRagQuery} />;
+          return (
+            <FacultyClasses 
+              onOpenRagQuery={handleOpenRagQuery} 
+              initialAssignmentId={currentViewProps?.selectedAssignmentId}
+              initialSection={currentViewProps?.selectedSection}
+            />
+          );
         case 'students':
-          return <FacultyStudents onOpenRagQuery={handleOpenRagQuery} />;
+          return (
+            <FacultyStudents 
+              onOpenRagQuery={handleOpenRagQuery} 
+              initialAssignmentId={currentViewProps?.selectedAssignmentId}
+              initialSection={currentViewProps?.selectedSection}
+            />
+          );
         case 'analytics':
         case 'performance':
-          return <FacultyAnalytics onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return (
+            <FacultyAnalytics 
+              onNavigate={handleNavigate} 
+              onOpenRagQuery={handleOpenRagQuery} 
+              initialAssignmentId={currentViewProps?.selectedAssignmentId}
+            />
+          );
         case 'assessments':
           return <FacultyAssessments onOpenRagQuery={handleOpenRagQuery} />;
         case 'coding-assessments':
@@ -317,7 +344,7 @@ export default function App() {
         case 'settings':
           return <FacultySettings />;
         default:
-          return <FacultyDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return <FacultyDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
       }
     }
 
@@ -325,7 +352,7 @@ export default function App() {
     if (activeRole === 'admin') {
       switch (currentView) {
         case 'dashboard':
-          return <AdminDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return <AdminDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
         case 'users':
           return <AdminUsers />;
         case 'faculty-assignments':
@@ -341,7 +368,7 @@ export default function App() {
         case 'coding-assessments':
           return <CodingAssessmentsView />;
         case 'rag-base':
-          return <AdminRagBase onOpenPdf={handleOpenPdf} onNavigate={setCurrentView} />;
+          return <AdminRagBase onOpenPdf={handleOpenPdf} onNavigate={handleNavigate} />;
         case 'rag-settings':
           return <AdminRagSettings />;
         case 'analytics':
@@ -351,11 +378,11 @@ export default function App() {
         case 'settings':
           return <AdminSettings />;
         default:
-          return <AdminDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+          return <AdminDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
       }
     }
 
-    return <StudentDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
+    return <StudentDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
   };
 
   return (
@@ -367,7 +394,7 @@ export default function App() {
       <Sidebar
         activeRole={activeRole}
         currentView={currentView}
-        onNavigate={setCurrentView}
+        onNavigate={handleNavigate}
         onLogout={handleLogout}
         onOpenRag={() => setIsRagChatOpen(true)}
         currentUser={currentUser}

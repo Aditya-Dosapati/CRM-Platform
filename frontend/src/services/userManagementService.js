@@ -1,6 +1,18 @@
 // GMR CRM - User Management & Admin Governance Service
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import auditService from './auditService.js';
+import {
+  normalizeBranch,
+  resolveBranch,
+  resolveDepartment,
+  getBranchDisplay,
+  normalizeYear,
+  normalizeSemester,
+  normalizeSection,
+  normalizeAcademicYear,
+  normalizeRegulation,
+  extractCanonicalCohort
+} from './academicCohortService.js';
 
 const LOCAL_USERS_STORE_KEY = 'gmrit_users_store';
 
@@ -14,7 +26,12 @@ export const DEFAULT_USERS = [
     displayRole: 'Admin',
     status: 'Active',
     rawStatus: 'active',
-    department: 'Institutional Administration',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
+    departmentId: 'dept-cse',
+    departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     designation: 'System Administrator'
   },
   {
@@ -27,9 +44,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     employeeId: 'FAC550',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     designation: 'Associate Professor'
   },
   {
@@ -42,9 +62,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     employeeId: '52413',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     designation: 'Professor'
   },
   {
@@ -57,9 +80,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     employeeId: 'FAC552',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     designation: 'Assistant Professor'
   },
   {
@@ -72,13 +98,16 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     employeeId: 'FAC553',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     designation: 'Assistant Professor'
   },
 
-  // 4th Year Sem 7 Section A Students
+  // 4th Year Sem 7 Section A Students (CSE Branch)
   {
     id: 'std-rahul',
     userId: 'std-rahul',
@@ -89,9 +118,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS001',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '4',
     semester: '7',
     section: 'A',
@@ -109,9 +141,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS002',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '4',
     semester: '7',
     section: 'A',
@@ -129,9 +164,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS003',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '4',
     semester: '7',
     section: 'A',
@@ -149,9 +187,136 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS004',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
+    year: '4',
+    semester: '7',
+    section: 'A',
+    program: 'B.Tech',
+    regulation: 'AR23',
+    academicYear: '2025-2026'
+  },
+
+  // 4th Year Sem 7 Section A Students (AIML Branch)
+  {
+    id: 'std-vikram-aiml',
+    userId: 'std-vikram-aiml',
+    email: 'vikram.23ml001@gmrit.edu.in',
+    name: 'Vikram Joshi',
+    role: 'student',
+    displayRole: 'Student',
+    status: 'Active',
+    rawStatus: 'active',
+    rollNumber: '23ML001',
+    department: 'CSE',
+    branch: 'AIML',
+    branchId: 'AIML',
+    departmentId: 'dept-aiml',
+    departmentCode: 'CSE-AIML',
+    branchDisplayName: 'CSE-AIML',
+    departmentName: 'CSE - Artificial Intelligence and Machine Learning',
+    year: '4',
+    semester: '7',
+    section: 'A',
+    program: 'B.Tech',
+    regulation: 'AR23',
+    academicYear: '2025-2026'
+  },
+  {
+    id: 'std-pooja-aiml',
+    userId: 'std-pooja-aiml',
+    email: 'pooja.23ml002@gmrit.edu.in',
+    name: 'Pooja Hegde',
+    role: 'student',
+    displayRole: 'Student',
+    status: 'Active',
+    rawStatus: 'active',
+    rollNumber: '23ML002',
+    department: 'CSE',
+    branch: 'AIML',
+    branchId: 'AIML',
+    departmentId: 'dept-aiml',
+    departmentCode: 'CSE-AIML',
+    branchDisplayName: 'CSE-AIML',
+    departmentName: 'CSE - Artificial Intelligence and Machine Learning',
+    year: '4',
+    semester: '7',
+    section: 'A',
+    program: 'B.Tech',
+    regulation: 'AR23',
+    academicYear: '2025-2026'
+  },
+  {
+    id: 'std-tru-aiml',
+    userId: 'std-tru-aiml',
+    email: 'tru@gmail.com',
+    name: 'Tiru Student',
+    role: 'student',
+    displayRole: 'Student',
+    status: 'Active',
+    rawStatus: 'active',
+    rollNumber: '06',
+    department: 'CSE',
+    branch: 'AIML',
+    branchId: 'AIML',
+    departmentId: 'dept-aiml',
+    departmentCode: 'CSE-AIML',
+    branchDisplayName: 'CSE-AIML',
+    departmentName: 'CSE - Artificial Intelligence and Machine Learning',
+    year: '4',
+    semester: '7',
+    section: 'A',
+    program: 'B.Tech',
+    regulation: 'AR23',
+    academicYear: '2025-2026'
+  },
+
+  // 4th Year Sem 7 Section A Students (AIDS Branch)
+  {
+    id: 'std-dinesh-aids',
+    userId: 'std-dinesh-aids',
+    email: 'dinesh.23ds001@gmrit.edu.in',
+    name: 'Dinesh Karthik',
+    role: 'student',
+    displayRole: 'Student',
+    status: 'Active',
+    rawStatus: 'active',
+    rollNumber: '23DS001',
+    department: 'CSE',
+    branch: 'AIDS',
+    branchId: 'AIDS',
+    departmentId: 'dept-aids',
+    departmentCode: 'CSE-AIDS',
+    branchDisplayName: 'CSE-AIDS',
+    departmentName: 'CSE - Artificial Intelligence and Data Science',
+    year: '4',
+    semester: '7',
+    section: 'A',
+    program: 'B.Tech',
+    regulation: 'AR23',
+    academicYear: '2025-2026'
+  },
+  {
+    id: 'std-sanya-aids',
+    userId: 'std-sanya-aids',
+    email: 'sanya.23ds002@gmrit.edu.in',
+    name: 'Sanya Malhotra',
+    role: 'student',
+    displayRole: 'Student',
+    status: 'Active',
+    rawStatus: 'active',
+    rollNumber: '23DS002',
+    department: 'CSE',
+    branch: 'AIDS',
+    branchId: 'AIDS',
+    departmentId: 'dept-aids',
+    departmentCode: 'CSE-AIDS',
+    branchDisplayName: 'CSE-AIDS',
+    departmentName: 'CSE - Artificial Intelligence and Data Science',
     year: '4',
     semester: '7',
     section: 'A',
@@ -171,9 +336,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS051',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '4',
     semester: '7',
     section: 'B',
@@ -191,9 +359,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS052',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '4',
     semester: '7',
     section: 'B',
@@ -213,9 +384,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS101',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '3',
     semester: '5',
     section: 'A',
@@ -233,9 +407,12 @@ export const DEFAULT_USERS = [
     status: 'Active',
     rawStatus: 'active',
     rollNumber: '23CS102',
-    department: 'Computer Science and Engineering',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
     departmentId: 'dept-cse',
     departmentCode: 'CSE',
+    branchDisplayName: 'CSE',
     year: '3',
     semester: '5',
     section: 'A',
@@ -248,6 +425,31 @@ export const DEFAULT_USERS = [
 class UserManagementService {
   constructor() {
     this._memoryUsers = this._loadLocalStore();
+  }
+
+  _sanitizeAndMigrateUsers(users) {
+    if (!Array.isArray(users)) return [];
+    return users.map(u => {
+      const b = resolveBranch(u);
+      const branchDisplayName = getBranchDisplay('CSE', b);
+      const deptName = b === 'AIML'
+        ? 'CSE - Artificial Intelligence and Machine Learning'
+        : b === 'AIDS'
+        ? 'CSE - Artificial Intelligence and Data Science'
+        : 'Computer Science and Engineering';
+      const deptId = b === 'AIML' ? 'dept-aiml' : b === 'AIDS' ? 'dept-aids' : 'dept-cse';
+
+      return {
+        ...u,
+        department: 'CSE',
+        branch: b,
+        branchId: b,
+        departmentCode: branchDisplayName,
+        branchDisplayName: branchDisplayName,
+        departmentName: deptName,
+        departmentId: deptId
+      };
+    });
   }
 
   _loadLocalStore() {
@@ -263,7 +465,9 @@ class UserManagementService {
           const parsed = JSON.parse(stored);
 
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            const sanitized = this._sanitizeAndMigrateUsers(parsed);
+            this._saveLocalStore(sanitized);
+            return sanitized;
           }
         }
       }
@@ -274,11 +478,13 @@ class UserManagementService {
       );
     }
 
-    return DEFAULT_USERS;
+    const base = (this._memoryUsers && this._memoryUsers.length > 0) ? this._memoryUsers : DEFAULT_USERS;
+    return this._sanitizeAndMigrateUsers(base);
   }
 
   _saveLocalStore(users) {
-    this._memoryUsers = users;
+    const sanitized = this._sanitizeAndMigrateUsers(users);
+    this._memoryUsers = sanitized;
 
     try {
       if (
@@ -288,7 +494,7 @@ class UserManagementService {
       ) {
         window.localStorage.setItem(
           LOCAL_USERS_STORE_KEY,
-          JSON.stringify(users)
+          JSON.stringify(sanitized)
         );
       }
     } catch (e) {
@@ -434,6 +640,11 @@ class UserManagementService {
                 studentInfo?.departments?.code ||
                 facultyInfo?.departments?.code ||
                 '',
+              branch:
+                studentInfo?.departments?.code ||
+                facultyInfo?.departments?.code ||
+                departmentId ||
+                '',
               rollNumber,
               employeeId,
               year,
@@ -469,11 +680,64 @@ class UserManagementService {
       userMap.set(u.email.toLowerCase(), u)
     );
 
-    const merged = Array.from(userMap.values());
+    const rawMerged = Array.from(userMap.values());
 
-    this._memoryUsers = merged;
+    const canonicalUsers = rawMerged.map((u) => {
+      const rawRole = (u.role || 'student').toLowerCase().trim();
+      const branch = normalizeBranch(u);
 
-    return merged;
+      let year = u.year;
+      let semester = u.semester;
+      let section = u.section;
+      let regulation = u.regulation;
+      let academicYear = u.academicYear;
+
+      if (rawRole === 'student') {
+        const numYear = normalizeYear(u.year, u.semester);
+        const numSem = normalizeSemester(u.semester, numYear);
+        const cleanSec = normalizeSection(u.section);
+        year = String(numYear);
+        semester = String(numSem);
+        section = cleanSec;
+        regulation = normalizeRegulation(u.regulation);
+        academicYear = normalizeAcademicYear(u.academicYear);
+      }
+
+      const rawStatus = (u.rawStatus || u.status || 'active').toLowerCase().trim();
+      const displayStatus = rawStatus === 'pending'
+        ? 'Pending Approval'
+        : (rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1));
+
+      return {
+        ...u,
+        id: u.id || u.userId,
+        userId: u.userId || u.id,
+        email: (u.email || '').toLowerCase().trim(),
+        name: u.name || u.full_name || 'User',
+        role: rawRole,
+        displayRole: rawRole ? rawRole.charAt(0).toUpperCase() + rawRole.slice(1) : 'Student',
+        status: displayStatus,
+        rawStatus,
+        department: 'CSE',
+        departmentId: branch.id,
+        departmentCode: branch.displayName,
+        departmentName: branch.name,
+        branch: branch.branch,
+        branchId: branch.branch,
+        branchDisplayName: branch.displayName,
+        year: year ? String(year) : '—',
+        semester: semester ? String(semester) : '—',
+        section: section ? String(section) : '—',
+        regulation: regulation || 'AR23',
+        academicYear: academicYear || '2025-2026',
+        rollNumber: u.rollNumber ? String(u.rollNumber).trim().toUpperCase() : (u.roll_number ? String(u.roll_number).trim().toUpperCase() : ''),
+        employeeId: u.employeeId ? String(u.employeeId).trim().toUpperCase() : (u.employee_id ? String(u.employee_id).trim().toUpperCase() : '')
+      };
+    });
+
+    this._memoryUsers = canonicalUsers;
+
+    return canonicalUsers;
   }
 
   /**
@@ -730,10 +994,6 @@ class UserManagementService {
    * Single user provisioning by Admin using secure Edge Function.
    */
   async provisionUser(userData) {
-    if (!isSupabaseConfigured()) {
-      throw new Error('Supabase client not configured.');
-    }
-
     const role = (userData.role || 'student')
       .toLowerCase()
       .trim();
@@ -760,241 +1020,235 @@ class UserManagementService {
     ).toLowerCase().trim();
 
     const numYear = userData.year
-      ? Number(userData.year)
+      ? normalizeYear(userData.year, userData.semester)
       : 1;
 
     const numSem = userData.semester
-      ? Number(userData.semester)
+      ? normalizeSemester(userData.semester, numYear)
       : (numYear * 2 - 1);
 
-    const section = (
-      userData.section || 'A'
-    ).trim().toUpperCase();
+    const section = normalizeSection(userData.section);
 
     const program = (
       userData.program || 'B.Tech'
     ).trim();
 
-    try {
-      const {
-        data,
-        error: fnErr
-      } = await supabase.functions.invoke(
-        'admin-provision-user',
-        {
-          body: {
-            action: 'single',
-            role,
-            name,
-            email,
-            password,
-            departmentId:
-              userData.departmentId || null,
-            rollNumber: userData.rollNumber
+    let targetUserId = userData.id || userData.userId || `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    if (isSupabaseConfigured()) {
+      try {
+        const {
+          data,
+          error: fnErr
+        } = await supabase.functions.invoke(
+          'admin-provision-user',
+          {
+            body: {
+              action: 'single',
+              role,
+              name,
+              email,
+              password,
+              departmentId:
+                userData.departmentId || null,
+              rollNumber: userData.rollNumber
+                ? String(userData.rollNumber)
+                    .trim()
+                    .toUpperCase()
+                : null,
+              employeeId: userData.employeeId
+                ? String(userData.employeeId)
+                    .trim()
+                    .toUpperCase()
+                : null,
+              program,
+              year: numYear,
+              semester: numSem,
+              section,
+              designation:
+                userData.designation ||
+                'Assistant Professor',
+              status
+            }
+          }
+        );
+
+        if (!fnErr && data?.success) {
+          if (data.userId) targetUserId = data.userId;
+        }
+      } catch (err) {
+        console.warn(
+          '[UserManagementService] admin-provision-user Edge Function notice:',
+          err.message
+        );
+      }
+
+      // Direct table upsert fallback for Admin
+      try {
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (existingUser?.id) {
+          targetUserId = existingUser.id;
+          await supabase
+            .from('users')
+            .update({
+              full_name: name,
+              role,
+              status
+            })
+            .eq('id', targetUserId);
+        } else {
+          const {
+            data: userProfile,
+            error: uErr
+          } = await supabase
+            .from('users')
+            .insert([
+              {
+                email,
+                full_name: name,
+                role,
+                status,
+                must_change_password: true,
+                created_at: new Date().toISOString()
+              }
+            ])
+            .select()
+            .single();
+
+          if (!uErr && userProfile?.id) {
+            targetUserId = userProfile.id;
+          }
+        }
+
+        if (role === 'student') {
+          const {
+            data: existingStudent
+          } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', targetUserId)
+            .maybeSingle();
+
+          const studentPayload = {
+            roll_number: userData.rollNumber
               ? String(userData.rollNumber)
                   .trim()
                   .toUpperCase()
               : null,
-            employeeId: userData.employeeId
+            department_id:
+              userData.departmentId || null,
+            year: numYear,
+            semester: numSem,
+            section,
+            program
+          };
+
+          if (existingStudent) {
+            await supabase
+              .from('students')
+              .update(studentPayload)
+              .eq('user_id', targetUserId);
+          } else {
+            await supabase
+              .from('students')
+              .insert([
+                {
+                  user_id: targetUserId,
+                  ...studentPayload
+                }
+              ]);
+          }
+        } else if (role === 'faculty') {
+          const {
+            data: existingFaculty
+          } = await supabase
+            .from('faculty')
+            .select('id')
+            .eq('user_id', targetUserId)
+            .maybeSingle();
+
+          const facultyPayload = {
+            employee_id: userData.employeeId
               ? String(userData.employeeId)
                   .trim()
                   .toUpperCase()
               : null,
-            program,
-            year: numYear,
-            semester: numSem,
-            section,
+            department_id:
+              userData.departmentId || null,
             designation:
               userData.designation ||
-              'Assistant Professor',
-            status
+              'Assistant Professor'
+          };
+
+          if (existingFaculty) {
+            await supabase
+              .from('faculty')
+              .update(facultyPayload)
+              .eq('user_id', targetUserId);
+          } else {
+            await supabase
+              .from('faculty')
+              .insert([
+                {
+                  user_id: targetUserId,
+                  ...facultyPayload
+                }
+              ]);
           }
         }
-      );
-
-      if (!fnErr && data?.success) {
-        auditService.logAction({
-          user: 'Admin',
-          role: 'admin',
-          userId: data.userId || email,
-          action: 'Provision User Account',
-          resource: '/admin/users',
-          result: 'Success',
-          details:
-            `Provisioned new [${role.toUpperCase()}] account for ${name} (${email}).`
-        });
-
-        return {
-          ...data,
-          tempPass: password
-        };
+      } catch (dbErr) {
+        console.warn('[UserManagementService] Supabase fallback write notice:', dbErr.message);
       }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      if (fnErr) {
-        let detailedMsg = fnErr.message || '';
-
-        try {
-          if (
-            fnErr.context &&
-            typeof fnErr.context.json === 'function'
-          ) {
-            const errBody = await fnErr.context.json();
-
-            if (errBody?.error) {
-              detailedMsg = errBody.error;
-            }
-          }
-        } catch (_) {}
-
-        if (
-          detailedMsg &&
-          !detailedMsg.includes('FunctionsHttpError')
-        ) {
-          throw new Error(detailedMsg);
-        }
-      }
-    } catch (err) {
-      const msg = err.message || '';
-
-      if (
-        !msg.includes('FunctionsFetchError') &&
-        !msg.includes(
-          'Failed to send a request to Edge Function'
-        )
-      ) {
-        throw err;
-      }
-
-      console.warn(
-        '[UserManagementService] admin-provision-user Edge Function offline notice:',
-        msg
-      );
     }
 
-    // Direct table upsert fallback for Admin.
-    try {
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('email', email)
-        .maybeSingle();
+    const branch = normalizeBranch(userData);
+    const cleanYear = role === 'student' ? normalizeYear(userData.year, userData.semester) : null;
+    const cleanSem = role === 'student' ? normalizeSemester(userData.semester, cleanYear) : null;
+    const cleanSec = role === 'student' ? normalizeSection(userData.section) : null;
 
-      let targetUserId = existingUser?.id;
+      const newUserObj = {
+        id: targetUserId,
+        userId: targetUserId,
+        email,
+        name,
+        role,
+        displayRole: role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Student',
+        status: status === 'active' ? 'Active' : 'Pending Approval',
+        rawStatus: status,
+        department: 'CSE',
+        departmentId: branch.id,
+        departmentCode: branch.displayName,
+        departmentName: branch.name,
+        branch: branch.branch,
+        branchId: branch.branch,
+        branchDisplayName: branch.displayName,
+        year: cleanYear ? String(cleanYear) : '—',
+        semester: cleanSem ? String(cleanSem) : '—',
+        section: cleanSec || '—',
+        program: program || 'B.Tech',
+        regulation: userData.regulation || 'AR23',
+        academicYear: userData.academicYear || '2025-2026',
+        rollNumber: userData.rollNumber ? String(userData.rollNumber).trim().toUpperCase() : '',
+        employeeId: userData.employeeId ? String(userData.employeeId).trim().toUpperCase() : '',
+        designation: userData.designation || (role === 'faculty' ? 'Assistant Professor' : ''),
+        createdAt: new Date().toISOString()
+      };
 
-      if (!targetUserId) {
-        const {
-          data: userProfile,
-          error: uErr
-        } = await supabase
-          .from('users')
-          .insert([
-            {
-              email,
-              full_name: name,
-              role,
-              status,
-              must_change_password: true,
-              created_at: new Date().toISOString()
-            }
-          ])
-          .select()
-          .single();
+      const existingUsers = this._loadLocalStore();
+      const updatedList = [
+        ...existingUsers.filter(u => u.id !== targetUserId && (u.email || '').toLowerCase() !== email),
+        newUserObj
+      ];
+      this._saveLocalStore(updatedList);
 
-        if (uErr) {
-          throw uErr;
-        }
-
-        targetUserId = userProfile.id;
-      } else {
-        await supabase
-          .from('users')
-          .update({
-            full_name: name,
-            role,
-            status
-          })
-          .eq('id', targetUserId);
-      }
-
-      if (role === 'student') {
-        const {
-          data: existingStudent
-        } = await supabase
-          .from('students')
-          .select('id')
-          .eq('user_id', targetUserId)
-          .maybeSingle();
-
-        const studentPayload = {
-          roll_number: userData.rollNumber
-            ? String(userData.rollNumber)
-                .trim()
-                .toUpperCase()
-            : null,
-          department_id:
-            userData.departmentId || null,
-          year: numYear,
-          semester: numSem,
-          section,
-          program
-        };
-
-        if (existingStudent) {
-          await supabase
-            .from('students')
-            .update(studentPayload)
-            .eq('user_id', targetUserId);
-        } else {
-          await supabase
-            .from('students')
-            .insert([
-              {
-                user_id: targetUserId,
-                ...studentPayload
-              }
-            ]);
-        }
-      } else if (role === 'faculty') {
-        const {
-          data: existingFaculty
-        } = await supabase
-          .from('faculty')
-          .select('id')
-          .eq('user_id', targetUserId)
-          .maybeSingle();
-
-        const facultyPayload = {
-          employee_id: userData.employeeId
-            ? String(userData.employeeId)
-                .trim()
-                .toUpperCase()
-            : null,
-          department_id:
-            userData.departmentId || null,
-          designation:
-            userData.designation ||
-            'Assistant Professor'
-        };
-
-        if (existingFaculty) {
-          await supabase
-            .from('faculty')
-            .update(facultyPayload)
-            .eq('user_id', targetUserId);
-        } else {
-          await supabase
-            .from('faculty')
-            .insert([
-              {
-                user_id: targetUserId,
-                ...facultyPayload
-              }
-            ]);
-        }
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('gmrit_users_updated'));
+        window.dispatchEvent(new CustomEvent('gmrit_assignments_updated'));
       }
 
       auditService.logAction({
@@ -1017,12 +1271,6 @@ class UserManagementService {
         status,
         tempPass: password
       };
-    } catch (dbErr) {
-      throw new Error(
-        dbErr.message ||
-        'Failed to provision user profile.'
-      );
-    }
   }
 
   /**
@@ -1288,11 +1536,22 @@ class UserManagementService {
         seenEmails.add(email);
       }
 
+      const branchResolved = resolveBranch(deptVal || row.branch || row.roll_number || row.employee_id || email);
+      const branchInfo = normalizeBranch(branchResolved);
+      const branchDisplayName = getBranchDisplay('CSE', branchResolved);
+
       let departmentId = null;
 
       if (deptVal) {
         departmentId =
-          deptCodeMap.get(deptVal) || null;
+          deptCodeMap.get(deptVal) ||
+          deptCodeMap.get(branchResolved) ||
+          deptCodeMap.get(branchDisplayName) ||
+          null;
+      }
+
+      if (!departmentId) {
+        departmentId = branchInfo.id;
       }
 
       if (rowRole === 'student') {
@@ -1357,7 +1616,12 @@ class UserManagementService {
           email,
           rollNumber,
           departmentVal: deptVal,
+          department: 'CSE',
           departmentId,
+          departmentCode: branchDisplayName,
+          branch: branchResolved,
+          branchId: branchResolved,
+          branchDisplayName,
           year: parsedYear,
           semester: parsedSem,
           section: section || 'A',
@@ -1411,7 +1675,12 @@ class UserManagementService {
           email,
           employeeId,
           departmentVal: deptVal,
+          department: 'CSE',
           departmentId,
+          departmentCode: branchDisplayName,
+          branch: branchResolved,
+          branchId: branchResolved,
+          branchDisplayName,
           designation,
           role: 'faculty'
         };
@@ -1483,8 +1752,21 @@ class UserManagementService {
       const row = validRows[i];
 
       try {
+        const branch = resolveBranch(
+          row.branch ||
+          row.branchId ||
+          row.departmentVal ||
+          row.departmentCode ||
+          row.rollNumber ||
+          row.employeeId ||
+          row.email
+        );
+        const branchDisplayName = getBranchDisplay('CSE', branch);
+        const branchInfo = normalizeBranch(branch);
+
         const deptId =
           row.departmentId ||
+          branchInfo.id ||
           fallbackDeptId;
 
         const identifier =
@@ -1515,6 +1797,12 @@ class UserManagementService {
               ? identifier
               : undefined,
           departmentId: deptId,
+          department: 'CSE',
+          branch: branch,
+          branchId: branch,
+          departmentCode: branchDisplayName,
+          branchDisplayName: branchDisplayName,
+          departmentVal: row.departmentVal,
           year: row.year || 1,
           semester: row.semester || 1,
           section: row.section || 'A',

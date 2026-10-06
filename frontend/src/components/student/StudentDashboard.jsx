@@ -18,13 +18,16 @@ import {
 } from 'lucide-react';
 import academicDataService from '../../services/academicDataService';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
+import assessmentService from '../../services/assessmentService';
 import authService from '../../services/authService';
+import { extractCanonicalCohort } from '../../services/academicCohortService';
 import EmptyState from '../common/EmptyState';
 
 export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
   const [selectedSemester, setSelectedSemester] = useState('Sem 4');
   const [subjects, setSubjects] = useState([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [asmtStats, setAsmtStats] = useState({ completed: 0, total: 0 });
 
   const currentUser = authService.getCurrentUser();
 
@@ -34,9 +37,24 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
       setLoadingSubjects(true);
       try {
         const studentId = currentUser?.id || currentUser?.userId;
-        const loadedSubjects = await facultyAssignmentService.getStudentAssignedSubjects(studentId);
-        if (isMounted && loadedSubjects) {
-          setSubjects(loadedSubjects);
+        const studentProfile = extractCanonicalCohort(currentUser);
+
+        const [loadedSubjects, asmtRes] = await Promise.all([
+          facultyAssignmentService.getStudentAssignedSubjects(studentId, studentProfile),
+          assessmentService.getAssessments({ student: studentProfile })
+        ]);
+
+        const localAttempts = assessmentService._loadAttemptsLocal();
+        const myAttempts = localAttempts.filter(att => 
+          att.studentId === studentId || att.studentUserId === studentId
+        );
+
+        const totalAsmts = asmtRes?.data?.length || 0;
+        const completedAsmts = myAttempts.length;
+
+        if (isMounted) {
+          if (loadedSubjects) setSubjects(loadedSubjects);
+          setAsmtStats({ completed: completedAsmts, total: totalAsmts });
         }
       } catch (err) {
         console.warn('StudentDashboard: could not load dynamic subjects:', err);
@@ -51,12 +69,14 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('gmrit_assignments_updated', handleUpdate);
+      window.addEventListener('gmrit_assessments_updated', handleUpdate);
     }
 
     return () => { 
       isMounted = false; 
       if (typeof window !== 'undefined') {
         window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+        window.removeEventListener('gmrit_assessments_updated', handleUpdate);
       }
     };
   }, [currentUser?.id, currentUser?.userId]);
@@ -96,16 +116,16 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         </div>
 
         {/* Assessments */}
-        <div className="kpi-card">
+        <div className="kpi-card" onClick={() => onNavigate('assessments')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
             <span className="kpi-label">Assessments</span>
             <div className="kpi-icon-wrap">
               <CheckSquare size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '0 / 0' : '0'}</div>
-          <div className="kpi-trend neutral">
-            <span>Scheduled</span>
+          <div className="kpi-value">{asmtStats.completed} / {asmtStats.total}</div>
+          <div className="kpi-trend positive">
+            <span>{asmtStats.total > 0 ? `${asmtStats.completed} Completed` : 'Scheduled'}</span>
           </div>
         </div>
 

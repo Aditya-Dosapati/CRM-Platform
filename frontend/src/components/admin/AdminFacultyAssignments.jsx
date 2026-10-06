@@ -27,6 +27,14 @@ import {
 import facultyAssignmentService from '../../services/facultyAssignmentService';
 import userManagementService from '../../services/userManagementService';
 import academicDataService, { MASTER_DEPARTMENTS } from '../../services/academicDataService';
+import {
+  extractCanonicalCohort,
+  matchesCohort,
+  normalizeBranch,
+  resolveBranch,
+  resolveDepartment,
+  getBranchDisplay
+} from '../../services/academicCohortService';
 import authService from '../../services/authService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import EmptyState from '../common/EmptyState';
@@ -50,6 +58,7 @@ export default function AdminFacultyAssignments() {
 
   // Modals & Active Faculty State
   const [selectedFaculty, setSelectedFaculty] = useState(null); // When non-null, Modify modal is open
+  const [studentList, setStudentList] = useState([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(null); // assignment object to delete
   const [conflictData, setConflictData] = useState(null);
@@ -59,11 +68,13 @@ export default function AdminFacultyAssignments() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState(null);
   const [formData, setFormData] = useState({
-    departmentId: '',
+    departmentId: 'dept-cse',
+    department: 'CSE',
+    branch: 'CSE',
     regulation: 'AR23',
     academicYear: '2025-2026',
-    year: 3,
-    semester: 5,
+    year: 4,
+    semester: 7,
     section: 'A',
     subjectId: ''
   });
@@ -112,7 +123,9 @@ export default function AdminFacultyAssignments() {
 
       const allUsers = Array.isArray(usersData) ? usersData : [];
       const facultyUsers = allUsers.filter(u => u.role === 'faculty');
+      const studentUsers = allUsers.filter(u => u.role === 'student');
       setFacultyList(facultyUsers);
+      setStudentList(studentUsers);
 
       if (deptsRes?.data) setDepartments(deptsRes.data);
       if (subsRes?.error) {
@@ -279,16 +292,14 @@ export default function AdminFacultyAssignments() {
   const handleOpenAddForm = () => {
     setFormError(null);
     setEditingAssignmentId(null);
-    
-    // Find department match for selected faculty or default to CSE
-    const facDeptId = selectedFaculty?.departmentId || (departments.find(d => (d.code || '').toUpperCase() === 'CSE')?.id) || departments[0]?.id || 'dept-cse';
-    
     setFormData({
-      departmentId: facDeptId,
+      departmentId: 'dept-cse',
+      department: 'CSE',
+      branch: 'CSE',
       regulation: 'AR23',
       academicYear: '2025-2026',
-      year: 3,
-      semester: 5,
+      year: 4,
+      semester: 7,
       section: 'A',
       subjectId: ''
     });
@@ -299,14 +310,18 @@ export default function AdminFacultyAssignments() {
   const handleOpenEditForm = (assignment) => {
     setFormError(null);
     setEditingAssignmentId(assignment.id);
+    const branch = resolveBranch(assignment.branch || assignment.branchId || assignment.departmentCode || assignment.departmentId);
+    const dept = resolveDepartment(assignment.department || assignment.departmentCode || assignment.departmentId);
     setFormData({
-      departmentId: assignment.departmentId,
+      departmentId: assignment.departmentId || (branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse'),
+      department: dept,
+      branch: branch,
       regulation: assignment.regulation || 'AR23',
       academicYear: assignment.academicYear || '2025-2026',
-      year: Number(assignment.year) || 3,
-      semester: Number(assignment.semester) || 5,
+      year: Number(assignment.year) || 4,
+      semester: Number(assignment.semester) || 7,
       section: assignment.section || 'A',
-      subjectId: assignment.subjectId
+      subjectId: assignment.subjectId || ''
     });
     setIsFormOpen(true);
   };
@@ -428,6 +443,38 @@ export default function AdminFacultyAssignments() {
     });
   }, [subjects, departments, formData.departmentId, formData.semester, formData.year, formData.regulation, subjectsError]);
 
+  // Dynamic Mapped Students preview for the selected academic cohort
+  const mappedStudentsPreview = useMemo(() => {
+    const branch = resolveBranch(formData.branch || formData.departmentId);
+    const department = resolveDepartment(formData.department || formData.departmentId);
+    const branchDisplayName = getBranchDisplay(department, branch);
+
+    const targetCohort = extractCanonicalCohort({
+      department,
+      branch,
+      year: formData.year,
+      semester: formData.semester,
+      section: formData.section,
+      academicYear: formData.academicYear,
+      regulation: formData.regulation
+    });
+
+    if (!targetCohort) return null;
+
+    const matching = studentList.filter(s => matchesCohort(s, targetCohort));
+    const displayCount = matching.length;
+    const yearSuffix = targetCohort.year === 1 ? '1st' : targetCohort.year === 2 ? '2nd' : targetCohort.year === 3 ? '3rd' : `${targetCohort.year}th`;
+    return {
+      count: displayCount,
+      displayBranch: branchDisplayName,
+      deptCode: branchDisplayName,
+      yearText: `${yearSuffix} Year`,
+      semester: targetCohort.semester,
+      section: targetCohort.section,
+      academicYear: targetCohort.academicYear
+    };
+  }, [studentList, formData]);
+
   // Submit Add or Edit Assignment Form
   const handleSaveAssignment = async (e) => {
     e.preventDefault();
@@ -436,17 +483,24 @@ export default function AdminFacultyAssignments() {
     setFormSubmitting(true);
 
     try {
-      if (!formData.subjectId || !formData.departmentId) {
-        throw new Error('Please select Department and Subject.');
+      if (!formData.subjectId) {
+        throw new Error('Please select a Subject.');
       }
 
       const facultyId = selectedFaculty.id || selectedFaculty.userId;
+      const branch = resolveBranch(formData.branch || formData.departmentId);
+      const department = resolveDepartment(formData.department || formData.departmentId);
+      const branchDisplayName = getBranchDisplay(department, branch);
 
       // 1. If EDITING existing assignment
       if (editingAssignmentId) {
         await facultyAssignmentService.updateAssignment(editingAssignmentId, {
           facultyId,
-          departmentId: formData.departmentId,
+          departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+          department: department,
+          departmentCode: branchDisplayName,
+          branch: branch,
+          branchId: branch,
           subjectId: formData.subjectId,
           year: Number(formData.year),
           semester: Number(formData.semester),
@@ -468,7 +522,9 @@ export default function AdminFacultyAssignments() {
       // 2. If CREATING new assignment -> check conflict
       const conflictCheck = await facultyAssignmentService.checkConflict({
         subjectId: formData.subjectId,
-        departmentId: formData.departmentId,
+        departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+        department: department,
+        branch: branch,
         year: Number(formData.year),
         semester: Number(formData.semester),
         section: formData.section,
@@ -482,7 +538,15 @@ export default function AdminFacultyAssignments() {
         } else {
           // Trigger conflict replace modal
           setConflictData({
-            newAssignment: { ...formData, facultyId },
+            newAssignment: {
+              ...formData,
+              facultyId,
+              departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+              department: department,
+              departmentCode: branchDisplayName,
+              branch: branch,
+              branchId: branch
+            },
             existingAssignment: conflictCheck.existingAssignment
           });
           setShowConflictModal(true);
@@ -494,7 +558,12 @@ export default function AdminFacultyAssignments() {
       // Direct create
       await facultyAssignmentService.createAssignment({
         ...formData,
-        facultyId
+        facultyId,
+        departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+        department: department,
+        departmentCode: branchDisplayName,
+        branch: branch,
+        branchId: branch
       }, null, currentUser);
 
       setIsFormOpen(false);
@@ -1250,21 +1319,33 @@ export default function AdminFacultyAssignments() {
                     )}
 
                     <form onSubmit={handleSaveAssignment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {/* Row 1: Department (1fr), Academic Year (1fr) */}
-                      <div className="form-grid-2col">
+                      {/* Row 1: Department (1fr), Branch (1fr), Academic Year (1fr) */}
+                      <div className="form-grid-3col">
                         <div className="input-group">
                           <label className="input-label" style={{ fontSize: '12px', fontWeight: 700 }}>Department *</label>
                           <select
                             className="input-field"
-                            value={formData.departmentId}
-                            onChange={(e) => handleFormChange('departmentId', e.target.value)}
+                            value={formData.department || 'CSE'}
+                            onChange={(e) => handleFormChange('department', e.target.value)}
                             required
                             style={{ fontSize: '12.5px', height: '38px' }}
                           >
-                            <option value="" disabled>Select Department</option>
-                            {departments.map(d => (
-                              <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
-                            ))}
+                            <option value="CSE">CSE</option>
+                          </select>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label" style={{ fontSize: '12px', fontWeight: 700 }}>Branch *</label>
+                          <select
+                            className="input-field"
+                            value={formData.branch || 'CSE'}
+                            onChange={(e) => handleFormChange('branch', e.target.value)}
+                            required
+                            style={{ fontSize: '12.5px', height: '38px' }}
+                          >
+                            <option value="CSE">CSE</option>
+                            <option value="AIML">AIML</option>
+                            <option value="AIDS">AIDS</option>
                           </select>
                         </div>
 
@@ -1394,6 +1475,38 @@ export default function AdminFacultyAssignments() {
                           </select>
                         </div>
                       </div>
+
+                      {/* Dynamic Mapped Students Live Preview */}
+                      {mappedStudentsPreview && (
+                        <div style={{
+                          padding: '10px 14px',
+                          backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                          border: '1px solid rgba(59, 130, 246, 0.25)',
+                          borderRadius: 'var(--radius-sm)',
+                          marginTop: '4px',
+                          marginBottom: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '8px'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '10.5px', color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Mapped Students
+                            </div>
+                            <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--color-text)' }}>
+                              {mappedStudentsPreview.count} Students
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', textAlign: 'right' }}>
+                            <span style={{ color: '#10b981', fontWeight: 700 }}>✓ Automatically mapped from</span>{' '}
+                            <strong style={{ color: 'var(--color-text)' }}>
+                              {mappedStudentsPreview.deptCode} • {mappedStudentsPreview.yearText} • Sem {mappedStudentsPreview.semester} • Sec {mappedStudentsPreview.section}
+                            </strong>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Form Footer Action Buttons */}
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>

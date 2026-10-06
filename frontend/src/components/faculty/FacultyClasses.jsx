@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
 import authService from '../../services/authService';
+import { extractCanonicalCohort, matchesCohort } from '../../services/academicCohortService';
 import EmptyState from '../common/EmptyState';
 
 export default function FacultyClasses({ onOpenRagQuery }) {
@@ -67,15 +68,8 @@ export default function FacultyClasses({ onOpenRagQuery }) {
   // Filter students for the selected class section
   const sectionStudents = useMemo(() => {
     if (!students || students.length === 0 || !currentClass) return [];
-    return students.filter(s => {
-      const sSec = (s.section || 'A').toUpperCase().trim();
-      const cSec = (currentClass.section || 'A').toUpperCase().trim();
-      const sYear = Number(s.year) || 4;
-      const cYear = Number(currentClass.year) || 4;
-      const sSem = Number(s.semester) || 7;
-      const cSem = Number(currentClass.semester) || 7;
-      return sSec === cSec && sYear === cYear && sSem === cSem;
-    });
+    const cCohort = extractCanonicalCohort(currentClass);
+    return students.filter(s => matchesCohort(s, cCohort));
   }, [students, currentClass]);
 
   const filteredStudents = useMemo(() => {
@@ -142,7 +136,8 @@ export default function FacultyClasses({ onOpenRagQuery }) {
         }}>
           {classes.map((cls) => {
             const isSelected = (cls.assignmentId || cls.id) === selectedClassId;
-            const clsStudentCount = students.filter(s => (s.section || 'A').toUpperCase() === (cls.section || 'A').toUpperCase() && Number(s.year) === Number(cls.year)).length;
+            const clsCohort = extractCanonicalCohort(cls);
+            const clsStudentCount = students.filter(s => matchesCohort(s, clsCohort)).length;
 
             return (
               <div

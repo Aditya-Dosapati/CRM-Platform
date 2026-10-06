@@ -28,7 +28,7 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
     setError(null);
     try {
       const studentId = currentUser?.id || currentUser?.userId;
-      const loadedSubjects = await facultyAssignmentService.getStudentAssignedSubjects(studentId);
+      const loadedSubjects = await facultyAssignmentService.getStudentAssignedSubjects(studentId, currentUser);
       if (loadedSubjects && loadedSubjects.length > 0) {
         setSubjects(loadedSubjects);
         setSelectedSubjectId(prevId => {
@@ -45,7 +45,7 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.id, currentUser?.userId]);
+  }, [currentUser]);
 
   useEffect(() => {
     fetchSubjectsData();

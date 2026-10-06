@@ -5,15 +5,48 @@ import userManagementService from './userManagementService.js';
 import academicDataService, { MASTER_DEPARTMENTS, MASTER_SUBJECTS } from './academicDataService.js';
 import auditService from './auditService.js';
 import { isValidUuid } from './ragDocumentService.js';
+import {
+  resolveDepartment,
+  resolveBranch,
+  getBranchDisplay,
+  normalizeBranch,
+  normalizeYear,
+  normalizeSemester,
+  normalizeSection,
+  normalizeAcademicYear,
+  normalizeRegulation,
+  extractCanonicalCohort,
+  matchesCohort,
+  isUserActive
+} from './academicCohortService.js';
 
 const LOCAL_STORAGE_KEY = 'gmrit_faculty_assignments_store';
 
 export const DEFAULT_ASSIGNMENTS = [
   {
+    id: 'assign-anand-cloud-a',
+    faculty_id: 'fac-anand',
+    subject_id: 'sub-cloud-devops-7',
+    department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'CSE',
+    academic_year: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'A',
+    assigned_by: 'user-admin',
+    is_active: true,
+    created_at: new Date('2025-06-01T08:30:00Z').toISOString(),
+    updated_at: new Date('2025-06-01T08:30:00Z').toISOString()
+  },
+  {
     id: 'assign-anand-nlp-a',
     faculty_id: 'fac-anand',
     subject_id: 'sub-nlp-7',
     department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'AIML',
     academic_year: '2025-2026',
     regulation: 'AR23',
     year: 4,
@@ -29,6 +62,8 @@ export const DEFAULT_ASSIGNMENTS = [
     faculty_id: 'fac-anand',
     subject_id: 'sub-ai-7',
     department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'AIML',
     academic_year: '2025-2026',
     regulation: 'AR23',
     year: 4,
@@ -44,6 +79,8 @@ export const DEFAULT_ASSIGNMENTS = [
     faculty_id: 'fac-anand',
     subject_id: 'sub-ml-5',
     department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'CSE',
     academic_year: '2025-2026',
     regulation: 'AR23',
     year: 4,
@@ -59,6 +96,8 @@ export const DEFAULT_ASSIGNMENTS = [
     faculty_id: 'fac-sudhakar',
     subject_id: 'sub-cloud-devops-7',
     department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'CSE',
     academic_year: '2025-2026',
     regulation: 'AR23',
     year: 4,
@@ -74,6 +113,8 @@ export const DEFAULT_ASSIGNMENTS = [
     faculty_id: 'fac-ravi',
     subject_id: 'sub-ml-5',
     department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'CSE',
     academic_year: '2025-2026',
     regulation: 'AR23',
     year: 3,
@@ -89,6 +130,8 @@ export const DEFAULT_ASSIGNMENTS = [
     faculty_id: 'fac-priya',
     subject_id: 'sub-dbms-4',
     department_id: 'dept-cse',
+    department: 'CSE',
+    branch: 'CSE',
     academic_year: '2025-2026',
     regulation: 'AR23',
     year: 2,
@@ -281,28 +324,34 @@ class FacultyAssignmentService {
       const subjectName = matchedSubject?.name || subObj.name || a.subjectName || (rawSubId === 'sub-nlp-7' ? 'Natural Language Processing' : rawSubId === 'sub-ai-7' ? 'Artificial Intelligence' : 'Course Subject');
       const subjectCode = matchedSubject?.code || subObj.code || a.subjectCode || (rawSubId === 'sub-nlp-7' ? '23CSC13' : rawSubId === 'sub-ai-7' ? '23ML302' : 'SUB');
       const subjectCredits = Number(matchedSubject?.credits || subObj.credits || a.subjectCredits) || 3;
-      const subjectType = matchedSubject?.subjectType || subObj.subject_type || a.subjectType || 'CORE';
-
-      // 3. Resolve Department
-      const matchedDept = deptsList.find(d => 
-        (d.id && d.id === rawDeptId) ||
-        (d.code && d.code.toLowerCase() === String(rawDeptId || '').toLowerCase()) ||
-        (d.name && d.name.toLowerCase() === String(rawDeptId || '').toLowerCase())
-      ) || MASTER_DEPARTMENTS.find(d => d.id === rawDeptId || d.code === rawDeptId);
-
-      const departmentName = matchedDept?.name || deptObj.name || a.departmentName || 'Computer Science and Engineering';
-      const departmentCode = matchedDept?.code || deptObj.code || a.departmentCode || 'CSE';
+      const subjectType = matchedSubject?.type || subObj.type || a.subjectType || 'CORE';
+      // 3. Resolve Canonical Department & Cohort Attributes
+      const cohort = extractCanonicalCohort({
+        department: a.department || a.department_code || deptObj.code || 'CSE',
+        branch: a.branch || a.branchId || a.branch_id || a.departmentCode || deptObj.code || rawDeptId || 'CSE',
+        year: a.year,
+        semester: a.semester,
+        section: a.section,
+        academicYear: a.academic_year || a.academicYear,
+        regulation: a.regulation || subObj.regulation || matchedSubject?.regulation
+      });
 
       return {
         id: a.id,
         facultyId: rawFacId,
         subjectId: rawSubId,
-        departmentId: rawDeptId || 'dept-cse',
-        academicYear: a.academic_year || a.academicYear || '2025-2026',
-        regulation: a.regulation || subObj.regulation || matchedSubject?.regulation || 'AR23',
-        year: Number(a.year) || 4,
-        semester: Number(a.semester) || 7,
-        section: (a.section || 'A').toUpperCase().trim(),
+        department: cohort.department,
+        departmentId: cohort.departmentId,
+        departmentCode: cohort.branchDisplayName,
+        departmentName: cohort.departmentName,
+        branchId: cohort.branch,
+        branch: cohort.branch,
+        branchDisplayName: cohort.branchDisplayName,
+        academicYear: cohort.academicYear,
+        regulation: cohort.regulation,
+        year: cohort.year,
+        semester: cohort.semester,
+        section: cohort.section,
         assignedBy: a.assigned_by || a.assignedBy,
         isActive: a.is_active !== false && a.isActive !== false,
         createdAt: a.created_at || a.createdAt,
@@ -320,11 +369,7 @@ class FacultyAssignmentService {
         subjectName,
         subjectCode,
         subjectCredits,
-        subjectType,
-
-        // Resolved Department metadata
-        departmentName,
-        departmentCode
+        subjectType
       };
     });
 
@@ -477,12 +522,19 @@ class FacultyAssignmentService {
       await this.toggleAssignmentStatus(replaceExistingId, false, adminUser, 'Replaced by new faculty assignment');
     }
 
+    const branch = resolveBranch(assignmentData.branch || assignmentData.branchId || assignmentData.departmentCode || departmentId);
+    const department = resolveDepartment(assignmentData.department || assignmentData.departmentCode || departmentId);
+    const branchDisplayName = getBranchDisplay(department, branch);
     const newRecordId = crypto.randomUUID ? crypto.randomUUID() : `fa_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const newRecord = {
       id: newRecordId,
       faculty_id: facultyId,
       subject_id: subjectId,
-      department_id: departmentId,
+      department_id: departmentId || (branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse'),
+      department: department,
+      department_code: branchDisplayName,
+      branch: branch,
+      branch_id: branch,
       academic_year: academicYear,
       regulation: regulation,
       year: numYear,
@@ -551,6 +603,15 @@ class FacultyAssignmentService {
     if (updateData.facultyId) payload.faculty_id = updateData.facultyId;
     if (updateData.subjectId) payload.subject_id = updateData.subjectId;
     if (updateData.departmentId) payload.department_id = updateData.departmentId;
+    if (updateData.departmentCode || updateData.branch || updateData.branchId || updateData.departmentId || updateData.department) {
+      const branch = resolveBranch(updateData.branch || updateData.branchId || updateData.departmentCode || updateData.departmentId);
+      const department = resolveDepartment(updateData.department || updateData.departmentId);
+      const branchDisplayName = getBranchDisplay(department, branch);
+      payload.department = department;
+      payload.department_code = branchDisplayName;
+      payload.branch = branch;
+      payload.branch_id = branch;
+    }
     if (updateData.academicYear) payload.academic_year = updateData.academicYear;
     if (updateData.regulation) payload.regulation = updateData.regulation;
     if (numYear !== undefined) payload.year = numYear;
@@ -694,138 +755,165 @@ class FacultyAssignmentService {
     });
 
     return activeAssignments.map(a => {
-      const yearSuffix = a.year === 1 ? '1st' : a.year === 2 ? '2nd' : a.year === 3 ? '3rd' : `${a.year}th`;
+      const cohort = extractCanonicalCohort(a);
+      const yearSuffix = cohort.year === 1 ? '1st' : cohort.year === 2 ? '2nd' : cohort.year === 3 ? '3rd' : `${cohort.year}th`;
       return {
         assignmentId: a.id,
         id: a.id, // Unique assignment ID
         subjectId: a.subjectId,
         name: a.subjectName,
         code: a.subjectCode,
-        credits: a.subjectCredits,
-        subjectType: a.subjectType,
-        year: a.year,
-        semester: a.semester,
-        section: a.section,
-        academicYear: a.academicYear,
-        regulation: a.regulation,
-        departmentId: a.departmentId,
-        departmentCode: a.departmentCode,
-        departmentName: a.departmentName,
+        credits: a.subjectCredits || 3,
+        subjectType: a.subjectType || 'CORE',
+        year: cohort.year,
+        semester: cohort.semester,
+        section: cohort.section,
+        academicYear: cohort.academicYear,
+        regulation: cohort.regulation,
+        department: cohort.department,
+        departmentId: cohort.departmentId,
+        departmentCode: cohort.branchDisplayName,
+        departmentName: cohort.departmentName,
+        branchId: cohort.branch,
+        branch: cohort.branch,
+        branchDisplayName: cohort.branchDisplayName,
         status: 'Active',
         progress: 68,
-        formattedClass: `${yearSuffix} Year • Semester ${a.semester} • Section ${a.section}`
+        formattedClass: `${cohort.branchDisplayName} • ${yearSuffix} Year • Semester ${cohort.semester} • Section ${cohort.section}`
       };
     });
   }
 
   /**
    * Get Students belonging to the sections assigned to a specific Faculty.
-   * Derives enrolled students automatically: Student -> Academic Class -> Faculty Assignment.
+   * Resolves enrolled students automatically via canonical cohorts.
+   * Strict branch & section isolation is enforced.
    */
-  async getFacultyAssignedStudents(facultyUserIdOrId, selectedSection = null) {
+  async getFacultyAssignedStudents(facultyUserIdOrId, selectedSection = null, selectedAssignmentId = null) {
     const assignedClasses = await this.getFacultyAssignedClasses(facultyUserIdOrId);
     
     if (!assignedClasses || assignedClasses.length === 0) {
       return [];
     }
 
-    // Extract set of assigned section configurations
-    const assignedTuples = assignedClasses.map(c => ({
-      deptId: c.departmentId,
-      deptCode: c.departmentCode,
-      year: Number(c.year),
-      semester: Number(c.semester),
-      section: c.section
-    }));
+    // Filter assigned classes by assignment ID or Section if specified
+    let targetClasses = assignedClasses;
+    if (selectedAssignmentId && selectedAssignmentId !== 'All') {
+      targetClasses = targetClasses.filter(c => (c.assignmentId || c.id) === selectedAssignmentId);
+    }
+    if (selectedSection && selectedSection !== 'All') {
+      const cleanTargetSec = normalizeSection(selectedSection);
+      targetClasses = targetClasses.filter(c => normalizeSection(c.section) === cleanTargetSec);
+    }
 
-    // Fetch all student records from database
+    if (targetClasses.length === 0) {
+      return [];
+    }
+
+    // Extract canonical cohorts for all target assignments
+    const targetCohorts = targetClasses.map(c => extractCanonicalCohort(c)).filter(Boolean);
+
     const allUsers = await userManagementService.getAllUsers();
     const studentUsers = allUsers.filter(u => u.role === 'student');
 
-    // Filter students matching the faculty's assigned sections
     const matchedStudents = studentUsers.filter(s => {
-      const sYear = Number(s.year) || 4;
-      const sSem = Number(s.semester) || 7;
-      const sSec = (s.section || 'A').toUpperCase().trim();
-      const sDeptId = s.departmentId;
-      const sDeptCode = s.departmentCode || (s.department?.includes('CSE') ? 'CSE' : '');
-
-      return assignedTuples.some(t => {
-        const matchesSec = t.section === sSec;
-        const matchesYear = t.year === sYear;
-        const matchesSem = t.semester === sSem;
-        const matchesDept = !t.deptId || !sDeptId || t.deptId === sDeptId || (t.deptCode && sDeptCode && t.deptCode === sDeptCode) || (!t.deptCode && !sDeptCode);
-        return matchesSec && matchesYear && matchesSem && matchesDept;
-      });
+      return targetCohorts.some(cohort => matchesCohort(s, cohort));
     });
 
-    let result = matchedStudents;
-    if (selectedSection && selectedSection !== 'All') {
-      result = result.filter(s => (s.section || 'A').toUpperCase() === String(selectedSection).toUpperCase());
-    }
-
-    return result.map(s => ({
-      id: s.id || s.userId,
-      user_id: s.userId || s.id,
-      name: s.name || s.full_name,
-      email: s.email,
-      roll_number: s.rollNumber || s.roll_number || '23CS001',
-      rollNumber: s.rollNumber || s.roll_number || '23CS001',
-      department: s.department || 'Computer Science and Engineering',
-      departmentCode: s.departmentCode || 'CSE',
-      year: s.year || 4,
-      semester: s.semester || 7,
-      section: s.section || 'A',
-      program: s.program || 'B.Tech',
-      regulation: s.regulation || 'AR23',
-      attendance: 88,
-      status: s.status || 'Active',
-      isAtRisk: false,
-      user: {
-        full_name: s.name || s.full_name,
-        email: s.email
-      }
-    }));
+    return matchedStudents.map(s => {
+      const sCohort = extractCanonicalCohort(s);
+      return {
+        id: s.id || s.userId,
+        user_id: s.userId || s.id,
+        name: s.name || s.full_name,
+        email: s.email,
+        roll_number: s.rollNumber || s.roll_number || '23CS001',
+        rollNumber: s.rollNumber || s.roll_number || '23CS001',
+        department: sCohort.departmentName,
+        departmentCode: sCohort.departmentCode,
+        departmentId: sCohort.departmentId,
+        branchId: sCohort.branchId,
+        year: sCohort.year,
+        semester: sCohort.semester,
+        section: sCohort.section,
+        program: s.program || 'B.Tech',
+        regulation: sCohort.regulation,
+        academicYear: sCohort.academicYear,
+        attendance: s.attendance || 88,
+        status: s.status || 'Active',
+        isAtRisk: Boolean(s.isAtRisk),
+        user: {
+          full_name: s.name || s.full_name,
+          email: s.email
+        }
+      };
+    });
   }
 
   /**
-   * Get Students for a specific assignment.
+   * Automatic Student Cohort Resolution for a Faculty Assignment.
+   * Resolves the canonical academic cohort: (branch_id, year, semester, section, academic_year, regulation)
+   * and returns all active students belonging to that cohort.
+   * Does NOT filter by student name, email, roll number, or subject name.
    */
-  async getStudentsForAssignment(assignmentId) {
-    const { data: allAssignments } = await this.getAssignments();
-    const assignment = allAssignments.find(a => a.id === assignmentId);
+  async getStudentsForFacultyAssignment(facultyAssignmentOrId) {
+    let assignment = null;
+    if (typeof facultyAssignmentOrId === 'object' && facultyAssignmentOrId !== null) {
+      assignment = facultyAssignmentOrId;
+    } else if (facultyAssignmentOrId) {
+      const { data: allAssignments } = await this.getAssignments();
+      assignment = allAssignments.find(a => a.id === facultyAssignmentOrId || a.assignmentId === facultyAssignmentOrId);
+    }
     if (!assignment) return [];
+
+    const cohort = extractCanonicalCohort(assignment);
+    if (!cohort) return [];
 
     const allUsers = await userManagementService.getAllUsers();
     const studentUsers = allUsers.filter(u => u.role === 'student');
 
-    return studentUsers.filter(s => {
-      const sYear = Number(s.year) || 4;
-      const sSem = Number(s.semester) || 7;
-      const sSec = (s.section || 'A').toUpperCase().trim();
-      return (
-        sYear === Number(assignment.year) &&
-        sSem === Number(assignment.semester) &&
-        sSec === assignment.section
-      );
-    }).map(s => ({
-      id: s.id || s.userId,
-      name: s.name,
-      email: s.email,
-      rollNumber: s.rollNumber || '23CS001',
-      department: s.department,
-      section: s.section,
-      year: s.year,
-      semester: s.semester,
-      status: s.status || 'Active'
-    }));
+    const matchingStudents = studentUsers.filter(s => matchesCohort(s, cohort));
+
+    return matchingStudents.map(s => {
+      const sCohort = extractCanonicalCohort(s);
+      return {
+        id: s.id || s.userId,
+        user_id: s.userId || s.id,
+        name: s.name || s.full_name,
+        email: s.email,
+        rollNumber: s.rollNumber || s.roll_number || '23CS001',
+        roll_number: s.rollNumber || s.roll_number || '23CS001',
+        department: sCohort.departmentName,
+        departmentCode: sCohort.departmentCode,
+        departmentId: sCohort.departmentId,
+        branchId: sCohort.branchId,
+        section: sCohort.section,
+        year: sCohort.year,
+        semester: sCohort.semester,
+        regulation: sCohort.regulation,
+        academicYear: sCohort.academicYear,
+        attendance: s.attendance || 88,
+        status: s.status || 'Active',
+        isAtRisk: Boolean(s.isAtRisk),
+        user: {
+          full_name: s.name || s.full_name,
+          email: s.email
+        }
+      };
+    });
+  }
+
+  /**
+   * Alias for backward compatibility
+   */
+  async getStudentsForAssignment(assignmentId) {
+    return this.getStudentsForFacultyAssignment(assignmentId);
   }
 
   /**
    * Get Enrolled Subjects & Assigned Faculty for a logged-in Student.
-   * Derives subjects automatically from Student Academic Profile + Faculty Assignments.
-   * Section isolation is strictly enforced.
-   * If one faculty teaches multiple subjects in this section, all of them appear.
+   * Derives subjects automatically from Student Academic Profile (Branch + Year + Sem + Section) + Faculty Assignments.
+   * Branch and Section isolation is strictly enforced.
    */
   async getStudentAssignedSubjects(studentUserIdOrId, studentProfile = null) {
     let studentInfo = studentProfile;
@@ -839,71 +927,22 @@ class FacultyAssignmentService {
       );
     }
 
+    const sCohort = extractCanonicalCohort(studentInfo || studentProfile);
+    if (!sCohort) return [];
+
     const { data: allAssignments } = await this.getAssignments({ status: 'active' });
     const { data: masterSubjects } = await academicDataService.getSubjects();
 
-    const sYear = Number(studentInfo?.year) || 4;
-    const sSem = Number(studentInfo?.semester) || 7;
-    const sSec = (studentInfo?.section || 'A').toUpperCase().trim();
-    const sDeptId = studentInfo?.departmentId || 'dept-cse';
-    const sDeptCode = studentInfo?.departmentCode || 'CSE';
-    const sReg = studentInfo?.regulation || 'AR23';
-
-    // Find active assignments matching the student's exact academic class and section
-    const matchingAssignments = allAssignments.filter(a => 
-      a.isActive &&
-      Number(a.year) === sYear &&
-      Number(a.semester) === sSem &&
-      a.section === sSec &&
-      (!sDeptId || !a.departmentId || a.departmentId === sDeptId || a.departmentCode === sDeptCode)
-    );
-
-    // Curriculum subjects for this student's semester
-    const semesterMasterSubjects = (masterSubjects || MASTER_SUBJECTS).filter(s => 
-      Number(s.semester) === sSem &&
-      (!s.regulation || s.regulation === sReg)
-    );
+    // 1. Find active faculty assignments matching this student's canonical cohort
+    const matchingAssignments = (allAssignments || []).filter(a => {
+      if (!a.isActive) return false;
+      return matchesCohort(studentInfo || sCohort, extractCanonicalCohort(a));
+    });
 
     const resultList = [];
     const processedSubjectKeys = new Set();
 
-    // 1. Process standard semester curriculum subjects
-    semesterMasterSubjects.forEach(sub => {
-      const matched = matchingAssignments.find(a => 
-        a.subjectId === sub.id ||
-        a.subjectCode === sub.code ||
-        a.subjectName?.toLowerCase() === sub.name?.toLowerCase()
-      );
-
-      const key = sub.code || sub.id;
-      processedSubjectKeys.add(key);
-
-      resultList.push({
-        id: sub.id,
-        name: sub.name,
-        code: sub.code,
-        credits: sub.credits || 3,
-        semester: sub.semester,
-        regulation: sub.regulation || sReg,
-        departmentId: sub.departmentId || sDeptId,
-        subjectType: sub.subjectType || 'CORE',
-        faculty: matched ? matched.facultyName : 'Faculty Assigned via Department',
-        facultyEmail: matched ? matched.facultyEmail : null,
-        facultyEmployeeId: matched ? matched.facultyEmployeeId : null,
-        facultyDesignation: matched ? matched.facultyDesignation : null,
-        assignedSection: sSec,
-        hasAssignedFaculty: Boolean(matched),
-        progress: matched ? 68 : 0,
-        units: [
-          { unitNumber: 1, title: 'Foundational Principles and Architecture', progress: 100 },
-          { unitNumber: 2, title: 'Theoretical Models & Algorithmic Design', progress: 85 },
-          { unitNumber: 3, title: 'Practical Implementations & Case Studies', progress: 50 },
-          { unitNumber: 4, title: 'Advanced Topics & Emerging Trends', progress: 20 }
-        ]
-      });
-    });
-
-    // 2. Also append any extra assignments assigned specifically to this section that were not in semesterMasterSubjects
+    // 2. Populate subjects from explicit active faculty assignments for this student's cohort
     matchingAssignments.forEach(a => {
       const key = a.subjectCode || a.subjectId;
       if (!processedSubjectKeys.has(key)) {
@@ -914,14 +953,17 @@ class FacultyAssignmentService {
           code: a.subjectCode,
           credits: a.subjectCredits || 3,
           semester: a.semester,
-          regulation: a.regulation || sReg,
+          regulation: a.regulation || sCohort.regulation,
           departmentId: a.departmentId,
+          departmentCode: a.departmentCode,
+          branchId: a.departmentCode,
           subjectType: a.subjectType || 'CORE',
           faculty: a.facultyName,
           facultyEmail: a.facultyEmail,
           facultyEmployeeId: a.facultyEmployeeId,
           facultyDesignation: a.facultyDesignation,
-          assignedSection: sSec,
+          facultyAssignmentId: a.id || a.assignmentId,
+          assignedSection: sCohort.section,
           hasAssignedFaculty: true,
           progress: 68,
           units: [
@@ -933,6 +975,50 @@ class FacultyAssignmentService {
         });
       }
     });
+
+    // 3. If no faculty assignments exist yet for this cohort, fallback to master syllabus CORE subjects for this branch
+    if (resultList.length === 0) {
+      const semesterMasterSubjects = (masterSubjects || MASTER_SUBJECTS).filter(s => {
+        const subSem = normalizeSemester(s.semester);
+        const subBranch = resolveBranch(s.departmentId || s.department_id || s.departmentCode);
+        const matchSem = subSem === sCohort.semester;
+        const matchDept = subBranch === sCohort.branch;
+        return matchSem && matchDept;
+      });
+
+      semesterMasterSubjects.forEach(sub => {
+        const key = sub.code || sub.id;
+        if (!processedSubjectKeys.has(key)) {
+          processedSubjectKeys.add(key);
+          resultList.push({
+            id: sub.id,
+            name: sub.name,
+            code: sub.code,
+            credits: sub.credits || 3,
+            semester: sub.semester,
+            regulation: sub.regulation || sCohort.regulation,
+            departmentId: sCohort.departmentId,
+            departmentCode: sCohort.departmentCode,
+            branchId: sCohort.branchId,
+            subjectType: sub.subjectType || 'CORE',
+            faculty: 'Faculty Assigned via Department',
+            facultyEmail: null,
+            facultyEmployeeId: null,
+            facultyDesignation: null,
+            facultyAssignmentId: null,
+            assignedSection: sCohort.section,
+            hasAssignedFaculty: false,
+            progress: 0,
+            units: [
+              { unitNumber: 1, title: 'Foundational Principles and Architecture', progress: 100 },
+              { unitNumber: 2, title: 'Theoretical Models & Algorithmic Design', progress: 85 },
+              { unitNumber: 3, title: 'Practical Implementations & Case Studies', progress: 50 },
+              { unitNumber: 4, title: 'Advanced Topics & Emerging Trends', progress: 20 }
+            ]
+          });
+        }
+      });
+    }
 
     return resultList;
   }

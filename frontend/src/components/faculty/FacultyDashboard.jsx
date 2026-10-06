@@ -231,66 +231,79 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: '14px'
           }}>
-            {classes.map((cls, idx) => (
-              <div key={cls.assignmentId || cls.id || idx} className={`card card-interactive stagger-${idx + 1}`} style={{ padding: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div>
+            {classes.map((cls, idx) => {
+              const yearText = `${cls.year}${cls.year === 1 ? 'st' : cls.year === 2 ? 'nd' : cls.year === 3 ? 'rd' : 'th'} Year`;
+              const subLine = `${cls.departmentCode || 'CSE'} • ${yearText} • Semester ${cls.semester} • Section ${cls.section}`;
+
+              return (
+                <div key={cls.assignmentId || cls.id || idx} className={`card card-interactive stagger-${idx + 1}`} style={{ padding: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span className="badge badge-blue">{cls.code}</span>
                       <span className="badge badge-purple" style={{ fontWeight: 800 }}>
-                        Sec {cls.section}
+                        Section {cls.section}
                       </span>
                     </div>
-                    <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--color-text)', marginTop: '6px' }}>
-                      {cls.name}
-                    </h3>
+                    <span className="badge badge-green" style={{ fontWeight: 700 }}>
+                      Active
+                    </span>
                   </div>
-                  <span className="badge badge-green">
-                    Active
-                  </span>
-                </div>
 
-                <div style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 600, marginBottom: '12px' }}>
-                  {cls.formattedClass || `${cls.year} Year • Semester ${cls.semester} • Section ${cls.section}`}
-                </div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text)', marginBottom: '4px' }}>
+                    {cls.name}
+                  </h3>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '8px',
-                  padding: '10px',
-                  backgroundColor: 'var(--color-bg)',
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '14px'
-                }}>
-                  <div>
-                    <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>CREDITS</span>
-                    <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.credits || 3} Credits</p>
+                  <div style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700, marginBottom: '12px' }}>
+                    {subLine}
                   </div>
-                  <div>
-                    <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>REGULATION</span>
-                    <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.regulation || 'AR23'}</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>DEPARTMENT</span>
-                    <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.departmentCode || 'CSE'}</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>ACADEMIC YEAR</span>
-                    <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)', margin: 0 }}>{cls.academicYear || '2025-2026'}</p>
-                  </div>
-                </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => onNavigate('students')} className="btn btn-secondary btn-sm" style={{ flex: 1 }}>
-                    View Students
-                  </button>
-                  <button onClick={() => onNavigate('analytics')} className="btn btn-secondary btn-sm" style={{ flex: 1 }}>
-                    Analytics
-                  </button>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--color-bg)',
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: '14px',
+                    border: '1px solid var(--color-border)'
+                  }}>
+                    <div>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>CREDITS</span>
+                      <p style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.credits || 3} Credits</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>REGULATION</span>
+                      <p style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.regulation || 'AR23'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>DEPARTMENT</span>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.departmentCode || 'CSE'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>ACADEMIC YEAR</span>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)', margin: 0 }}>{cls.academicYear || '2025-2026'}</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={() => onNavigate('students', { selectedAssignmentId: cls.assignmentId || cls.id, selectedSection: cls.section })} 
+                      className="btn btn-secondary btn-sm" 
+                      style={{ flex: 1, fontWeight: 700 }}
+                    >
+                      View Students
+                    </button>
+                    <button 
+                      onClick={() => onNavigate('analytics', { selectedAssignmentId: cls.assignmentId || cls.id })} 
+                      className="btn btn-secondary btn-sm" 
+                      style={{ flex: 1, fontWeight: 700 }}
+                    >
+                      Analytics
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
