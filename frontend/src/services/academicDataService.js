@@ -149,7 +149,7 @@ class AcademicDataService {
 
     let filtered = allDistinctSubjects;
     if (departmentIdOrCode && departmentIdOrCode !== 'All') {
-      filtered = allDistinctSubjects.filter(s => 
+      filtered = allDistinctSubjects.filter(s =>
         !s.departmentId || s.departmentId === departmentIdOrCode || s.departmentId === 'dept-cse'
       );
     }
