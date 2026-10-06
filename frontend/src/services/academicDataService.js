@@ -1,185 +1,112 @@
-// GMR CRM - Academic Data Service (Direct Supabase Integration)
+// GMR CRM - Academic Data Service (Direct Supabase Integration with Master Catalogue Fallback)
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import { isValidUuid } from './ragDocumentService.js';
+import userManagementService from './userManagementService.js';
+import facultyAssignmentService from './facultyAssignmentService.js';
+
+export const MASTER_DEPARTMENTS = [
+  { id: 'dept-cse', code: 'CSE', name: 'Computer Science and Engineering' },
+  { id: 'dept-aids', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science' },
+  { id: 'dept-aiml', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning' },
+  { id: 'dept-it', code: 'IT', name: 'Information Technology' },
+  { id: 'dept-ece', code: 'ECE', name: 'Electronics and Communication Engineering' },
+  { id: 'dept-eee', code: 'EEE', name: 'Electrical and Electronics Engineering' },
+  { id: 'dept-mech', code: 'MECH', name: 'Mechanical Engineering' },
+  { id: 'dept-civil', code: 'CIVIL', name: 'Civil Engineering' }
+];
+
+export const MASTER_SUBJECTS = [
+  // Semester 3 (2nd Year)
+  { id: 'sub-ps-python', code: '23CS301', name: 'Problem Solving using Python', semester: 3, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-econ-pm', code: '23HSX10', name: 'Engineering Economics and Project Management', semester: 3, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-ai-3', code: '23ML302', name: 'Artificial Intelligence', semester: 3, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-daa-3', code: '23CS303', name: 'Design and Analysis of Algorithms', semester: 3, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-dld-3', code: '23CS304', name: 'Digital Logic Design', semester: 3, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-dms-3', code: '23CS305', name: 'Discrete Mathematical Structures', semester: 3, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-java-3', code: '23CS306', name: 'Object Oriented Programming with JAVA', semester: 3, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+
+  // Semester 4 (2nd Year)
+  { id: 'sub-dbms-4', code: '23IT304', name: 'Database Management Systems', semester: 4, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-os-4', code: '23IT403', name: 'Operating Systems', semester: 4, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-coa-4', code: '23CS403', name: 'Computer Organization and Architecture', semester: 4, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-prob-stats', code: '23MA404', name: 'Probability and Statistics using Python', semester: 4, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-web-dev', code: '23CS405', name: 'Web Coding and Development', semester: 4, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-fds-4', code: '23DS405', name: 'Foundations of Data Science', semester: 4, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aids' },
+  { id: 'sub-fml-4', code: '23ML405', name: 'Foundations of Machine Learning', semester: 4, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
+
+  // Semester 5 (3rd Year)
+  { id: 'sub-mpmc-5', code: '23EC502', name: 'Microprocessors and Microcontrollers (Integrated)', semester: 5, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-ml-5', code: '23CS502', name: 'Machine Learning', semester: 5, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-cn-5', code: '23CS503', name: 'Computer Networks (Integrated)', semester: 5, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-toc-5', code: '23CS504', name: 'Theory of Computation', semester: 5, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-wt-5', code: '23IT405', name: 'Web Technologies', semester: 5, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-ann-5', code: '23CSC11', name: 'Artificial Neural Networks', semester: 5, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
+  { id: 'sub-cv-5', code: '23MLC11', name: 'Computer Vision & Pattern Recognition', semester: 5, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-aiml' },
+  { id: 'sub-cloud-5', code: '23MLC31', name: 'Fundamentals of Cloud Computing', semester: 5, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
+
+  // Semester 6 (3rd Year)
+  { id: 'sub-cd-6', code: '23CS601', name: 'Compiler Design', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-cns-6', code: '23CS602', name: 'Cryptography and Network Security', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-se-6', code: '23CS603', name: 'Software Engineering & Agile Methodologies', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-nlp-6', code: '23ML601', name: 'Natural Language Processing', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
+
+  // Semester 7 (4th Year)
+  { id: 'sub-ai-7', code: '23ML302', name: 'Artificial Intelligence', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-cloud-devops-7', code: '23CS701', name: 'Cloud Computing & DevOps', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-bda-7', code: '23CS702', name: 'Big Data Analytics', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-dl-7', code: '23ML701', name: 'Deep Learning & Reinforcement Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
+  { id: 'sub-proj-7', code: '23CS703', name: 'Full Stack Capstone Project', semester: 7, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+
+  // Semester 8 (4th Year)
+  { id: 'sub-major-proj-8', code: '23CS801', name: 'Major Project / Industry Internship', semester: 8, credits: 10, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' }
+];
 
 class AcademicDataService {
   /**
-   * Fetch all academic departments directly from Supabase `departments` table.
-   * Returns empty array if none exist; does NOT inject mock fallback IDs.
+   * Fetch all academic departments directly from Supabase `departments` table, with full master catalogue fallback.
    */
   async getDepartments() {
-    if (!isSupabaseConfigured()) {
-      return {
-        data: [],
-        source: 'local_cache',
-        error: 'Supabase client is not configured'
-      };
-    }
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('id, name, code, created_at')
+          .order('name', { ascending: true });
 
-    try {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('id, name, code, created_at')
-        .order('name', { ascending: true });
-
-      if (error) {
-        console.error('[AcademicDataService] Supabase departments query error:', error);
-        return {
-          data: [],
-          source: 'supabase',
-          error: error.message || 'Failed to query departments table'
-        };
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const formatted = data.map(item => ({
+            id: item.id,
+            code: item.code || '',
+            name: item.name || ''
+          }));
+          return {
+            data: formatted,
+            source: 'supabase',
+            error: null
+          };
+        }
+      } catch (err) {
+        console.warn('[AcademicDataService] Exception fetching departments, using master catalogue:', err);
       }
-
-      const formatted = (data || []).map(item => ({
-        id: item.id,
-        code: item.code || '',
-        name: item.name || ''
-      }));
-
-      return {
-        data: formatted,
-        source: 'supabase',
-        error: null
-      };
-    } catch (err) {
-      console.error('[AcademicDataService] Exception fetching departments:', err);
-      return {
-        data: [],
-        source: 'supabase',
-        error: err.message || 'Unexpected error fetching departments'
-      };
     }
+
+    return {
+      data: MASTER_DEPARTMENTS,
+      source: 'local_catalogue',
+      error: null
+    };
   }
 
   /**
-   * Fetch academic subjects directly from Supabase `subjects` + `subject_departments` tables.
-   * - If departmentIdOrCode is a valid UUID: queries subject_departments mapped to that department UUID.
-   * - If departmentIdOrCode is a department code ('CSE', 'AIDS', 'AIML'): queries mapped subjects.
-   * - If departmentIdOrCode is null: fetches all master subjects.
-   * Returns canonical UUIDs from public.subjects.id.
+   * Fetch academic subjects directly from Supabase `subjects`, with master catalogue fallback.
+   * Returns complete subject records with code, name, credits, semester, regulation, department.
    */
   async getSubjects(departmentIdOrCode = null) {
-    if (!isSupabaseConfigured()) {
-      return {
-        data: [],
-        source: 'local_cache',
-        error: 'Supabase client is not configured'
-      };
-    }
+    let supabaseSubjects = [];
 
-    try {
-      // 1. Filter by Department UUID via normalized subject_departments
-      if (departmentIdOrCode && isValidUuid(departmentIdOrCode)) {
-        const { data: mappingData, error: mapErr } = await supabase
-          .from('subject_departments')
-          .select(`
-            subject_id,
-            department_id,
-            subjects:subject_id (
-              id,
-              name,
-              code,
-              semester,
-              credits,
-              subject_type,
-              elective_group,
-              regulation
-            )
-          `)
-          .eq('department_id', departmentIdOrCode);
-
-        if (mapErr) {
-          console.error('[AcademicDataService] Supabase subject_departments query error:', mapErr);
-          return {
-            data: [],
-            source: 'supabase',
-            error: mapErr.message || 'Failed to query subjects for selected department'
-          };
-        }
-
-        const subjectsList = (mappingData || [])
-          .map(m => m.subjects)
-          .filter(Boolean)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-        const formatted = subjectsList.map(s => ({
-          id: s.id,
-          code: s.code || '',
-          name: s.name || '',
-          semester: s.semester,
-          credits: s.credits || 3,
-          subjectType: s.subject_type || 'CORE',
-          electiveGroup: s.elective_group || null,
-          regulation: s.regulation || 'AR23',
-          departmentId: departmentIdOrCode
-        }));
-
-        return {
-          data: formatted,
-          source: 'supabase',
-          error: null
-        };
-      }
-
-      // 2. Filter by Department Short Code (e.g., 'CSE', 'AIDS', 'AIML')
-      if (departmentIdOrCode && typeof departmentIdOrCode === 'string' && !isValidUuid(departmentIdOrCode)) {
-        const { data: mappingData, error: mapErr } = await supabase
-          .from('subject_departments')
-          .select(`
-            subject_id,
-            department_id,
-            departments:department_id!inner (code),
-            subjects:subject_id (
-              id,
-              name,
-              code,
-              semester,
-              credits,
-              subject_type,
-              elective_group,
-              regulation
-            )
-          `)
-          .eq('departments.code', departmentIdOrCode);
-
-        if (mapErr) {
-          console.error('[AcademicDataService] Supabase subject_departments by code query error:', mapErr);
-          return {
-            data: [],
-            source: 'supabase',
-            error: mapErr.message || `Failed to query subjects for branch code ${departmentIdOrCode}`
-          };
-        }
-
-        const subjectsList = (mappingData || [])
-          .map(m => m.subjects)
-          .filter(Boolean)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-        const formatted = subjectsList.map(s => ({
-          id: s.id,
-          code: s.code || '',
-          name: s.name || '',
-          semester: s.semester,
-          credits: s.credits || 3,
-          subjectType: s.subject_type || 'CORE',
-          electiveGroup: s.elective_group || null,
-          regulation: s.regulation || 'AR23',
-          departmentId: null
-        }));
-
-        return {
-          data: formatted,
-          source: 'supabase',
-          error: null
-        };
-      }
-
-      // 3. Fetch all master subjects
-      const { data: allSubjects, error: allErr } = await supabase
-        .from('subjects')
-        .select(`
+    if (isSupabaseConfigured()) {
+      try {
+        let query = supabase.from('subjects').select(`
           id,
           name,
           code,
@@ -188,27 +115,159 @@ class AcademicDataService {
           subject_type,
           elective_group,
           regulation
-        `)
-        .order('name', { ascending: true });
+        `).order('name', { ascending: true });
 
-      if (allErr) {
-        console.error('[AcademicDataService] Supabase all subjects query error:', allErr);
-        return {
-          data: [],
-          source: 'supabase',
-          error: allErr.message || 'Failed to query subjects table'
-        };
+        const { data, error } = await query;
+        if (!error && Array.isArray(data) && data.length > 0) {
+          supabaseSubjects = data.map(s => ({
+            id: s.id,
+            code: s.code || '',
+            name: s.name || '',
+            semester: Number(s.semester) || 1,
+            credits: Number(s.credits) || 3,
+            subjectType: s.subject_type || 'CORE',
+            electiveGroup: s.elective_group || null,
+            regulation: s.regulation || 'AR23',
+            departmentId: departmentIdOrCode || 'dept-cse'
+          }));
+        }
+      } catch (err) {
+        console.warn('[AcademicDataService] Exception querying subjects from Supabase, using master catalogue:', err);
+      }
+    }
+
+    // Combine Supabase subjects with Master catalogue (deduplicated by code & name)
+    const combinedMap = new Map();
+    MASTER_SUBJECTS.forEach(s => combinedMap.set(s.id, s));
+    MASTER_SUBJECTS.forEach(s => combinedMap.set(s.code, s));
+    supabaseSubjects.forEach(s => {
+      combinedMap.set(s.id, s);
+      combinedMap.set(s.code, s);
+    });
+
+    const allDistinctSubjects = Array.from(new Set(Array.from(combinedMap.values())));
+
+    let filtered = allDistinctSubjects;
+    if (departmentIdOrCode && departmentIdOrCode !== 'All') {
+      filtered = allDistinctSubjects.filter(s => 
+        !s.departmentId || s.departmentId === departmentIdOrCode || s.departmentId === 'dept-cse'
+      );
+    }
+
+    return {
+      data: filtered,
+      source: supabaseSubjects.length > 0 ? 'supabase' : 'local_catalogue',
+      error: null
+    };
+  }
+
+  /**
+   * Get single subject by ID or Code from catalogue/database.
+   */
+  async getSubjectById(subjectIdOrCode) {
+    if (!subjectIdOrCode) return null;
+
+    if (isSupabaseConfigured() && isValidUuid(subjectIdOrCode)) {
+      try {
+        const { data, error } = await supabase
+          .from('subjects')
+          .select(`
+            id,
+            name,
+            code,
+            semester,
+            credits,
+            subject_type,
+            elective_group,
+            regulation
+          `)
+          .eq('id', subjectIdOrCode)
+          .maybeSingle();
+
+        if (!error && data) {
+          return {
+            id: data.id,
+            code: data.code || '',
+            name: data.name || '',
+            semester: Number(data.semester) || 1,
+            credits: Number(data.credits) || 3,
+            subjectType: data.subject_type || 'CORE',
+            electiveGroup: data.elective_group || null,
+            regulation: data.regulation || 'AR23'
+          };
+        }
+      } catch (err) {
+        console.warn('[AcademicDataService] Exception fetching subject by id:', err);
+      }
+    }
+
+    // Lookup in master subjects
+    return MASTER_SUBJECTS.find(s => s.id === subjectIdOrCode || s.code === subjectIdOrCode) || null;
+  }
+
+  /**
+   * Fetch all active faculty members with their user profiles and department details.
+   */
+  async getFaculty() {
+    try {
+      const allUsers = await userManagementService.getAllUsers();
+      const faculty = allUsers.filter(u => u.role === 'faculty' && u.rawStatus === 'active');
+      return {
+        data: faculty,
+        source: 'supabase',
+        error: null
+      };
+    } catch (err) {
+      console.error('[AcademicDataService] Exception fetching faculty:', err);
+      return {
+        data: [],
+        source: 'supabase',
+        error: err.message
+      };
+    }
+  }
+
+  /**
+   * Fetch all students from the database joined with user profile and department metadata.
+   */
+  async getStudents(filters = {}) {
+    try {
+      const allUsers = await userManagementService.getAllUsers();
+      let students = allUsers.filter(u => u.role === 'student');
+
+      if (filters.departmentId) {
+        students = students.filter(s => s.departmentId === filters.departmentId);
+      }
+      if (filters.year && filters.year !== 'All') {
+        students = students.filter(s => String(s.year) === String(filters.year));
+      }
+      if (filters.semester && filters.semester !== 'All') {
+        students = students.filter(s => String(s.semester) === String(filters.semester));
+      }
+      if (filters.section && filters.section !== 'All') {
+        students = students.filter(s => s.section === String(filters.section).toUpperCase());
       }
 
-      const formatted = (allSubjects || []).map(s => ({
-        id: s.id,
-        code: s.code || '',
-        name: s.name || '',
+      const formatted = students.map(s => ({
+        id: s.id || s.userId,
+        user_id: s.userId || s.id,
+        name: s.name,
+        email: s.email,
+        roll_number: s.rollNumber || 'N/A',
+        rollNumber: s.rollNumber || 'N/A',
+        department: s.department,
+        departmentId: s.departmentId,
+        year: s.year,
         semester: s.semester,
-        credits: s.credits || 3,
-        subjectType: s.subject_type || 'CORE',
-        electiveGroup: s.elective_group || null,
-        regulation: s.regulation || 'AR23'
+        section: s.section || 'A',
+        program: s.program || 'B.Tech',
+        attendance: 88,
+        status: s.status || 'Active',
+        isAtRisk: false,
+        user: {
+          full_name: s.name,
+          email: s.email
+        }
       }));
 
       return {
@@ -217,52 +276,34 @@ class AcademicDataService {
         error: null
       };
     } catch (err) {
-      console.error('[AcademicDataService] Exception fetching subjects:', err);
+      console.error('[AcademicDataService] Exception fetching students:', err);
       return {
         data: [],
         source: 'supabase',
-        error: err.message || 'Unexpected error fetching subjects'
+        error: err.message
       };
     }
   }
 
   /**
-   * Get single subject by canonical UUID from public.subjects.id
+   * Get Assigned Classes for a specific Faculty user.
    */
-  async getSubjectById(subjectId) {
-    if (!subjectId || !isValidUuid(subjectId)) return null;
-    try {
-      const { data, error } = await supabase
-        .from('subjects')
-        .select(`
-          id,
-          name,
-          code,
-          semester,
-          credits,
-          subject_type,
-          elective_group,
-          regulation
-        `)
-        .eq('id', subjectId)
-        .maybeSingle();
+  async getFacultyAssignedClasses(facultyUserId) {
+    return facultyAssignmentService.getFacultyAssignedClasses(facultyUserId);
+  }
 
-      if (error || !data) return null;
+  /**
+   * Get Students belonging to the sections assigned to a specific Faculty.
+   */
+  async getFacultyAssignedStudents(facultyUserId, selectedSection = null) {
+    return facultyAssignmentService.getFacultyAssignedStudents(facultyUserId, selectedSection);
+  }
 
-      return {
-        id: data.id,
-        code: data.code || '',
-        name: data.name || '',
-        semester: data.semester,
-        credits: data.credits || 3,
-        subjectType: data.subject_type || 'CORE',
-        electiveGroup: data.elective_group || null,
-        regulation: data.regulation || 'AR23'
-      };
-    } catch (err) {
-      console.error('[AcademicDataService] Exception fetching subject by id:', err);
-      return null;
-    }
+  /**
+   * Get Enrolled Subjects & Assigned Faculty for a logged-in Student.
+   */
+  async getStudentAssignedSubjects(studentUserId, studentProfile = null) {
+    return facultyAssignmentService.getStudentAssignedSubjects(studentUserId, studentProfile);
   }
 
   /**

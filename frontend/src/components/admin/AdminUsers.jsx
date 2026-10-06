@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Users, Plus, Download, Upload, ShieldAlert, KeyRound, Check, X, Search, 
   Filter, ShieldCheck, Mail, UserX, FileSpreadsheet, AlertTriangle, CheckCircle2, 
-  RotateCw, UserCheck, UserMinus, GraduationCap, Briefcase, ChevronRight 
+  RotateCw, UserCheck, UserMinus, GraduationCap, Briefcase, ChevronRight, Shield
 } from 'lucide-react';
 import userManagementService from '../../services/userManagementService';
 import academicDataService from '../../services/academicDataService';
@@ -63,15 +63,29 @@ export default function AdminUsers() {
     return Array.isArray(authUsers) ? authUsers : (authUsers?.data ?? authUsers?.users ?? []);
   }, [authUsers]);
 
-  // Statistics
+  // Dynamic Statistics
   const stats = useMemo(() => {
-    const total = safeUsersList.length;
-    const pending = safeUsersList.filter(u => (u.rawStatus || u.status || '').toLowerCase() === 'pending').length;
-    const activeStudents = safeUsersList.filter(u => u.role === 'student' && (u.rawStatus || u.status || '').toLowerCase() === 'active').length;
-    const activeFaculty = safeUsersList.filter(u => u.role === 'faculty' && (u.rawStatus || u.status || '').toLowerCase() === 'active').length;
-    const inactive = safeUsersList.filter(u => ['inactive', 'deactivated', 'rejected'].includes((u.rawStatus || u.status || '').toLowerCase())).length;
+    const list = safeUsersList;
+    const total = list.length;
+    const pending = list.filter(u => (u.rawStatus || u.status || '').toLowerCase() === 'pending').length;
+    const activeStudents = list.filter(u => u.role === 'student' && (u.rawStatus || u.status || '').toLowerCase() === 'active').length;
+    const activeFaculty = list.filter(u => u.role === 'faculty' && (u.rawStatus || u.status || '').toLowerCase() === 'active').length;
+    const activeAdmins = list.filter(u => u.role === 'admin' && (u.rawStatus || u.status || '').toLowerCase() === 'active').length;
 
-    return { total, pending, activeStudents, activeFaculty, inactive };
+    const allStudents = list.filter(u => u.role === 'student').length;
+    const allFaculty = list.filter(u => u.role === 'faculty').length;
+    const allAdmins = list.filter(u => u.role === 'admin').length;
+
+    return { 
+      total, 
+      pending, 
+      activeStudents, 
+      activeFaculty, 
+      activeAdmins,
+      allStudents,
+      allFaculty,
+      allAdmins
+    };
   }, [safeUsersList]);
 
   // Filtered list
@@ -99,7 +113,8 @@ export default function AdminUsers() {
         const emailMatch = (u.email || '').toLowerCase().includes(q);
         const rollMatch = (u.rollNumber || u.employeeId || u.userId || '').toLowerCase().includes(q);
         const deptMatch = (u.department || '').toLowerCase().includes(q);
-        return nameMatch || emailMatch || rollMatch || deptMatch;
+        const secMatch = (u.section || '').toLowerCase() === q;
+        return nameMatch || emailMatch || rollMatch || deptMatch || secMatch;
       }
 
       return true;
@@ -147,41 +162,79 @@ export default function AdminUsers() {
     }
   };
 
-  // Create Single User Modal State
-  const [createRole, setCreateRole] = useState('student');
+  // 1. Provision Single User Modal State
+  const [createRole, setCreateRole] = useState('student'); // 'student' | 'faculty' | 'admin'
   const [createName, setCreateName] = useState('');
   const [createEmail, setCreateEmail] = useState('');
-  const [createIdentifier, setCreateIdentifier] = useState('');
+  const [createIdentifier, setCreateIdentifier] = useState(''); // Roll Number or Employee ID
   const [createDeptId, setCreateDeptId] = useState('');
   const [createYear, setCreateYear] = useState('1');
+  const [createSemester, setCreateSemester] = useState('1');
   const [createSection, setCreateSection] = useState('A');
   const [createDesignation, setCreateDesignation] = useState('Assistant Professor');
+  const [createStatus, setCreateStatus] = useState('active'); // 'active' | 'pending'
   const [createPassword, setCreatePassword] = useState('GMRIT@' + Math.floor(1000 + Math.random() * 9000));
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [createFormError, setCreateFormError] = useState('');
+
+  // Auto-sync semester with year if year changes
+  const handleYearChange = (yr) => {
+    setCreateYear(yr);
+    const numYr = parseInt(yr, 10) || 1;
+    setCreateSemester(String(numYr * 2 - 1));
+  };
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    setCreateFormError('');
+
+    // Field validations
+    if (!createName.trim() || createName.trim().length < 2) {
+      setCreateFormError('Full Name must be at least 2 characters.');
+      return;
+    }
+
+    if (!createEmail.trim() || !createEmail.includes('@') || !createEmail.includes('.')) {
+      setCreateFormError('Please enter a valid institutional email address.');
+      return;
+    }
+
+    if (createRole === 'student' && !createIdentifier.trim()) {
+      setCreateFormError('Student Roll Number is required.');
+      return;
+    }
+
+    if (createRole === 'faculty' && !createIdentifier.trim()) {
+      setCreateFormError('Faculty Employee ID is required.');
+      return;
+    }
+
     setIsSubmittingCreate(true);
     try {
+      const selectedDept = createDeptId || (departments[0]?.id || null);
+      
       const res = await userManagementService.provisionUser({
         role: createRole,
-        name: createName,
-        email: createEmail,
-        rollNumber: createRole === 'student' ? createIdentifier : undefined,
-        employeeId: createRole === 'faculty' ? createIdentifier : undefined,
-        departmentId: createDeptId || (departments[0]?.id || null),
+        name: createName.trim(),
+        email: createEmail.trim().toLowerCase(),
+        rollNumber: createRole === 'student' ? createIdentifier.trim().toUpperCase() : undefined,
+        employeeId: createRole === 'faculty' ? createIdentifier.trim().toUpperCase() : undefined,
+        departmentId: createRole !== 'admin' ? selectedDept : null,
         year: createRole === 'student' ? Number(createYear) : undefined,
-        section: createRole === 'student' ? createSection : undefined,
+        semester: createRole === 'student' ? Number(createSemester) : undefined,
+        section: createRole === 'student' ? createSection.trim().toUpperCase() : undefined,
         designation: createRole === 'faculty' ? createDesignation : undefined,
         password: createPassword,
-        status: 'active'
+        status: createStatus
       });
 
       setLastCreatedAccount({
-        name: createName,
-        email: createEmail,
-        role: createRole === 'student' ? 'Student' : 'Faculty',
-        tempPass: createPassword
+        name: createName.trim(),
+        email: createEmail.trim().toLowerCase(),
+        role: createRole === 'student' ? 'Student' : (createRole === 'faculty' ? 'Faculty' : 'Admin'),
+        identifier: createIdentifier.trim().toUpperCase(),
+        tempPass: createPassword,
+        status: createStatus === 'active' ? 'Active' : 'Pending Approval'
       });
 
       setShowCreateModal(false);
@@ -192,16 +245,18 @@ export default function AdminUsers() {
       setCreateName('');
       setCreateEmail('');
       setCreateIdentifier('');
+      setCreateStatus('active');
       setCreatePassword('GMRIT@' + Math.floor(1000 + Math.random() * 9000));
+      setCreateFormError('');
     } catch (err) {
-      alert(err.message || 'Failed to provision user.');
+      setCreateFormError(err.message || 'Failed to provision user.');
     } finally {
       setIsSubmittingCreate(false);
     }
   };
 
-  // Bulk CSV Import Modal State
-  const [importRole, setImportRole] = useState('student');
+  // 2. Bulk CSV Import Modal State
+  const [importRole, setImportRole] = useState('student'); // 'student' | 'faculty' | 'mixed'
   const [csvFile, setCsvFile] = useState(null);
   const [csvRawText, setCsvRawText] = useState('');
   const [validationReport, setValidationReport] = useState(null);
@@ -220,13 +275,8 @@ export default function AdminUsers() {
         const text = event.target?.result || '';
         setCsvRawText(text);
         const parsedRows = userManagementService.parseCsv(text);
-        if (importRole === 'student') {
-          const report = userManagementService.validateStudentCsv(parsedRows, departments);
-          setValidationReport(report);
-        } else {
-          const report = userManagementService.validateFacultyCsv(parsedRows, departments);
-          setValidationReport(report);
-        }
+        const report = userManagementService.validateCsv(parsedRows, departments, importRole === 'mixed' ? 'student' : importRole);
+        setValidationReport(report);
       };
       reader.readAsText(file);
     }
@@ -238,30 +288,35 @@ export default function AdminUsers() {
     setImportResult(null);
     if (csvRawText) {
       const parsedRows = userManagementService.parseCsv(csvRawText);
-      if (newRole === 'student') {
-        setValidationReport(userManagementService.validateStudentCsv(parsedRows, departments));
-      } else {
-        setValidationReport(userManagementService.validateFacultyCsv(parsedRows, departments));
-      }
+      const report = userManagementService.validateCsv(parsedRows, departments, newRole === 'mixed' ? 'student' : newRole);
+      setValidationReport(report);
     }
   };
 
   const downloadSampleTemplate = (roleType) => {
     let headers = '';
     let sampleRow = '';
+    let filename = '';
+
     if (roleType === 'student') {
-      headers = 'full_name,email,roll_number,department_code,year,section,program\n';
-      sampleRow = 'Kavya Reddy,kavya.23cs001@gmrit.edu.in,23A81A0501,CSE,2,A,B.Tech\nRahul Sharma,rahul.23aiml002@gmrit.edu.in,23A81A4202,AIML,2,B,B.Tech\n';
+      headers = 'full_name,email,roll_number,department,year,semester,section,role\n';
+      sampleRow = 'Rahul Kumar,rahul.23cs101@gmrit.edu.in,23CS101,Computer Science and Engineering,2,3,A,Student\nPriya Sharma,priya.23cs102@gmrit.edu.in,23CS102,Computer Science and Engineering,2,3,A,Student\n';
+      filename = 'gmrit_student_template.csv';
+    } else if (roleType === 'faculty') {
+      headers = 'full_name,email,employee_id,department,designation,role\n';
+      sampleRow = 'Dr. A. K. Verma,verma.ak@gmrit.edu.in,GMR-CSE-1022,Computer Science and Engineering,Associate Professor,Faculty\nDr. S. Priya,priya.s@gmrit.edu.in,GMR-AIDS-1044,Artificial Intelligence & Data Science,Assistant Professor,Faculty\n';
+      filename = 'gmrit_faculty_template.csv';
     } else {
-      headers = 'full_name,email,employee_id,department_code,designation\n';
-      sampleRow = 'Dr. A. K. Verma,verma.ak@gmrit.edu.in,GMR-CSE-1022,CSE,Associate Professor\nDr. S. Priya,priya.s@gmrit.edu.in,GMR-AIDS-1044,AIDS,Assistant Professor\n';
+      headers = 'full_name,email,roll_number,employee_id,department,year,semester,section,designation,role\n';
+      sampleRow = 'Rahul Kumar,rahul.23cs101@gmrit.edu.in,23CS101,,Computer Science and Engineering,2,3,A,,Student\nDr. A. K. Verma,verma.ak@gmrit.edu.in,,GMR-CSE-1022,Computer Science and Engineering,,,Associate Professor,Faculty\n';
+      filename = 'gmrit_mixed_roster_template.csv';
     }
 
     const blob = new Blob([headers + sampleRow], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `gmrit_${roleType}_import_template.csv`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -277,27 +332,19 @@ export default function AdminUsers() {
     setImportProgress(0);
 
     try {
-      let result;
-      if (importRole === 'student') {
-        result = await userManagementService.executeStudentBulkImport(
-          validationReport.validRows,
-          fallbackDeptId || (departments[0]?.id || null),
-          (p) => setImportProgress(p)
-        );
-      } else {
-        result = await userManagementService.executeFacultyBulkImport(
-          validationReport.validRows,
-          fallbackDeptId || (departments[0]?.id || null),
-          (p) => setImportProgress(p)
-        );
-      }
+      const result = await userManagementService.executeBulkImport(
+        validationReport.validRows,
+        fallbackDeptId || (departments[0]?.id || null),
+        (p) => setImportProgress(p)
+      );
 
       setImportResult(result);
       await loadUsersAndDepartments();
       setActionFeedback({
         type: 'success',
-        message: `Successfully imported ${result.succeeded} ${importRole} records.`
+        message: `Successfully imported ${result.succeeded} accounts (${result.failed} failed).`
       });
+      setTimeout(() => setActionFeedback(null), 5000);
     } catch (err) {
       alert(err.message || 'Bulk import failed.');
     } finally {
@@ -321,7 +368,7 @@ export default function AdminUsers() {
             User Provisioning & Access Governance
           </h1>
           <p style={{ fontSize: '13.5px', color: 'var(--color-text)', opacity: 0.75, marginTop: '4px' }}>
-            Admin-controlled registration approvals, credential provisioning, and bulk CSV ingestion
+            Admin-controlled registration approvals, credential provisioning, and bulk CSV ingestion for Students & Faculty
           </p>
         </div>
 
@@ -413,11 +460,11 @@ export default function AdminUsers() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
         <div className="tabs-nav" style={{ marginBottom: 0, borderBottom: 'none' }}>
           {[
-            { id: 'all', label: 'All Users' },
+            { id: 'all', label: `All Users (${stats.total})` },
             { id: 'pending', label: `Pending Approvals (${stats.pending})`, highlight: stats.pending > 0 },
             { id: 'students', label: `Students (${stats.activeStudents})` },
             { id: 'faculty', label: `Faculty (${stats.activeFaculty})` },
-            { id: 'admins', label: 'Admins' }
+            { id: 'admins', label: `Admins (${stats.allAdmins})` }
           ].map(tab => (
             <button
               key={tab.id}
@@ -451,7 +498,7 @@ export default function AdminUsers() {
           <div style={{ position: 'relative', width: '260px' }}>
             <input
               type="text"
-              placeholder="Search by name, ID, email..."
+              placeholder="Search name, roll no, email..."
               className="input-field"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -480,7 +527,7 @@ export default function AdminUsers() {
               <th>Roll / Employee ID</th>
               <th>Role</th>
               <th>Department</th>
-              <th>Year / Sem</th>
+              <th>Academic Details / Designation</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -512,7 +559,6 @@ export default function AdminUsers() {
             ) : (
               filteredUsers.map((u) => {
                 const isPending = (u.rawStatus || u.status || '').toLowerCase() === 'pending';
-                const isRejected = (u.rawStatus || u.status || '').toLowerCase() === 'rejected';
                 const isActive = (u.rawStatus || u.status || '').toLowerCase() === 'active';
 
                 return (
@@ -536,7 +582,11 @@ export default function AdminUsers() {
                     </td>
                     <td style={{ fontSize: '12.5px' }}>{u.department}</td>
                     <td style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.8 }}>
-                      {u.role === 'student' ? `${u.year} • ${u.semester}` : (u.designation || 'Faculty')}
+                      {u.role === 'student' ? (
+                        <span>Year {u.year || 1} • Sem {u.semester || 1} • Sec {u.section || 'A'}</span>
+                      ) : (
+                        <span>{u.designation || (u.role === 'admin' ? 'System Administrator' : 'Faculty')}</span>
+                      )}
                     </td>
                     <td>
                       <span className={`badge ${
@@ -592,17 +642,17 @@ export default function AdminUsers() {
         </table>
       </div>
 
-      {/* Provision Single User Modal */}
+      {/* 1. Provision Single User Modal */}
       {showCreateModal && (
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '580px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
                   Provision Institutional Account
                 </h3>
                 <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7, margin: '2px 0 0 0' }}>
-                  Admin Workflow: Create verified student or faculty accounts with instant activation.
+                  Admin Workflow: Create verified student, faculty, or admin accounts with instant activation.
                 </p>
               </div>
               <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: 'pointer' }}>
@@ -611,112 +661,216 @@ export default function AdminUsers() {
             </div>
 
             <form onSubmit={handleCreateSubmit}>
-              <div className="modal-body">
+              <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+                {createFormError && (
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'var(--pastel-red-bg, #FFF1F2)',
+                    border: '1px solid var(--pastel-red-border, #FECDD3)',
+                    borderRadius: '8px',
+                    color: '#BE123C',
+                    fontSize: '12.5px',
+                    marginBottom: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <AlertTriangle size={15} />
+                    <span>{createFormError}</span>
+                  </div>
+                )}
+
+                {/* Role Selector Tabs */}
                 <div className="input-group" style={{ marginBottom: '14px' }}>
-                  <label className="input-label">Account Role</label>
-                  <select
-                    className="input-field"
-                    value={createRole}
-                    onChange={(e) => setCreateRole(e.target.value)}
-                    style={{ fontWeight: 600 }}
-                  >
-                    <option value="student">Student Account</option>
-                    <option value="faculty">Faculty / Teaching Staff Account</option>
-                  </select>
+                  <label className="input-label">Account Role / User Type</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setCreateRole('student')}
+                      className={`btn ${createRole === 'student' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      style={{ justifyContent: 'center' }}
+                    >
+                      <GraduationCap size={14} />
+                      <span>Student</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateRole('faculty')}
+                      className={`btn ${createRole === 'faculty' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      style={{ justifyContent: 'center' }}
+                    >
+                      <Briefcase size={14} />
+                      <span>Faculty</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateRole('admin')}
+                      className={`btn ${createRole === 'admin' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      style={{ justifyContent: 'center' }}
+                    >
+                      <Shield size={14} />
+                      <span>Admin</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                   <div className="input-group">
-                    <label className="input-label">Full Name</label>
+                    <label className="input-label">Full Name *</label>
                     <input
                       type="text"
                       required
-                      placeholder={createRole === 'student' ? "e.g. Kavya Reddy" : "e.g. Dr. A. K. Verma"}
+                      placeholder={createRole === 'student' ? "e.g. Rahul Kumar" : (createRole === 'faculty' ? "e.g. Dr. A. K. Verma" : "e.g. Admin User")}
                       className="input-field"
                       value={createName}
                       onChange={(e) => setCreateName(e.target.value)}
                     />
                   </div>
 
-                  <div className="input-group">
-                    <label className="input-label">
-                      {createRole === 'student' ? 'Roll Number' : 'Employee ID'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder={createRole === 'student' ? "e.g. 23A81A0501" : "e.g. GMR-CSE-1022"}
-                      className="input-field"
-                      value={createIdentifier}
-                      onChange={(e) => setCreateIdentifier(e.target.value)}
-                    />
-                  </div>
+                  {createRole !== 'admin' ? (
+                    <div className="input-group">
+                      <label className="input-label">
+                        {createRole === 'student' ? 'Student / Roll Number *' : 'Faculty Employee ID *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder={createRole === 'student' ? "e.g. 23CS101" : "e.g. GMR-CSE-1022"}
+                        className="input-field"
+                        value={createIdentifier}
+                        onChange={(e) => setCreateIdentifier(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="input-group">
+                      <label className="input-label">Account Status</label>
+                      <select
+                        className="input-field"
+                        value={createStatus}
+                        onChange={(e) => setCreateStatus(e.target.value)}
+                      >
+                        <option value="active">Active (Immediate Login)</option>
+                        <option value="pending">Pending Approval</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '14px' }}>
                   <div className="input-group">
-                    <label className="input-label">Institutional Email</label>
+                    <label className="input-label">Institutional Email *</label>
                     <input
                       type="email"
                       required
-                      placeholder="user@gmrit.edu.in"
+                      placeholder={createRole === 'student' ? "student@gmrit.edu.in" : "user@gmrit.edu.in"}
                       className="input-field"
                       value={createEmail}
                       onChange={(e) => setCreateEmail(e.target.value)}
                     />
                   </div>
 
-                  <div className="input-group">
-                    <label className="input-label">Academic Department</label>
-                    <select
-                      className="input-field"
-                      value={createDeptId}
-                      onChange={(e) => setCreateDeptId(e.target.value)}
-                    >
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {createRole !== 'admin' ? (
+                    <div className="input-group">
+                      <label className="input-label">Academic Department *</label>
+                      <select
+                        className="input-field"
+                        value={createDeptId}
+                        onChange={(e) => setCreateDeptId(e.target.value)}
+                      >
+                        {departments.map(d => (
+                          <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="input-group">
+                      <label className="input-label">Scope</label>
+                      <input type="text" disabled value="Institutional System" className="input-field" style={{ opacity: 0.8 }} />
+                    </div>
+                  )}
                 </div>
 
+                {/* Student specific fields */}
                 {createRole === 'student' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-                    <div className="input-group">
-                      <label className="input-label">Academic Year</label>
-                      <select className="input-field" value={createYear} onChange={(e) => setCreateYear(e.target.value)}>
-                        <option value="1">I Year</option>
-                        <option value="2">II Year</option>
-                        <option value="3">III Year</option>
-                        <option value="4">IV Year</option>
-                      </select>
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                      <div className="input-group">
+                        <label className="input-label">Academic Year</label>
+                        <select className="input-field" value={createYear} onChange={(e) => handleYearChange(e.target.value)}>
+                          <option value="1">I Year</option>
+                          <option value="2">II Year</option>
+                          <option value="3">III Year</option>
+                          <option value="4">IV Year</option>
+                        </select>
+                      </div>
+
+                      <div className="input-group">
+                        <label className="input-label">Semester</label>
+                        <select className="input-field" value={createSemester} onChange={(e) => setCreateSemester(e.target.value)}>
+                          <option value="1">Semester 1</option>
+                          <option value="2">Semester 2</option>
+                          <option value="3">Semester 3</option>
+                          <option value="4">Semester 4</option>
+                          <option value="5">Semester 5</option>
+                          <option value="6">Semester 6</option>
+                          <option value="7">Semester 7</option>
+                          <option value="8">Semester 8</option>
+                        </select>
+                      </div>
+
+                      <div className="input-group">
+                        <label className="input-label">Section</label>
+                        <select className="input-field" value={createSection} onChange={(e) => setCreateSection(e.target.value)}>
+                          <option value="A">Section A</option>
+                          <option value="B">Section B</option>
+                          <option value="C">Section C</option>
+                          <option value="D">Section D</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="input-group">
-                      <label className="input-label">Section</label>
-                      <select className="input-field" value={createSection} onChange={(e) => setCreateSection(e.target.value)}>
-                        <option value="A">Section A</option>
-                        <option value="B">Section B</option>
-                        <option value="C">Section C</option>
-                        <option value="D">Section D</option>
+                    <div className="input-group" style={{ marginBottom: '14px' }}>
+                      <label className="input-label">Account Status</label>
+                      <select
+                        className="input-field"
+                        value={createStatus}
+                        onChange={(e) => setCreateStatus(e.target.value)}
+                      >
+                        <option value="active">Active (Immediate Login)</option>
+                        <option value="pending">Pending Approval</option>
                       </select>
                     </div>
-                  </div>
+                  </>
                 )}
 
+                {/* Faculty specific fields */}
                 {createRole === 'faculty' && (
-                  <div className="input-group" style={{ marginBottom: '14px' }}>
-                    <label className="input-label">Designation</label>
-                    <select
-                      className="input-field"
-                      value={createDesignation}
-                      onChange={(e) => setCreateDesignation(e.target.value)}
-                    >
-                      <option value="Assistant Professor">Assistant Professor</option>
-                      <option value="Associate Professor">Associate Professor</option>
-                      <option value="Professor">Professor</option>
-                      <option value="Head of Department">Head of Department</option>
-                    </select>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                    <div className="input-group">
+                      <label className="input-label">Designation</label>
+                      <select
+                        className="input-field"
+                        value={createDesignation}
+                        onChange={(e) => setCreateDesignation(e.target.value)}
+                      >
+                        <option value="Assistant Professor">Assistant Professor</option>
+                        <option value="Associate Professor">Associate Professor</option>
+                        <option value="Professor">Professor</option>
+                        <option value="Head of Department">Head of Department</option>
+                      </select>
+                    </div>
+
+                    <div className="input-group">
+                      <label className="input-label">Account Status</label>
+                      <select
+                        className="input-field"
+                        value={createStatus}
+                        onChange={(e) => setCreateStatus(e.target.value)}
+                      >
+                        <option value="active">Active (Immediate Login)</option>
+                        <option value="pending">Pending Approval</option>
+                      </select>
+                    </div>
                   </div>
                 )}
 
@@ -755,7 +909,7 @@ export default function AdminUsers() {
                 </button>
                 <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingCreate}>
                   <ShieldCheck size={14} />
-                  <span>{isSubmittingCreate ? 'Provisioning...' : 'Provision & Activate Account'}</span>
+                  <span>{isSubmittingCreate ? 'Provisioning...' : `Provision & Save ${createRole.charAt(0).toUpperCase() + createRole.slice(1)}`}</span>
                 </button>
               </div>
             </form>
@@ -763,17 +917,17 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* Bulk CSV Import Modal */}
+      {/* 2. Bulk CSV Import Modal */}
       {showBulkImportModal && (
         <div className="modal-overlay" onClick={() => setShowBulkImportModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
                   Bulk CSV Account Ingestion
                 </h3>
                 <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7, margin: '2px 0 0 0' }}>
-                  Import student or faculty rosters with pre-validation and safe batch creation.
+                  Import student or faculty rosters with pre-validation and safe batch provisioning.
                 </p>
               </div>
               <button onClick={() => setShowBulkImportModal(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: 'pointer' }}>
@@ -781,14 +935,41 @@ export default function AdminUsers() {
               </button>
             </div>
 
-            <div className="modal-body">
-              {/* Import Role Selector */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+              {/* Supported User Types Indicator */}
+              <div style={{
+                padding: '12px 14px',
+                background: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>
+                  Supported User Types
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 600 }}>
+                    <GraduationCap size={15} color="var(--color-primary)" />
+                    <span>👨‍🎓 Students</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 600 }}>
+                    <Briefcase size={15} color="var(--color-primary)" />
+                    <span>👨‍🏫 Faculty</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 600 }}>
+                    <Users size={15} color="var(--color-primary)" />
+                    <span>👥 Mixed Roster</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Import Role Mode Selector */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
                 <button
                   type="button"
                   onClick={() => handleImportRoleChange('student')}
                   className={`btn ${importRole === 'student' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, justifyContent: 'center' }}
                 >
                   <GraduationCap size={14} />
                   <span>Student Roster</span>
@@ -797,46 +978,61 @@ export default function AdminUsers() {
                   type="button"
                   onClick={() => handleImportRoleChange('faculty')}
                   className={`btn ${importRole === 'faculty' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, justifyContent: 'center' }}
                 >
                   <Briefcase size={14} />
                   <span>Faculty Roster</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => handleImportRoleChange('mixed')}
+                  className={`btn ${importRole === 'mixed' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  <Users size={14} />
+                  <span>Mixed CSV</span>
+                </button>
               </div>
 
-              {/* Template Download Option */}
+              {/* Template Download & Format Guide */}
               <div style={{
                 padding: '12px 14px',
-                background: 'var(--color-bg)',
+                background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)',
                 marginBottom: '16px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
               }}>
                 <div>
                   <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-text)' }}>
-                    Download CSV Template
+                    {importRole === 'student' ? 'Student CSV Template & Format' : (importRole === 'faculty' ? 'Faculty CSV Template & Format' : 'Mixed Roster Template & Format')}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>
-                    Includes formatted headers ({importRole === 'student' ? 'full_name, email, roll_number, department_code, year, section' : 'full_name, email, employee_id, department_code, designation'})
+                  <div style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, fontFamily: 'monospace', marginTop: '2px' }}>
+                    {importRole === 'student' 
+                      ? 'full_name, email, roll_number, department, year, semester, section, role' 
+                      : (importRole === 'faculty' 
+                        ? 'full_name, email, employee_id, department, designation, role' 
+                        : 'full_name, email, roll_number/employee_id, department, year, semester, section, role')}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => downloadSampleTemplate(importRole)}
                   className="btn btn-secondary btn-sm"
-                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  style={{ fontSize: '11.5px', padding: '5px 12px' }}
                 >
                   <Download size={13} />
-                  <span>Template</span>
+                  <span>Download Template</span>
                 </button>
               </div>
 
               {/* File Upload Field */}
-              <div className="input-group" style={{ marginBottom: '16px' }}>
-                <label className="input-label">Select CSV File</label>
+              <div className="input-group" style={{ marginBottom: '14px' }}>
+                <label className="input-label">Select CSV File (.csv)</label>
                 <input
                   type="file"
                   accept=".csv,text/csv"
@@ -847,8 +1043,8 @@ export default function AdminUsers() {
               </div>
 
               {/* Fallback Department */}
-              <div className="input-group" style={{ marginBottom: '16px' }}>
-                <label className="input-label">Default Department (Fallback if not in CSV)</label>
+              <div className="input-group" style={{ marginBottom: '14px' }}>
+                <label className="input-label">Default Department (Fallback if empty in CSV)</label>
                 <select
                   className="input-field"
                   value={fallbackDeptId}
@@ -869,12 +1065,18 @@ export default function AdminUsers() {
                   borderRadius: 'var(--radius-md)',
                   marginBottom: '14px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' }}>
                       Pre-Import Validation Report
                     </span>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       <span className="badge badge-green">{validationReport.validCount} Valid</span>
+                      {validationReport.studentCount > 0 && (
+                        <span className="badge badge-blue">{validationReport.studentCount} Students</span>
+                      )}
+                      {validationReport.facultyCount > 0 && (
+                        <span className="badge badge-purple">{validationReport.facultyCount} Faculty</span>
+                      )}
                       {validationReport.invalidCount > 0 && (
                         <span className="badge badge-danger">{validationReport.invalidCount} Invalid</span>
                       )}
@@ -892,11 +1094,11 @@ export default function AdminUsers() {
                       fontSize: '11.5px',
                       color: 'var(--color-accent)'
                     }}>
-                      <strong>Errors Found:</strong>
+                      <strong>Errors Found in CSV:</strong>
                       <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                         {validationReport.invalidRows.map((inv, i) => (
                           <li key={i}>
-                            Row {inv.rowNumber}: {inv.errors.join(', ')}
+                            Row {inv.rowNumber}: {inv.errors.join('; ')}
                           </li>
                         ))}
                       </ul>
@@ -914,7 +1116,7 @@ export default function AdminUsers() {
               {isImporting && (
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                    <span>Importing accounts...</span>
+                    <span>Importing accounts to database...</span>
                     <span>{importProgress}%</span>
                   </div>
                   <div style={{ width: '100%', height: '6px', background: 'var(--color-border)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -957,7 +1159,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* Account Provisioned Success Modal */}
+      {/* 3. Account Provisioned Success Modal */}
       {showSuccessModal && lastCreatedAccount && (
         <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
           <div className="modal-content" style={{ maxWidth: '460px', textAlign: 'center', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
@@ -999,6 +1201,14 @@ export default function AdminUsers() {
                 <span style={{ color: 'var(--color-text)', opacity: 0.7 }}>Name: </span>
                 <strong>{lastCreatedAccount.name}</strong>
               </div>
+              {lastCreatedAccount.identifier && (
+                <div>
+                  <span style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                    {lastCreatedAccount.role === 'Student' ? 'Roll Number: ' : 'Employee ID: '}
+                  </span>
+                  <strong style={{ fontFamily: 'monospace' }}>{lastCreatedAccount.identifier}</strong>
+                </div>
+              )}
               <div>
                 <span style={{ color: 'var(--color-text)', opacity: 0.7 }}>Email: </span>
                 <strong style={{ fontFamily: 'monospace' }}>{lastCreatedAccount.email}</strong>
@@ -1006,6 +1216,12 @@ export default function AdminUsers() {
               <div>
                 <span style={{ color: 'var(--color-text)', opacity: 0.7 }}>Temporary Password: </span>
                 <strong style={{ fontFamily: 'monospace', color: 'var(--color-primary)' }}>{lastCreatedAccount.tempPass}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-text)', opacity: 0.7 }}>Initial Status: </span>
+                <span className="badge badge-green" style={{ display: 'inline-block', marginLeft: '4px' }}>
+                  {lastCreatedAccount.status}
+                </span>
               </div>
             </div>
 

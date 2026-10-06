@@ -7,7 +7,6 @@
 
 An enterprise-grade Academic CRM & AI platform built for higher education institutions (specifically modeled for GMR Institute of Technology). It combines **Institutional Role-Based Access Control (RBAC)**, **Curriculum Management**, **Interactive Coding Assessment Engine**, and an **AI RAG (Retrieval-Augmented Generation) Assistant** with source citations.
 
----
 
 ## 📑 Table of Contents
 - [Project Overview](#-project-overview)

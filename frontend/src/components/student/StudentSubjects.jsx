@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import academicDataService from '../../services/academicDataService';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
+import authService from '../../services/authService';
 import ragDocumentService from '../../services/ragDocumentService';
 import authService from '../../services/authService';
 import SyllabusViewer from './syllabus/SyllabusViewer';
@@ -28,28 +30,7 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
   const [pyqYearFilter, setPyqYearFilter] = useState('All');
   const [pyqExamFilter, setPyqExamFilter] = useState('All');
 
-  // 1. Fetch Verified Student Profile & Branch from public.students and public.departments
-  const fetchStudentProfile = useCallback(async () => {
-    setProfileLoading(true);
-    try {
-      const user = authService.getCurrentUser();
-      const profile = await academicDataService.getStudentProfile(user?.userId || user?.id);
-      setStudentProfile(profile);
-    } catch (err) {
-      console.warn('[StudentSubjects] Failed to resolve student profile:', err);
-      setStudentProfile({
-        branch: 'CSE',
-        branchCode: 'CSE',
-        departmentName: 'Computer Science & Engineering',
-        semester: 1,
-        year: 1,
-        isFSI: false,
-        careerPath: null
-      });
-    } finally {
-      setProfileLoading(false);
-    }
-  }, []);
+  const currentUser = authService.getCurrentUser();
 
   useEffect(() => {
     fetchStudentProfile();
@@ -60,22 +41,24 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await academicDataService.getSubjects();
-      if (res.data && res.data.length > 0) {
-        setSubjects(res.data);
+      const studentId = currentUser?.id || currentUser?.userId;
+      const loadedSubjects = await facultyAssignmentService.getStudentAssignedSubjects(studentId);
+      if (loadedSubjects && loadedSubjects.length > 0) {
+        setSubjects(loadedSubjects);
         setSelectedSubjectId(prevId => {
-          if (prevId && res.data.some(s => s.id === prevId)) return prevId;
-          return res.data[0].id;
+          if (prevId && loadedSubjects.some(s => s.id === prevId)) return prevId;
+          return loadedSubjects[0].id;
         });
       } else {
         setSubjects([]);
       }
+      setDataSource('supabase');
     } catch (err) {
       console.warn('[StudentSubjects] Notice fetching course enrollments:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser?.id, currentUser?.userId]);
 
   useEffect(() => {
     fetchSubjectsData();
@@ -409,24 +392,23 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
             </div>
           )}
 
-          {/* TAB 2: COURSE LEARNING OBJECTIVES */}
-          {activeTab === 'overview' && (
-            <div className="card" style={{ padding: '20px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '12px' }}>
-                Course Learning Objectives (CLOs)
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  `Understand foundational theoretical principles and algorithmic paradigms of ${selectedSubject.name}.`,
-                  `Formulate analytical problem solutions and evaluate complexity trade-offs under practical engineering constraints.`,
-                  `Implement robust computer applications utilizing standardized laboratory toolsets and development frameworks.`,
-                  `Synthesize multidisciplinary case studies for autonomous engineering design and scientific reporting.`
-                ].map((clo, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <span className="badge badge-blue" style={{ minWidth: '24px', justifyContent: 'center' }}>CLO {idx + 1}</span>
-                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{clo}</span>
-                  </div>
-                ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="card" style={{ padding: '18px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
+                Course Faculty & Coordinator
+              </h4>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                <div><strong>Assigned Faculty:</strong> {selectedSubject.faculty || 'To be assigned'}</div>
+                {selectedSubject.facultyEmployeeId && (
+                  <div><strong>Employee ID:</strong> {selectedSubject.facultyEmployeeId}</div>
+                )}
+                {selectedSubject.facultyEmail ? (
+                  <div><strong>Email:</strong> {selectedSubject.facultyEmail}</div>
+                ) : (
+                  <div><strong>Institutional Email:</strong> faculty@gmrit.edu.in</div>
+                )}
+                <div><strong>Office:</strong> Department of CSE, Block 3, Room 204</div>
+                <div><strong>Office Hours:</strong> Mon - Thu (3:30 PM - 5:00 PM)</div>
               </div>
             </div>
           )}

@@ -23,7 +23,8 @@ import {
   Shield,
   ShieldAlert,
   Code2,
-  Terminal
+  Terminal,
+  UserCheck
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -50,10 +51,9 @@ export default function Sidebar({
       case 'faculty':
         return [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'classes', label: 'My Classes', icon: Layers },
+          { id: 'classes', label: 'My Subjects', icon: BookOpen },
           { id: 'students', label: 'Students', icon: Users },
           { id: 'assessments', label: 'Assessments', icon: CheckSquare },
-          { id: 'coding-assessments', label: 'Coding Assessments', icon: Terminal },
           { id: 'resources', label: 'Resources', icon: FolderArchive },
           { id: 'analytics', label: 'Analytics', icon: Activity }
         ];
@@ -61,6 +61,7 @@ export default function Sidebar({
         return [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'users', label: 'User Provisioning', icon: Users },
+          { id: 'faculty-assignments', label: 'Faculty Assignments', icon: UserCheck },
           { id: 'syllabus', label: 'Syllabus Management', icon: FileText },
           { id: 'pyqs', label: 'PYQ Management', icon: HelpCircle },
           { id: 'coding-management', label: 'Coding Management', icon: Code2 },

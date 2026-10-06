@@ -33,6 +33,7 @@ import FacultySettings from './components/faculty/FacultySettings';
 // Admin Views
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminUsers from './components/admin/AdminUsers';
+import AdminFacultyAssignments from './components/admin/AdminFacultyAssignments';
 import AdminSyllabus from './components/admin/AdminSyllabus';
 import AdminPYQs from './components/admin/AdminPYQs';
 import AdminRagBase from './components/admin/AdminRagBase';
@@ -96,8 +97,8 @@ const VIEW_METADATA = {
     subtitle: 'Reference textbooks, digital lecture notes, and lab manuals'
   },
   classes: {
-    title: 'Faculty Classes & Sections',
-    subtitle: 'Class schedules, assigned batches, and syllabus coverage tracking'
+    title: 'My Subjects',
+    subtitle: 'Course schedules, assigned batches, and syllabus coverage tracking'
   },
   students: {
     title: 'Student Cohort Management',
@@ -114,6 +115,10 @@ const VIEW_METADATA = {
   users: {
     title: 'User Provisioning & RBAC',
     subtitle: 'Institutional accounts management and credential administration'
+  },
+  'faculty-assignments': {
+    title: 'Faculty Assignments',
+    subtitle: 'Assign faculty members to subjects, classes, and sections'
   },
   'rag-base': {
     title: 'RAG Knowledge Base',
@@ -323,6 +328,8 @@ export default function App() {
           return <AdminDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
         case 'users':
           return <AdminUsers />;
+        case 'faculty-assignments':
+          return <AdminFacultyAssignments />;
         case 'syllabus':
           return <AdminSyllabus onOpenPdf={handleOpenPdf} />;
         case 'pyqs':
