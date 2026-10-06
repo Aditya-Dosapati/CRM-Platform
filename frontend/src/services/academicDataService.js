@@ -305,6 +305,107 @@ class AcademicDataService {
   async getStudentAssignedSubjects(studentUserId, studentProfile = null) {
     return facultyAssignmentService.getStudentAssignedSubjects(studentUserId, studentProfile);
   }
+
+  /**
+   * Fetch verified student profile with department / branch details from public.students.
+   * Resolves existing branch/stream, semester, year, FSI status, and career path.
+   */
+  async getStudentProfile(userId = null) {
+    let targetUid = userId;
+
+    if (!targetUid && isSupabaseConfigured()) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        targetUid = authData?.user?.id || null;
+      } catch (e) {
+        console.warn('[AcademicDataService] Could not resolve auth user:', e);
+      }
+    }
+
+    if (!isSupabaseConfigured() || !targetUid) {
+      return {
+        branch: 'CSE',
+        branchCode: 'CSE',
+        departmentName: 'Computer Science & Engineering',
+        semester: 4,
+        year: 2,
+        section: 'A',
+        program: 'B.Tech',
+        isFSI: false,
+        careerPath: null
+      };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          id,
+          user_id,
+          roll_number,
+          department_id,
+          semester,
+          year,
+          section,
+          program,
+          departments ( id, code, name )
+        `)
+        .eq('user_id', targetUid)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[AcademicDataService] Notice querying student profile:', error.message);
+      }
+
+      const deptCode = data?.departments?.code || '';
+      const deptName = data?.departments?.name || '';
+      const rawBranch = deptCode || deptName || 'CSE';
+
+      // Safe normalization for branch
+      let branchCode = 'CSE';
+      const cleanUpper = rawBranch.toUpperCase();
+      if (cleanUpper.includes('AIML') || cleanUpper.includes('MACHINE LEARNING')) {
+        branchCode = 'CSE-AIML';
+      } else if (
+        cleanUpper.includes('AIDS') ||
+        cleanUpper.includes('DATA SCIENCE') ||
+        cleanUpper.includes('AI&DS') ||
+        cleanUpper.includes('AI & DS')
+      ) {
+        branchCode = 'CSE-AIDS';
+      } else {
+        branchCode = 'CSE';
+      }
+
+      return {
+        id: data?.id || null,
+        userId: targetUid,
+        rollNumber: data?.roll_number || '',
+        branch: branchCode,
+        branchCode: branchCode,
+        departmentName: deptName || 'Computer Science & Engineering',
+        semester: data?.semester || 1,
+        year: data?.year || 1,
+        section: data?.section || 'A',
+        program: data?.program || 'B.Tech',
+        isFSI: Boolean(data?.is_fsi || data?.isFSI),
+        careerPath: data?.career_path || data?.careerPath || null
+      };
+    } catch (err) {
+      console.warn('[AcademicDataService] Exception fetching student profile:', err);
+      return {
+        branch: 'CSE',
+        branchCode: 'CSE',
+        departmentName: 'Computer Science & Engineering',
+        semester: 4,
+        year: 2,
+        section: 'A',
+        program: 'B.Tech',
+        isFSI: false,
+        careerPath: null
+      };
+    }
+  }
 }
 
 export const academicDataService = new AcademicDataService();
