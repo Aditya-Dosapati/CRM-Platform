@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import academicDataService from '../../services/academicDataService';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
+import authService from '../../services/authService';
 import ragDocumentService from '../../services/ragDocumentService';
 import { 
   FolderDown, BookOpen, FileText, Download, Sparkles, Filter, 
@@ -15,17 +17,25 @@ export default function StudentResources({ onOpenPdf, onOpenRagQuery }) {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const currentUser = authService.getCurrentUser();
+
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [subRes, docsRes] = await Promise.all([
-          academicDataService.getSubjects(),
+        const studentId = currentUser?.id || currentUser?.userId;
+        const [assignedSubs, docsRes] = await Promise.all([
+          facultyAssignmentService.getStudentAssignedSubjects(studentId, currentUser),
           ragDocumentService.getDocuments()
         ]);
         if (isMounted) {
-          if (subRes.data) setSubjects(subRes.data);
+          if (assignedSubs && assignedSubs.length > 0) {
+            setSubjects(assignedSubs);
+          } else {
+            const allSubs = await academicDataService.getSubjects();
+            if (allSubs.data) setSubjects(allSubs.data);
+          }
           const rawDocs = Array.isArray(docsRes) ? docsRes : (docsRes?.data || []);
           setResources(rawDocs);
         }
@@ -37,7 +47,7 @@ export default function StudentResources({ onOpenPdf, onOpenRagQuery }) {
     };
     fetchData();
     return () => { isMounted = false; };
-  }, []);
+  }, [currentUser]);
 
   const filteredResources = useMemo(() => {
     return resources.filter(res => {

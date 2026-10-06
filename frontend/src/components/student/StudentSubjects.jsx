@@ -3,6 +3,7 @@ import academicDataService from '../../services/academicDataService';
 import ragDocumentService from '../../services/ragDocumentService';
 import authService from '../../services/authService';
 import SyllabusViewer from './syllabus/SyllabusViewer';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
 import {
   BookOpen, FileText, Sparkles, CheckCircle2, Download, Layers,
   GraduationCap, Clock, Award, Users, ChevronRight, BarChart3, AlertCircle,
@@ -55,23 +56,51 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
     fetchStudentProfile();
   }, [fetchStudentProfile]);
 
-  // 2. Fetch Optional Course Enrollments (Non-blocking: syllabus display DOES NOT depend on this)
+  // 2. Fetch Optional Course Enrollments
+  // Non-blocking: syllabus display DOES NOT depend on this
   const fetchSubjectsData = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const res = await academicDataService.getSubjects();
-      if (res.data && res.data.length > 0) {
-        setSubjects(res.data);
-        setSelectedSubjectId(prevId => {
-          if (prevId && res.data.some(s => s.id === prevId)) return prevId;
-          return res.data[0].id;
+      const currentUser = authService.getCurrentUser();
+
+      const studentId = currentUser?.id || currentUser?.userId;
+
+      if (!studentId) {
+        console.warn('[StudentSubjects] No authenticated student found.');
+        setSubjects([]);
+        setSelectedSubjectId('');
+        return;
+      }
+
+      const loadedSubjects =
+        await facultyAssignmentService.getStudentAssignedSubjects(
+          studentId,
+          currentUser
+        );
+
+      if (loadedSubjects && loadedSubjects.length > 0) {
+        setSubjects(loadedSubjects);
+
+        setSelectedSubjectId((prevId) => {
+          if (prevId && loadedSubjects.some((s) => s.id === prevId)) {
+            return prevId;
+          }
+
+          return loadedSubjects[0].id;
         });
       } else {
         setSubjects([]);
+        setSelectedSubjectId('');
       }
     } catch (err) {
-      console.warn('[StudentSubjects] Notice fetching course enrollments:', err);
+      console.warn(
+        '[StudentSubjects] Notice fetching course enrollments:',
+        err
+      );
+      setSubjects([]);
+      setSelectedSubjectId('');
     } finally {
       setLoading(false);
     }
@@ -79,6 +108,19 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
 
   useEffect(() => {
     fetchSubjectsData();
+
+    const handleUpdate = () => {
+      fetchSubjectsData();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gmrit_assignments_updated', handleUpdate);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+      }
+    };
   }, [fetchSubjectsData]);
 
   const selectedSubject = useMemo(() => {

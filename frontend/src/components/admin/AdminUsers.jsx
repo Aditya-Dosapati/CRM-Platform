@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import userManagementService from '../../services/userManagementService';
 import academicDataService from '../../services/academicDataService';
+import { getBranchDisplay, resolveBranch } from '../../services/academicCohortService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import EmptyState from '../common/EmptyState';
 
@@ -91,8 +92,8 @@ export default function AdminUsers() {
   // Filtered list
   const filteredUsers = useMemo(() => {
     return safeUsersList.filter(u => {
-      const statusLower = (u.rawStatus || u.status || '').toLowerCase();
-      const roleLower = (u.role || '').toLowerCase();
+      const statusLower = (u.rawStatus || u.status || '').toLowerCase().trim();
+      const roleLower = (u.role || '').toLowerCase().trim();
 
       // Tab filter
       if (activeTab === 'pending' && statusLower !== 'pending') return false;
@@ -102,8 +103,20 @@ export default function AdminUsers() {
 
       // Department filter
       if (departmentFilter !== 'all') {
-        if (u.departmentId && u.departmentId !== departmentFilter) return false;
-        if (!u.departmentId && u.department && !u.department.toLowerCase().includes(departmentFilter.toLowerCase())) return false;
+        const deptFilterLower = departmentFilter.toLowerCase().trim();
+        const selDept = departments.find(d => d.id === departmentFilter);
+        const selCodeLower = (selDept?.code || '').toLowerCase().trim();
+        const selNameLower = (selDept?.name || '').toLowerCase().trim();
+
+        const matchesDeptId = u.departmentId === departmentFilter;
+        const matchesDeptCode = (u.departmentCode || '').toLowerCase().trim() === deptFilterLower || (selCodeLower && (u.departmentCode || '').toLowerCase().trim() === selCodeLower);
+        const matchesBranch = (u.branch || '').toLowerCase().trim() === deptFilterLower || (selCodeLower && (u.branch || '').toLowerCase().trim() === selCodeLower);
+        const matchesBranchDisplayName = (u.branchDisplayName || '').toLowerCase().trim() === deptFilterLower || (selCodeLower && (u.branchDisplayName || '').toLowerCase().trim() === selCodeLower);
+        const matchesDeptName = (u.departmentName || u.department || '').toLowerCase().includes(deptFilterLower) || (selNameLower && (u.departmentName || u.department || '').toLowerCase().includes(selNameLower));
+
+        if (!matchesDeptId && !matchesDeptCode && !matchesBranch && !matchesBranchDisplayName && !matchesDeptName) {
+          return false;
+        }
       }
 
       // Search query
@@ -111,15 +124,41 @@ export default function AdminUsers() {
         const q = searchQuery.toLowerCase().trim();
         const nameMatch = (u.name || '').toLowerCase().includes(q);
         const emailMatch = (u.email || '').toLowerCase().includes(q);
-        const rollMatch = (u.rollNumber || u.employeeId || u.userId || '').toLowerCase().includes(q);
+        const rollMatch = (u.rollNumber || '').toLowerCase().includes(q);
+        const empMatch = (u.employeeId || '').toLowerCase().includes(q);
+        const userMatch = (u.userId || u.id || '').toLowerCase().includes(q);
         const deptMatch = (u.department || '').toLowerCase().includes(q);
+        const branchMatch = (u.branch || '').toLowerCase().includes(q);
+        const branchDisplayMatch = (u.branchDisplayName || '').toLowerCase().includes(q);
+        const deptCodeMatch = (u.departmentCode || '').toLowerCase().includes(q);
+        const deptNameMatch = (u.departmentName || '').toLowerCase().includes(q);
         const secMatch = (u.section || '').toLowerCase() === q;
-        return nameMatch || emailMatch || rollMatch || deptMatch || secMatch;
+        const desigMatch = (u.designation || '').toLowerCase().includes(q);
+
+        // Canonical combined branch display match (e.g., 'cse-aiml', 'cse-aids', 'cse')
+        const combinedCanonical = `${u.department || 'CSE'}-${u.branch || 'CSE'}`.toLowerCase();
+        const combinedMatch = combinedCanonical.includes(q);
+
+        return (
+          nameMatch ||
+          emailMatch ||
+          rollMatch ||
+          empMatch ||
+          userMatch ||
+          deptMatch ||
+          branchMatch ||
+          branchDisplayMatch ||
+          deptCodeMatch ||
+          deptNameMatch ||
+          secMatch ||
+          desigMatch ||
+          combinedMatch
+        );
       }
 
       return true;
     });
-  }, [safeUsersList, activeTab, departmentFilter, searchQuery]);
+  }, [safeUsersList, activeTab, departmentFilter, searchQuery, departments]);
 
   // Actions
   const handleApprove = async (u) => {
@@ -526,7 +565,7 @@ export default function AdminUsers() {
               <th>Full Name & Email</th>
               <th>Roll / Employee ID</th>
               <th>Role</th>
-              <th>Department</th>
+              <th>Department / Branch</th>
               <th>Academic Details / Designation</th>
               <th>Status</th>
               <th>Actions</th>
@@ -580,7 +619,9 @@ export default function AdminUsers() {
                         {u.displayRole}
                       </span>
                     </td>
-                    <td style={{ fontSize: '12.5px' }}>{u.department}</td>
+                    <td style={{ fontSize: '12.5px', fontWeight: 600 }}>
+                      {u.branchDisplayName || getBranchDisplay(u.department || 'CSE', u.branch || 'CSE')}
+                    </td>
                     <td style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.8 }}>
                       {u.role === 'student' ? (
                         <span>Year {u.year || 1} • Sem {u.semester || 1} • Sec {u.section || 'A'}</span>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import academicDataService from '../../services/academicDataService';
+import facultyAssignmentService from '../../services/facultyAssignmentService';
+import authService from '../../services/authService';
 import { TrendingUp, Award, Calendar, CheckCircle, Activity, Sparkles, Zap, BookOpen } from 'lucide-react';
 import EmptyState from '../common/EmptyState';
 
@@ -7,14 +9,17 @@ export default function StudentInfographics({ onOpenRagQuery }) {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const currentUser = authService.getCurrentUser();
+
   useEffect(() => {
     let isMounted = true;
     const fetchSubjects = async () => {
       setLoading(true);
       try {
-        const res = await academicDataService.getSubjects();
-        if (isMounted && res.data) {
-          setSubjects(res.data);
+        const studentId = currentUser?.id || currentUser?.userId;
+        const loadedSubs = await facultyAssignmentService.getStudentAssignedSubjects(studentId, currentUser);
+        if (isMounted) {
+          setSubjects(loadedSubs || []);
         }
       } catch (e) {
         console.warn('StudentInfographics: could not load subjects:', e);
@@ -24,7 +29,7 @@ export default function StudentInfographics({ onOpenRagQuery }) {
     };
     fetchSubjects();
     return () => { isMounted = false; };
-  }, []);
+  }, [currentUser]);
 
   const hasSubjects = subjects && subjects.length > 0;
 

@@ -4,10 +4,12 @@ import { isValidUuid } from './ragDocumentService.js';
 import userManagementService from './userManagementService.js';
 import facultyAssignmentService from './facultyAssignmentService.js';
 
+import { normalizeBranch, registerDepartments } from './academicCohortService.js';
+
 export const MASTER_DEPARTMENTS = [
   { id: 'dept-cse', code: 'CSE', name: 'Computer Science and Engineering' },
-  { id: 'dept-aids', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science' },
-  { id: 'dept-aiml', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning' },
+  { id: 'dept-aids', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science' },
+  { id: 'dept-aiml', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning' },
   { id: 'dept-it', code: 'IT', name: 'Information Technology' },
   { id: 'dept-ece', code: 'ECE', name: 'Electronics and Communication Engineering' },
   { id: 'dept-eee', code: 'EEE', name: 'Electrical and Electronics Engineering' },
@@ -51,7 +53,9 @@ export const MASTER_SUBJECTS = [
   { id: 'sub-nlp-6', code: '23ML601', name: 'Natural Language Processing', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
 
   // Semester 7 (4th Year)
-  { id: 'sub-ai-7', code: '23ML302', name: 'Artificial Intelligence', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+  { id: 'sub-ai-7', code: '23ML302', name: 'Artificial Intelligence', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
+  { id: 'sub-nlp-7', code: '23CSC13', name: 'Natural Language Processing', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
+  { id: 'sub-ml-7', code: '23CS502', name: 'Machine Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
   { id: 'sub-cloud-devops-7', code: '23CS701', name: 'Cloud Computing & DevOps', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
   { id: 'sub-bda-7', code: '23CS702', name: 'Big Data Analytics', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
   { id: 'sub-dl-7', code: '23ML701', name: 'Deep Learning & Reinforcement Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
@@ -74,11 +78,15 @@ class AcademicDataService {
           .order('name', { ascending: true });
 
         if (!error && Array.isArray(data) && data.length > 0) {
-          const formatted = data.map(item => ({
-            id: item.id,
-            code: item.code || '',
-            name: item.name || ''
-          }));
+          const formatted = data.map(item => {
+            const canonical = normalizeBranch(item.code || item.name || item.id);
+            return {
+              id: item.id,
+              code: canonical.code,
+              name: item.name || canonical.name
+            };
+          });
+          registerDepartments(formatted);
           return {
             data: formatted,
             source: 'supabase',
@@ -90,6 +98,7 @@ class AcademicDataService {
       }
     }
 
+    registerDepartments(MASTER_DEPARTMENTS);
     return {
       data: MASTER_DEPARTMENTS,
       source: 'local_catalogue',
@@ -149,9 +158,54 @@ class AcademicDataService {
 
     let filtered = allDistinctSubjects;
     if (departmentIdOrCode && departmentIdOrCode !== 'All') {
-      filtered = allDistinctSubjects.filter(s =>
-        !s.departmentId || s.departmentId === departmentIdOrCode || s.departmentId === 'dept-cse'
-      );
+      const targetDept =
+        MASTER_DEPARTMENTS.find(
+          d =>
+            d.id === departmentIdOrCode ||
+            d.code === departmentIdOrCode
+        ) || {
+          id: departmentIdOrCode,
+          code: departmentIdOrCode
+        };
+
+      const targetCode = String(
+        targetDept?.code || departmentIdOrCode
+      ).toUpperCase();
+
+      const targetName = String(
+        targetDept?.name || ''
+      ).toLowerCase();
+
+      const isCseTarget =
+        targetCode === 'CSE' ||
+        targetCode === 'AIML' ||
+        targetCode === 'AIDS' ||
+        targetName.includes('computer') ||
+        targetName.includes('cse');
+
+      filtered = allDistinctSubjects.filter(s => {
+        if (!s.departmentId) return true;
+
+        if (
+          s.departmentId === departmentIdOrCode ||
+          s.departmentId === targetDept.id
+        ) {
+          return true;
+        }
+
+        if (
+          isCseTarget &&
+          (
+            s.departmentId === 'dept-cse' ||
+            s.departmentId === 'dept-aiml' ||
+            s.departmentId === 'dept-aids'
+          )
+        ) {
+          return true;
+        }
+
+        return false;
+      });
     }
 
     return {
