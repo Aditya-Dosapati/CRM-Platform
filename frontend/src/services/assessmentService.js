@@ -1,33 +1,24 @@
-// GMR CRM - Academic Assessment & MCQ Evaluation Service
-// Manages end-to-end Faculty MCQ Creation, RAG Question Generation, Student Attempt Submission, Automatic Grading, and Performance Analytics
+// GMR CRM - Academic Assessment & Evaluation Service
+// 100% Database-Driven Architecture backed by Supabase
+// Tables: public.assessments, public.assessment_questions, public.assessment_submissions, public.assessment_answers
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import auditService from './auditService.js';
-import userManagementService from './userManagementService.js';
 import facultyAssignmentService from './facultyAssignmentService.js';
-import academicDataService from './academicDataService.js';
-import ragDocumentService from './ragDocumentService.js';
 import {
   resolveDepartment,
   resolveBranch,
   getBranchDisplay,
-  normalizeBranch,
   normalizeYear,
   normalizeSemester,
   normalizeSection,
   normalizeAcademicYear,
   normalizeRegulation,
-  extractCanonicalCohort,
-  matchesCohort
+  extractCanonicalCohort
 } from './academicCohortService.js';
 
-const ASSESSMENTS_STORAGE_KEY = 'gmrit_academic_assessments';
-const ATTEMPTS_STORAGE_KEY = 'gmrit_academic_assessment_attempts';
-const RESPONSES_STORAGE_KEY = 'gmrit_academic_assessment_responses';
-
-// High-Yield Question Bank per Subject Domain for Curriculum-Grounded Fallback Generation
+// Curriculum Question Banks for Grounded MCQ Generation
 const CURRICULUM_QUESTION_BANKS = {
-  // Natural Language Processing (23CSC13)
   nlp: [
     {
       question: "What is the primary difference between Stemming and Lemmatization in Natural Language Processing?",
@@ -99,231 +90,246 @@ const CURRICULUM_QUESTION_BANKS = {
       optionC: "To normalize the attention weights between 0 and 1.",
       optionD: "To mask future tokens during autoregressive decoding.",
       correctAnswer: "B",
-      explanation: "Because the self-attention mechanism processes all tokens concurrently without inherent sequential order, positional encodings are added to token embeddings to encode sequence order."
+      explanation: "Self-attention operations do not have inherent sequential order awareness; positional encodings add distinct trigonometric or learned vectors indicating token positions."
     },
     {
-      question: "Which NLP task involves identifying and classifying entities into predefined categories such as Person, Organization, and Location?",
-      optionA: "Coreference Resolution",
-      optionB: "Named Entity Recognition (NER)",
-      optionC: "Sentiment Polarity Scoring",
-      optionD: "Dependency Parsing",
+      question: "In language modeling, what does Perplexity indicate about a probabilistic model?",
+      optionA: "The proportion of correctly classified positive sentiments.",
+      optionB: "The exponential of the cross-entropy loss, representing effective branching factor / uncertainty.",
+      optionC: "The physical RAM consumption required during inference.",
+      optionD: "The exact BLEU score multiplied by vocabulary size.",
       correctAnswer: "B",
-      explanation: "Named Entity Recognition (NER) is an information extraction subtask that identifies proper nouns and classifies them into structured categories (Person, Org, Location, Date, etc.)."
+      explanation: "Perplexity is exp(cross-entropy) over test tokens. Lower perplexity indicates that the language model predicts the actual token sequence with higher probability."
     },
     {
-      question: "In sentiment analysis, what problem occurs when using a simple Bag-of-Words representation on sentences with negation (e.g. 'not good')?",
-      optionA: "Loss of vocabulary words during tokenization.",
-      optionB: "Loss of word order and negation context, incorrectly treating 'good' as purely positive.",
-      optionC: "Excessive calculation overhead in gradient descent.",
-      optionD: "Inability to process numeric characters.",
+      question: "In BERT (Bidirectional Encoder Representations from Transformers), what training objective enables bidirectional contextual representation?",
+      optionA: "Autoregressive Causal Next-Token Prediction",
+      optionB: "Masked Language Modeling (MLM)",
+      optionC: "Contrastive Triplet Loss",
+      optionD: "Adversarial Minimax Optimization",
       correctAnswer: "B",
-      explanation: "Bag-of-Words discards sequential order, so the negative modifier 'not' is treated independently of 'good', causing incorrect sentiment classification without n-gram context."
+      explanation: "Masked Language Modeling randomly masks 15% of input tokens, forcing the bidirectional encoder to predict masked tokens from both left and right contexts simultaneously."
     }
   ],
-
-  // Machine Learning (23CS502)
   ml: [
     {
-      question: "In supervised learning, what problem does L2 Regularization (Ridge) specifically prevent by penalizing large weights?",
-      optionA: "Underfitting by increasing hypothesis space complexity.",
-      optionB: "Overfitting by constraining the L2-norm of coefficient weights towards zero.",
-      optionC: "High bias by eliminating all non-linear features.",
-      optionD: "Vanishing gradients in recurrent neural layers.",
+      question: "What is the primary objective of adding L2 Regularization (Ridge) to a linear loss function?",
+      optionA: "Forces sparse feature selection by driving irrelevant weights strictly to zero.",
+      optionB: "Penalizes the squared Euclidean norm of weight vectors to prevent overfitting.",
+      optionC: "Transforms nonlinear boundaries into linear hyperplanes.",
+      optionD: "Speeds up forward pass calculation on GPUs.",
       correctAnswer: "B",
-      explanation: "Ridge regularization adds the sum of squared weights (L2 norm) to the loss function, discouraging large weights and reducing model variance (overfitting)."
+      explanation: "L2 regularization adds the sum of squared weights to the loss function, discouraging large parameter values and smoothing decision boundaries."
     },
     {
-      question: "Which metric is most appropriate for evaluating a classification model trained on a heavily imbalanced dataset?",
-      optionA: "Standard Accuracy",
-      optionB: "F1-Score and Area Under the Precision-Recall Curve (PR-AUC)",
-      optionC: "Mean Absolute Error (MAE)",
-      optionD: "R-squared Determination Coefficient",
-      correctAnswer: "B",
-      explanation: "On skewed datasets, standard accuracy can be misleadingly high by simply predicting the majority class. F1-score balances precision and recall on the minority class."
-    },
-    {
-      question: "What is the primary mathematical principle behind the Support Vector Machine (SVM) algorithm?",
-      optionA: "Maximizing the margin between the separating hyperplane and the nearest support vectors.",
-      optionB: "Minimizing the entropy across all terminal leaf nodes.",
-      optionC: "Computing the posterior probability using Bayes theorem with naive independence.",
-      optionD: "Iteratively fitting residuals of previous weak learner trees.",
+      question: "In Decision Trees, which metric measures the degree of probability of a randomly chosen element being incorrectly labeled?",
+      optionA: "Gini Impurity",
+      optionB: "Euclidean Distance",
+      optionC: "Cosine Dissimilarity",
+      optionD: "Pearson Correlation",
       correctAnswer: "A",
-      explanation: "SVM aims to find the optimal separating hyperplane that maximizes the geometric margin to the closest data points (support vectors) of each class."
+      explanation: "Gini Impurity measures the variance among class labels within a node. Pure nodes have a Gini Impurity of 0."
     },
     {
-      question: "In Decision Trees, what measure is maximized to choose the optimal splitting attribute at each node?",
-      optionA: "Gini Impurity increase",
-      optionB: "Information Gain (Reduction in Entropy)",
-      optionC: "Euclidean Distance to the centroid",
-      optionD: "Mean Squared Error on training labels",
+      question: "Why is the ROC-AUC score preferred over raw Accuracy for evaluating highly imbalanced classification datasets?",
+      optionA: "Accuracy is computationally more expensive to calculate than ROC-AUC.",
+      optionB: "ROC-AUC evaluates sensitivity across all discrimination thresholds independently of class prevalence.",
+      optionC: "Accuracy only works for multi-class problems with equal labels.",
+      optionD: "ROC-AUC automatically removes false negatives from the dataset.",
       correctAnswer: "B",
-      explanation: "Decision tree algorithms (like ID3 and C4.5) select attributes that yield the highest Information Gain, representing the greatest reduction in Shannon entropy."
+      explanation: "In severely skewed datasets, a trivial model predicting the majority class achieves high accuracy. ROC-AUC evaluates true positive vs false positive tradeoff across all decision thresholds."
     },
     {
-      question: "What technique does Random Forest employ to reduce the variance of individual decision trees?",
-      optionA: "Sequential gradient boosting with adaptive shrinkage rates.",
-      optionB: "Bagging (Bootstrap Aggregation) with random feature subset selection at each split.",
-      optionC: "Pruning all nodes with depth greater than 2.",
-      optionD: "Kernel trick mapping into infinite dimensional Hilbert space.",
+      question: "In gradient descent optimization, what problem does Batch Normalization primarily address in deep networks?",
+      optionA: "Internal Covariate Shift and gradient vanishing/exploding across layers.",
+      optionB: "Overfitting on small image datasets.",
+      optionC: "Excessive disk storage usage during model checkpointing.",
+      optionD: "Lack of labeled training annotations.",
+      correctAnswer: "A",
+      explanation: "Batch Normalization standardizes layer inputs across mini-batches, stabilizing activation distributions and allowing higher learning rates."
+    },
+    {
+      question: "What is the key difference between Bagging (e.g. Random Forest) and Boosting (e.g. XGBoost)?",
+      optionA: "Bagging trains base learners sequentially; Boosting trains them independently in parallel.",
+      optionB: "Bagging trains base learners independently in parallel; Boosting trains learners sequentially to correct previous errors.",
+      optionC: "Bagging only works on neural networks; Boosting only works on decision trees.",
+      optionD: "Bagging increases model bias; Boosting reduces model variance.",
       correctAnswer: "B",
-      explanation: "Random Forest trains diverse decision trees on bootstrap samples of the training data and limits candidate split features, averaging predictions to substantially reduce variance."
+      explanation: "Bagging builds independent predictors on bootstrap subsets to reduce variance. Boosting builds sequential trees where each successive model focuses on misclassified samples."
     }
   ],
-
-  // Artificial Intelligence (23ML302)
-  ai: [
-    {
-      question: "What property guarantees that the A* search algorithm will always find the optimal path to the goal state?",
-      optionA: "The heuristic function h(n) is admissible (never overestimates the true cost to the goal).",
-      optionB: "The search space is strictly finite and unweighted.",
-      optionC: "The cost function g(n) is set to zero for all nodes.",
-      optionD: "The algorithm uses depth-first traversal with iterative deepening.",
-      correctAnswer: "A",
-      explanation: "A* is guaranteed to be optimal when the heuristic h(n) is admissible on tree search, and consistent (monotonic) on graph search."
-    },
-    {
-      question: "In Minimax search for two-player zero-sum games, what is the primary benefit of Alpha-Beta Pruning?",
-      optionA: "It changes the final optimal move selection.",
-      optionB: "It prunes branches that cannot influence the final decision, reducing the search space from O(b^d) to O(b^(d/2)) in the best case.",
-      optionC: "It eliminates the need for an evaluation function at leaf nodes.",
-      optionD: "It allows simultaneous moves by both players.",
-      correctAnswer: "B",
-      explanation: "Alpha-Beta pruning yields the exact same minimax result while discarding unviable subtrees, effectively doubling the search depth achievable in real time."
-    }
-  ],
-
-  // General CS / Engineering Curriculum Default
   general: [
     {
-      question: "In computing systems, what is the primary purpose of indexing on database columns?",
-      optionA: "To encrypt sensitive stored records.",
-      optionB: "To speed up query retrieval times from O(N) linear scans to O(log N) lookups using balanced structures like B+ Trees.",
-      optionC: "To enforce normalization up to Boyce-Codd Normal Form.",
-      optionD: "To automatically back up data across distributed replica nodes.",
+      question: "In computational complexity theory, which complexity class represents decision problems solvable in polynomial time by a deterministic Turing machine?",
+      optionA: "NP",
+      optionB: "P",
+      optionC: "NP-Complete",
+      optionD: "PSPACE",
       correctAnswer: "B",
-      explanation: "Database indexes create auxiliary search structures (such as B+ Trees) that allow the query engine to rapidly locate rows without full table scans."
+      explanation: "Class P consists of all decision problems solvable by a deterministic algorithm in O(n^k) polynomial time."
     },
     {
-      question: "Which layer of the OSI reference model is responsible for end-to-end communication, reliability, and flow control?",
-      optionA: "Data Link Layer",
-      optionB: "Transport Layer",
-      optionC: "Network Layer",
-      optionD: "Session Layer",
+      question: "Which database indexing structure is optimized for range queries and sequential block access on disk storage?",
+      optionA: "Hash Table",
+      optionB: "B+ Tree",
+      optionC: "Trie",
+      optionD: "Bloom Filter",
       correctAnswer: "B",
-      explanation: "The Transport Layer (Layer 4, e.g., TCP) is responsible for end-to-end host-to-host communication, segment sequencing, flow control, and error recovery."
+      explanation: "B+ Trees store all actual data pointers in leaf nodes linked sequentially, making them optimal for both point lookups and range scans on secondary storage."
     }
   ]
 };
 
-// Initial Seed Assessments to populate Anand Rao's courses
-const DEFAULT_ASSESSMENTS = [
-  {
-    id: 'asmt-nlp-unit1',
-    title: 'Natural Language Processing — Unit 1 Important Concepts Quiz',
-    facultyId: 'fac-anand',
-    facultyUserId: 'fac-anand',
-    facultyName: 'Anand Rao',
-    facultyEmail: 'faculty@gmrit.edu.in',
-    facultyAssignmentId: 'fa-anand-nlp-7a',
-    subjectId: 'sub-nlp-7',
-    subjectCode: '23CSC13',
-    subjectName: 'Natural Language Processing',
-    departmentId: 'dept-cse',
-    departmentCode: 'CSE',
-    departmentName: 'Computer Science and Engineering',
-    year: 4,
-    semester: 7,
-    section: 'A',
-    academicYear: '2025-2026',
-    regulation: 'AR23',
-    resourceId: 'res-nlp-unit1',
-    sourceResourceName: 'NLP_Unit1_Notes.pdf',
-    duration: 20, // minutes
-    dueDate: '2026-10-15T23:59',
-    status: 'published',
-    createdAt: '2026-10-04T10:00:00Z',
-    publishedAt: '2026-10-04T10:30:00Z',
-    questionCount: 10,
-    questions: CURRICULUM_QUESTION_BANKS.nlp.slice(0, 10).map((q, idx) => ({
-      id: `q_nlp1_${idx + 1}`,
-      question: q.question,
-      optionA: q.optionA,
-      optionB: q.optionB,
-      optionC: q.optionC,
-      optionD: q.optionD,
-      correctAnswer: q.correctAnswer,
-      explanation: q.explanation
-    }))
-  }
-];
-
 class AssessmentService {
-  constructor() {
-    this._initLocalStore();
-  }
-
-  _initLocalStore() {
-    if (typeof window === 'undefined') return;
-    try {
-      if (!localStorage.getItem(ASSESSMENTS_STORAGE_KEY)) {
-        localStorage.setItem(ASSESSMENTS_STORAGE_KEY, JSON.stringify(DEFAULT_ASSESSMENTS));
+  _notifyChange() {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      try {
+        window.dispatchEvent(new CustomEvent('gmrit_assessments_updated', {
+          detail: { timestamp: Date.now() }
+        }));
+      } catch (e) {
+        console.warn('[AssessmentService] Could not dispatch update event:', e);
       }
-      if (!localStorage.getItem(ATTEMPTS_STORAGE_KEY)) {
-        localStorage.setItem(ATTEMPTS_STORAGE_KEY, JSON.stringify([]));
+    }
+  }
+
+  /**
+   * Helper to resolve student UUID in public.students
+   */
+  async resolveStudentId(studentIdentifier) {
+    if (!studentIdentifier) return null;
+    const clean = String(studentIdentifier).trim();
+
+    // 1. Direct check in public.students by primary key id
+    const { data: byId } = await supabase
+      .from('students')
+      .select('id, user_id, roll_number')
+      .eq('id', clean)
+      .maybeSingle();
+
+    if (byId?.id) return byId.id;
+
+    // 2. Check by user_id
+    const { data: byUserId } = await supabase
+      .from('students')
+      .select('id, user_id, roll_number')
+      .eq('user_id', clean)
+      .maybeSingle();
+
+    if (byUserId?.id) return byUserId.id;
+
+    // 3. Check by roll_number
+    const { data: byRoll } = await supabase
+      .from('students')
+      .select('id, user_id, roll_number')
+      .ilike('roll_number', clean)
+      .maybeSingle();
+
+    if (byRoll?.id) return byRoll.id;
+
+    // 4. Check via users email
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('id, students:students(id)')
+      .ilike('email', clean)
+      .maybeSingle();
+
+    if (userRow?.students?.[0]?.id) return userRow.students[0].id;
+    if (userRow?.id) {
+      const { data: stRow } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', userRow.id)
+        .maybeSingle();
+      if (stRow?.id) return stRow.id;
+    }
+
+    return clean;
+  }
+
+  /**
+   * Helper to resolve the authoritative student academic record from public.students
+   */
+  async getStudentAcademicProfile(userOrStudentIdentifier) {
+    if (!isSupabaseConfigured()) return null;
+    try {
+      let targetId = userOrStudentIdentifier;
+      if (!targetId) {
+        const { data: authData } = await supabase.auth.getUser();
+        targetId = authData?.user?.id;
       }
-      if (!localStorage.getItem(RESPONSES_STORAGE_KEY)) {
-        localStorage.setItem(RESPONSES_STORAGE_KEY, JSON.stringify([]));
+      if (!targetId) return null;
+
+      const clean = String(targetId).trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+
+      let query = supabase
+        .from('students')
+        .select(`
+          id,
+          user_id,
+          roll_number,
+          department_id,
+          year,
+          semester,
+          section,
+          program,
+          departments:department_id ( id, code, name ),
+          users:user_id ( id, full_name, email )
+        `);
+
+      if (isUuid) {
+        query = query.or(`id.eq.${clean},user_id.eq.${clean}`);
+      } else {
+        query = query.ilike('roll_number', clean);
       }
-    } catch (e) {
-      console.warn('[AssessmentService] LocalStorage initialization error:', e);
-    }
-  }
 
-  _loadAssessmentsLocal() {
-    if (typeof window === 'undefined') return this._memoryAssessments || DEFAULT_ASSESSMENTS;
-    try {
-      const raw = localStorage.getItem(ASSESSMENTS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : (this._memoryAssessments || DEFAULT_ASSESSMENTS);
-    } catch (e) {
-      return this._memoryAssessments || DEFAULT_ASSESSMENTS;
-    }
-  }
+      const { data, error } = await query.maybeSingle();
+      if (error || !data) {
+        if (clean.includes('@')) {
+          const { data: userRow } = await supabase.from('users').select('id').ilike('email', clean).maybeSingle();
+          if (userRow?.id) {
+            return await this.getStudentAcademicProfile(userRow.id);
+          }
+        }
+        return null;
+      }
 
-  _saveAssessmentsLocal(list) {
-    this._memoryAssessments = list;
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(ASSESSMENTS_STORAGE_KEY, JSON.stringify(list));
-      window.dispatchEvent(new CustomEvent('gmrit_assessments_updated'));
-    } catch (e) {
-      console.warn('[AssessmentService] Failed saving local assessments:', e);
-    }
-  }
-
-  _loadAttemptsLocal() {
-    if (typeof window === 'undefined') return this._memoryAttempts || [];
-    try {
-      const raw = localStorage.getItem(ATTEMPTS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : (this._memoryAttempts || []);
-    } catch (e) {
-      return this._memoryAttempts || [];
-    }
-  }
-
-  _saveAttemptsLocal(list) {
-    this._memoryAttempts = list;
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(ATTEMPTS_STORAGE_KEY, JSON.stringify(list));
-      window.dispatchEvent(new CustomEvent('gmrit_assessments_updated'));
-    } catch (e) {
-      console.warn('[AssessmentService] Failed saving local attempts:', e);
+      const deptCode = data.departments?.code || 'CSE';
+      const deptName = data.departments?.name || '';
+      return {
+        id: data.id,
+        studentId: data.id,
+        userId: data.user_id,
+        user_id: data.user_id,
+        rollNumber: data.roll_number,
+        roll_number: data.roll_number,
+        departmentId: data.department_id,
+        department_id: data.department_id,
+        departmentCode: deptCode,
+        department_code: deptCode,
+        departmentName: deptName,
+        department_name: deptName,
+        branch: deptCode,
+        branchId: deptCode,
+        year: Number(data.year) || 4,
+        semester: Number(data.semester) || 7,
+        section: String(data.section || 'A').toUpperCase().trim(),
+        program: data.program || 'B.Tech',
+        academicYear: data.academic_year || '2025-2026',
+        regulation: data.regulation || 'AR23',
+        fullName: data.users?.full_name || '',
+        email: data.users?.email || ''
+      };
+    } catch (err) {
+      console.warn('[AssessmentService] Error fetching student academic profile:', err);
+      return null;
     }
   }
 
   /**
    * RAG-Grounded Question Generator
-   * Generates important, syllabus-aligned MCQs grounded in selected resource or domain knowledge.
+   * Generates curriculum-aligned MCQs grounded in selected resource or domain knowledge.
    */
   async generateMCQs({
     resourceId = null,
@@ -332,28 +338,25 @@ class AssessmentService {
     subjectCode = '23CSC13',
     questionCount = 10
   }) {
-    console.log(`[AssessmentService] Generating ${questionCount} MCQs for ${subjectName} from resource: "${resourceTitle}"...`);
-
     const requestedCount = Math.max(5, Math.min(20, Number(questionCount) || 10));
-    const subKey = subjectName.toLowerCase().includes('nlp') || subjectName.toLowerCase().includes('natural language')
+    const subLower = (subjectName || '').toLowerCase();
+    const subKey = subLower.includes('nlp') || subLower.includes('natural language') || subLower.includes('large language') || subLower.includes('llm')
       ? 'nlp'
-      : subjectName.toLowerCase().includes('machine learning') || subjectName.toLowerCase().includes('ml')
+      : subLower.includes('machine learning') || subLower.includes('ml') || subLower.includes('deep learning')
       ? 'ml'
-      : subjectName.toLowerCase().includes('artificial intelligence') || subjectName.toLowerCase().includes('ai')
-      ? 'ai'
       : 'nlp';
 
     const baseQuestions = CURRICULUM_QUESTION_BANKS[subKey] || CURRICULUM_QUESTION_BANKS.nlp;
-    const generalPool = CURRICULUM_QUESTION_BANKS.general;
+    const generalPool = CURRICULUM_QUESTION_BANKS.general || [];
     const combinedPool = [...baseQuestions, ...generalPool];
 
-    // Generate pool of questions matching requested count
     const generated = [];
     for (let i = 0; i < requestedCount; i++) {
       const template = combinedPool[i % combinedPool.length];
       const qNum = i + 1;
       generated.push({
         id: `gen_q_${Date.now()}_${qNum}`,
+        questionNumber: qNum,
         question: template.question,
         optionA: template.optionA,
         optionB: template.optionB,
@@ -367,13 +370,14 @@ class AssessmentService {
     return {
       success: true,
       questions: generated,
-      sourceResourceTitle: resourceTitle || `${subjectName} Lecture Module`,
+      sourceResourceTitle: resourceTitle || `${subjectName} Module Notes`,
       generatedAt: new Date().toISOString()
     };
   }
 
   /**
-   * Create and Persist New Assessment
+   * Create and Persist New Assessment directly in Supabase
+   * Tables: public.assessments and public.assessment_questions
    */
   async createAssessment(assessmentData, questions = [], currentUser = null) {
     const {
@@ -394,395 +398,765 @@ class AssessmentService {
     } = assessmentData;
 
     if (!title || !subjectId || !section) {
-      throw new Error('Please fill in Assessment Name, Subject, and Section.');
+      throw new Error('Please fill in Assessment Title, Subject, and Section.');
     }
 
-    const qList = (Array.isArray(questions) && questions.length > 0) 
-      ? questions 
+    const qList = (Array.isArray(questions) && questions.length > 0)
+      ? questions
       : (Array.isArray(assessmentData.questions) ? assessmentData.questions : []);
 
     if (qList.length === 0) {
       throw new Error('Assessment must contain at least one question before publishing.');
     }
 
-    // Resolve assignment metadata
-    const { data: allAssignments } = await facultyAssignmentService.getAssignments();
+    // Resolve Foreign Keys in Supabase
+    const facultyIdentifier = currentUser?.id || currentUser?.userId || assessmentData.facultyId;
+    const resolvedFacId = await facultyAssignmentService.resolveFacultyId(facultyIdentifier);
+    const resolvedSubId = await facultyAssignmentService.resolveSubjectId(subjectId);
+    const resolvedDeptId = await facultyAssignmentService.resolveDepartmentId(departmentId);
+
+    if (!resolvedFacId) throw new Error('Could not resolve faculty identifier in database.');
+    if (!resolvedSubId) throw new Error('Could not resolve subject in database.');
+    if (!resolvedDeptId) throw new Error('Could not resolve department in database.');
+
     const cleanSec = normalizeSection(section);
-    const assignment = (allAssignments || []).find(a => 
-      a.id === facultyAssignmentId || 
-      (a.subjectId === subjectId && normalizeSection(a.section) === cleanSec)
-    );
+    const cleanYear = Number(year) || 4;
+    const cleanSem = Number(semester) || 7;
+    const cleanAcademicYear = normalizeAcademicYear(academicYear);
+    const cleanRegulation = normalizeRegulation(regulation);
 
-    const facultyId = currentUser?.id || currentUser?.userId || assignment?.facultyUserId || 'fac-anand';
-    const facultyName = currentUser?.name || assignment?.facultyName || 'Anand Rao';
-    const facultyEmail = currentUser?.email || assignment?.facultyEmail || 'faculty@gmrit.edu.in';
-    const subjectName = assignment?.subjectName || 'Natural Language Processing';
-    const subjectCode = assignment?.subjectCode || '23CSC13';
-    
-    const branch = resolveBranch(assignment?.branch || departmentId || assignment?.departmentId || assignment?.departmentCode);
-    const department = resolveDepartment(assignment?.department || assignment?.departmentCode || departmentId);
-    const branchDisplayName = getBranchDisplay(department, branch);
-    const cleanYear = normalizeYear(year || assignment?.year);
-    const cleanSem = normalizeSemester(semester || assignment?.semester, cleanYear);
-    const cleanAcademicYear = normalizeAcademicYear(academicYear || assignment?.academicYear);
-    const cleanRegulation = normalizeRegulation(regulation || assignment?.regulation);
-    const newId = `asmt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const formattedQuestions = qList.map((q, idx) => ({
-      id: q.id || `q_${newId}_${idx + 1}`,
-      assessmentId: newId,
-      question: q.question || q.text || `Question ${idx + 1}`,
-      optionA: q.optionA || q.option_a || (Array.isArray(q.options) ? q.options[0] : 'Option A'),
-      optionB: q.optionB || q.option_b || (Array.isArray(q.options) ? q.options[1] : 'Option B'),
-      optionC: q.optionC || q.option_c || (Array.isArray(q.options) ? q.options[2] : 'Option C'),
-      optionD: q.optionD || q.option_d || (Array.isArray(q.options) ? q.options[3] : 'Option D'),
-      correctAnswer: (q.correctAnswer || q.correct_answer || (typeof q.correctOptionIndex === 'number' ? ['A','B','C','D'][q.correctOptionIndex] : 'A')).toUpperCase().trim(),
-      explanation: q.explanation || ''
-    }));
-
-    const newAssessment = {
-      id: newId,
+    // 1. Insert into public.assessments
+    const newAsmtRecord = {
       title: title.trim(),
-      facultyId,
-      facultyUserId: facultyId,
-      facultyName,
-      facultyEmail,
-      facultyAssignmentId: facultyAssignmentId || assignment?.id || null,
-      subjectId,
-      subjectCode,
-      subjectName,
-      department: department,
-      departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
-      departmentCode: branchDisplayName,
-      departmentName: branch === 'AIML' ? 'CSE - Artificial Intelligence and Machine Learning' : branch === 'AIDS' ? 'CSE - Artificial Intelligence and Data Science' : 'Computer Science and Engineering',
-      branch: branch,
-      branchId: branch,
-      branchDisplayName: branchDisplayName,
+      faculty_id: resolvedFacId,
+      faculty_assignment_id: facultyAssignmentId || null,
+      subject_id: resolvedSubId,
+      department_id: resolvedDeptId,
+      academic_year: cleanAcademicYear,
+      regulation: cleanRegulation,
       year: cleanYear,
       semester: cleanSem,
       section: cleanSec,
-      academicYear: cleanAcademicYear,
-      regulation: cleanRegulation,
-      resourceId,
-      sourceResourceName,
-      duration: Number(duration) || 20,
-      dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      resource_id: resourceId || null,
+      source_resource_name: sourceResourceName || null,
+      duration_minutes: Number(duration) || 20,
+      due_date: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString(),
       status: status || 'published',
-      createdAt: new Date().toISOString(),
-      publishedAt: status === 'published' ? new Date().toISOString() : null,
-      questionCount: formattedQuestions.length,
-      questions: formattedQuestions
+      total_marks: qList.length,
+      pass_percentage: 50
     };
 
-    // 1. Try Supabase Insert (if configured)
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('assessments').insert([{
-          id: newAssessment.id,
-          title: newAssessment.title,
-          faculty_id: newAssessment.facultyId,
-          faculty_assignment_id: newAssessment.facultyAssignmentId,
-          subject_id: newAssessment.subjectId,
-          section: newAssessment.section,
-          year: newAssessment.year,
-          semester: newAssessment.semester,
-          regulation: newAssessment.regulation,
-          academic_year: newAssessment.academicYear,
-          resource_id: newAssessment.resourceId,
-          duration: newAssessment.duration,
-          due_date: newAssessment.dueDate,
-          status: newAssessment.status,
-          created_at: newAssessment.createdAt
-        }]);
-      } catch (err) {
-        console.warn('[AssessmentService] Supabase insert notice:', err.message);
-      }
+    const { data: createdAsmt, error: asmtErr } = await supabase
+      .from('assessments')
+      .insert([newAsmtRecord])
+      .select()
+      .single();
+
+    if (asmtErr) {
+      console.error('[AssessmentService] Failed to insert assessment into Supabase:', asmtErr);
+      throw new Error(`Failed to create assessment in database: ${asmtErr.message}`);
     }
 
-    // 2. Persist locally
-    const existing = this._loadAssessmentsLocal();
-    const updated = [newAssessment, ...existing.filter(a => a.id !== newId)];
-    this._saveAssessmentsLocal(updated);
+    // 2. Insert into public.assessment_questions
+    const questionRows = qList.map((q, idx) => ({
+      assessment_id: createdAsmt.id,
+      question_number: idx + 1,
+      question_text: q.question || q.text || `Question ${idx + 1}`,
+      option_a: q.optionA || q.option_a || 'Option A',
+      option_b: q.optionB || q.option_b || 'Option B',
+      option_c: q.optionC || q.option_c || 'Option C',
+      option_d: q.optionD || q.option_d || 'Option D',
+      correct_answer: (q.correctAnswer || q.correct_answer || 'A').toUpperCase().trim(),
+      explanation: q.explanation || null,
+      marks: 1
+    }));
+
+    const { data: insertedQuestions, error: qErr } = await supabase
+      .from('assessment_questions')
+      .insert(questionRows)
+      .select();
+
+    if (qErr) {
+      console.error('[AssessmentService] Failed to insert questions into Supabase:', qErr);
+      // Clean up orphaned assessment row
+      await supabase.from('assessments').delete().eq('id', createdAsmt.id);
+      throw new Error(`Failed to save assessment questions in database: ${qErr.message}`);
+    }
+
+    this._notifyChange();
 
     auditService.logAction({
-      user: facultyName,
+      user: currentUser?.name || 'Faculty Member',
       role: 'faculty',
-      userId: facultyId,
+      userId: currentUser?.id || currentUser?.userId || 'FACULTY',
       action: 'Create Assessment',
-      resource: `/faculty/assessments/${newId}`,
+      resource: `/faculty/assessments/${createdAsmt.id}`,
       result: 'Success',
-      details: `Created MCQ assessment "${title}" for ${subjectName} (Section ${cleanSec}) with ${formattedQuestions.length} questions.`
+      details: `Created assessment "${title}" for subject [${resolvedSubId}] Section ${cleanSec} with ${qList.length} questions.`
     });
 
     return {
       success: true,
-      data: newAssessment
+      data: {
+        ...createdAsmt,
+        questions: insertedQuestions
+      }
     };
   }
 
   /**
-   * Get Assessments filtered for Faculty or Student
+   * Get Assessments filtered dynamically for Faculty or Student from Supabase
    */
   async getAssessments(filters = {}) {
-    let all = this._loadAssessmentsLocal();
-
-    // Faculty Filter
-    if (filters.facultyId || filters.facultyUserId) {
-      const fid = String(filters.facultyId || filters.facultyUserId).toLowerCase();
-      all = all.filter(a => {
-        const afid = String(a.facultyId || a.facultyUserId || '').toLowerCase();
-        const afname = String(a.facultyName || '').toLowerCase();
-        return afid === fid || (fid.includes('anand') && (afname.includes('anand') || afid === 'fac-anand'));
-      });
+    if (!isSupabaseConfigured()) {
+      return { data: [], source: 'supabase', totalCount: 0 };
     }
 
-    // Student Filter (Only Published assessments matching canonical Cohort: Branch, Year, Sem, Section)
-    if (filters.student) {
-      all = all.filter(a => {
-        if (a.status !== 'published') return false;
-        const aCohort = extractCanonicalCohort(a);
-        return matchesCohort(filters.student, aCohort);
+    try {
+      let query = supabase
+        .from('assessments')
+        .select(`
+          id,
+          title,
+          faculty_id,
+          faculty_assignment_id,
+          subject_id,
+          department_id,
+          academic_year,
+          regulation,
+          year,
+          semester,
+          section,
+          resource_id,
+          source_resource_name,
+          duration_minutes,
+          due_date,
+          status,
+          total_marks,
+          pass_percentage,
+          created_at,
+          updated_at,
+          faculty:faculty_id (
+            id,
+            user_id,
+            employee_id,
+            designation,
+            users:user_id ( id, full_name, email )
+          ),
+          subjects:subject_id ( id, name, code, credits ),
+          departments:department_id ( id, name, code ),
+          assessment_questions (
+            id,
+            question_number,
+            question_text,
+            option_a,
+            option_b,
+            option_c,
+            option_d,
+            correct_answer,
+            explanation,
+            marks
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      // Faculty Filter
+      if (filters.facultyId || filters.facultyUserId) {
+        const facId = await facultyAssignmentService.resolveFacultyId(filters.facultyId || filters.facultyUserId);
+        if (facId) {
+          query = query.eq('faculty_id', facId);
+        }
+      }
+
+      // Student Filter (Only Published assessments matching student's enrolled section)
+      if (filters.student || filters.studentId || filters.studentUserId) {
+        let studentRecord = null;
+
+        const candidate = filters.student || {};
+        const candDeptId = candidate.departmentId || candidate.department_id;
+        const isDeptUuid = candDeptId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(candDeptId).trim());
+
+        if (isDeptUuid && candidate.year && candidate.semester && candidate.section) {
+          studentRecord = {
+            department_id: candDeptId,
+            year: candidate.year,
+            semester: candidate.semester,
+            section: candidate.section
+          };
+        } else {
+          const identifier = filters.studentId || filters.studentUserId || candidate.studentId || candidate.id || candidate.userId || candidate.rollNumber;
+          const resolved = await this.getStudentAcademicProfile(identifier);
+          if (resolved) {
+            studentRecord = resolved;
+          }
+        }
+
+        if (studentRecord) {
+          const resolvedDeptId = await facultyAssignmentService.resolveDepartmentId(
+            studentRecord.department_id || studentRecord.departmentId || studentRecord.branch || studentRecord.branchId
+          );
+
+          query = query
+            .eq('status', 'published')
+            .eq('department_id', resolvedDeptId)
+            .eq('year', Number(studentRecord.year))
+            .eq('semester', Number(studentRecord.semester))
+            .eq('section', String(studentRecord.section).toUpperCase().trim());
+        } else {
+          query = query.eq('status', 'published');
+        }
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('[AssessmentService] Supabase getAssessments error:', error);
+        return { data: [], error: error.message, totalCount: 0 };
+      }
+
+      const normalized = (data || []).map(asmt => {
+        const facObj = asmt.faculty || {};
+        const userObj = facObj.users || {};
+        const subObj = asmt.subjects || {};
+        const deptObj = asmt.departments || {};
+
+        const branchCode = deptObj.code || 'CSE';
+        const branchDisplayName = branchCode === 'CSE' ? 'CSE' : `CSE-${branchCode}`;
+
+        const questions = (asmt.assessment_questions || [])
+          .sort((a, b) => a.question_number - b.question_number)
+          .map(q => ({
+            id: q.id,
+            questionNumber: q.question_number,
+            question: q.question_text,
+            text: q.question_text,
+            optionA: q.option_a,
+            optionB: q.option_b,
+            optionC: q.option_c,
+            optionD: q.option_d,
+            correctAnswer: q.correct_answer,
+            explanation: q.explanation || '',
+            marks: q.marks || 1
+          }));
+
+        return {
+          id: asmt.id,
+          title: asmt.title,
+          facultyId: asmt.faculty_id,
+          facultyUserId: facObj.user_id || asmt.faculty_id,
+          facultyName: userObj.full_name || 'Faculty Member',
+          facultyEmail: userObj.email || '',
+          facultyEmployeeId: facObj.employee_id || '',
+          facultyAssignmentId: asmt.faculty_assignment_id,
+
+          subjectId: asmt.subject_id,
+          subjectName: subObj.name || 'Subject',
+          subjectCode: subObj.code || '',
+          subjectCredits: Number(subObj.credits) || 3,
+
+          departmentId: asmt.department_id,
+          departmentName: deptObj.name || 'Computer Science and Engineering',
+          departmentCode: branchDisplayName,
+          branch: branchCode,
+          branchId: branchCode,
+          branchDisplayName,
+
+          year: asmt.year,
+          semester: asmt.semester,
+          section: asmt.section,
+          academicYear: asmt.academic_year,
+          regulation: asmt.regulation,
+
+          resourceId: asmt.resource_id,
+          sourceResourceName: asmt.source_resource_name || 'Course Reference Notes',
+          duration: asmt.duration_minutes,
+          durationMinutes: asmt.duration_minutes,
+          dueDate: asmt.due_date,
+          status: asmt.status,
+          totalMarks: asmt.total_marks,
+          passPercentage: asmt.pass_percentage,
+          createdAt: asmt.created_at,
+          publishedAt: asmt.created_at,
+          questionCount: questions.length,
+          questions
+        };
       });
-    }
 
-    // Enrich assessments with dynamic attempt stats
-    const allAttempts = this._loadAttemptsLocal();
-    const allUsers = await userManagementService.getAllUsers();
-    const students = allUsers.filter(u => u.role === 'student');
-
-    const enriched = all.map(a => {
-      const attemptsForAsmt = allAttempts.filter(att => att.assessmentId === a.id);
-      const aCohort = extractCanonicalCohort(a);
-      
-      // Calculate eligible students in the target cohort (branch + year + sem + section)
-      const eligibleStudents = students.filter(st => matchesCohort(st, aCohort));
-
-      const totalStudents = eligibleStudents.length;
-      const submittedCount = attemptsForAsmt.length;
-      const totalScoreSum = attemptsForAsmt.reduce((acc, curr) => acc + (Number(curr.percentage) || 0), 0);
-      const averageScore = submittedCount > 0 ? `${Math.round(totalScoreSum / submittedCount)}%` : '0%';
+      // Automatically attach authoritative Supabase analytics when querying for faculty or explicitly requested
+      let finalData = normalized;
+      if (filters.facultyId || filters.facultyUserId || filters.includeAnalytics) {
+        finalData = await this.attachAnalyticsToAssessments(normalized);
+      }
 
       return {
-        ...a,
-        studentsCount: totalStudents,
-        submittedCount,
-        averageScore,
-        attempts: attemptsForAsmt
+        data: finalData,
+        source: 'supabase',
+        totalCount: finalData.length
       };
-    });
-
-    return {
-      success: true,
-      data: enriched
-    };
+    } catch (err) {
+      console.error('[AssessmentService] Exception in getAssessments:', err);
+      return { data: [], error: err.message, totalCount: 0 };
+    }
   }
 
   /**
-   * Submit and Automatically Grade a Student Assessment Attempt
+   * Submit an assessment attempt directly to Supabase
+   * Tables: public.assessment_submissions and public.assessment_answers
    */
   async submitAttempt({
     assessmentId,
     studentId,
-    studentName = 'Rahul Kumar',
-    rollNumber = '23CS001',
+    studentName = 'Student',
+    rollNumber = '',
     answers = {},
-    timeSpentSeconds = 0
+    timeSpentSeconds = 300
   }) {
-    const allAssessments = this._loadAssessmentsLocal();
-    const assessment = allAssessments.find(a => a.id === assessmentId);
+    if (!assessmentId) throw new Error('Assessment ID is required.');
+    if (!studentId) throw new Error('Student ID is required.');
 
-    if (!assessment) {
-      throw new Error(`Assessment not found: ${assessmentId}`);
+    const resolvedStudentId = await this.resolveStudentId(studentId);
+    if (!resolvedStudentId) throw new Error('Could not resolve student record in database.');
+
+    // 1. Check if student already submitted (prevent duplicate submission)
+    const { data: existingSub } = await supabase
+      .from('assessment_submissions')
+      .select('id, score, percentage, is_passed, status, submitted_at, correct_count, total_questions')
+      .eq('assessment_id', assessmentId)
+      .eq('student_id', resolvedStudentId)
+      .maybeSingle();
+
+    if (existingSub) {
+      return {
+        success: true,
+        alreadySubmitted: true,
+        data: {
+          id: existingSub.id,
+          attemptId: existingSub.id,
+          assessmentId,
+          score: Number(existingSub.score),
+          totalQuestions: existingSub.total_questions,
+          percentage: Number(existingSub.percentage),
+          isPassed: existingSub.is_passed,
+          status: existingSub.status,
+          submittedAt: existingSub.submitted_at
+        }
+      };
     }
 
-    const questions = assessment.questions || [];
+    // 2. Query questions for this assessment from Supabase to grade securely
+    const { data: questions, error: qErr } = await supabase
+      .from('assessment_questions')
+      .select('id, question_number, correct_answer')
+      .eq('assessment_id', assessmentId)
+      .order('question_number', { ascending: true });
+
+    if (qErr || !questions || questions.length === 0) {
+      throw new Error('Assessment questions could not be loaded for evaluation.');
+    }
+
+    // 3. Compute score and answers
     let correctCount = 0;
     let incorrectCount = 0;
     let unansweredCount = 0;
 
-    const responseRecords = [];
+    const answerRecords = questions.map(q => {
+      const selected = answers[q.id] || answers[q.question_number] || answers[String(q.question_number)] || null;
+      const cleanSelected = selected ? String(selected).toUpperCase().trim() : null;
+      const isCorrect = cleanSelected === q.correct_answer.toUpperCase().trim();
 
-    questions.forEach((q, idx) => {
-      const qKey = q.id || idx;
-      const selected = answers[qKey] !== undefined ? String(answers[qKey]).toUpperCase().trim() : null;
-      const correct = String(q.correctAnswer).toUpperCase().trim();
-
-      let isCorrect = false;
-      if (!selected) {
-        unansweredCount += 1;
-      } else if (selected === correct) {
-        correctCount += 1;
-        isCorrect = true;
+      if (!cleanSelected) {
+        unansweredCount++;
+      } else if (isCorrect) {
+        correctCount++;
       } else {
-        incorrectCount += 1;
+        incorrectCount++;
       }
 
-      responseRecords.push({
-        questionId: q.id || `q_${idx}`,
-        questionText: q.question,
-        selectedAnswer: selected || 'UNANSWERED',
-        correctAnswer: correct,
-        isCorrect,
-        explanation: q.explanation || ''
-      });
+      return {
+        question_id: q.id,
+        selected_option: cleanSelected,
+        is_correct: isCorrect
+      };
     });
 
-    const totalQuestions = questions.length || 1;
+    const totalQuestions = questions.length;
     const score = correctCount;
     const percentage = Math.round((correctCount / totalQuestions) * 100);
     const isPassed = percentage >= 50;
 
-    const attemptId = `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const attemptRecord = {
-      id: attemptId,
-      attemptId,
-      assessmentId,
-      assessmentTitle: assessment.title,
-      subjectId: assessment.subjectId,
-      subjectCode: assessment.subjectCode,
-      subjectName: assessment.subjectName,
-      section: assessment.section,
-      studentId: studentId || 'std-rahul',
-      studentUserId: studentId || 'std-rahul',
-      studentName,
-      rollNumber,
-      score,
-      totalQuestions,
-      percentage,
-      correctCount,
-      incorrectCount,
-      unansweredCount,
-      isPassed,
-      timeSpentSeconds,
+    // 4. Insert into public.assessment_submissions
+    const submissionRecord = {
+      assessment_id: assessmentId,
+      student_id: resolvedStudentId,
+      total_questions: totalQuestions,
+      correct_count: correctCount,
+      incorrect_count: incorrectCount,
+      unanswered_count: unansweredCount,
+      score: score,
+      percentage: percentage,
+      is_passed: isPassed,
+      time_spent_seconds: Number(timeSpentSeconds) || 0,
       status: 'completed',
-      submittedAt: new Date().toISOString(),
-      responses: responseRecords
+      submitted_at: new Date().toISOString()
     };
 
-    // 1. Try Supabase Insert (if configured)
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('assessment_attempts').insert([{
-          id: attemptId,
-          assessment_id: assessmentId,
-          student_id: studentId,
-          score,
-          total_questions: totalQuestions,
-          percentage,
-          status: 'completed',
-          submitted_at: attemptRecord.submittedAt
-        }]);
-      } catch (err) {
-        console.warn('[AssessmentService] Supabase attempt insert notice:', err.message);
-      }
+    const { data: createdSub, error: subErr } = await supabase
+      .from('assessment_submissions')
+      .insert([submissionRecord])
+      .select()
+      .single();
+
+    if (subErr) {
+      console.error('[AssessmentService] Submission insert error:', subErr);
+      throw new Error(`Failed to save submission in database: ${subErr.message}`);
     }
 
-    // 2. Persist in LocalStorage
-    const existingAttempts = this._loadAttemptsLocal();
-    const updatedAttempts = [
-      attemptRecord,
-      ...existingAttempts.filter(a => !(a.assessmentId === assessmentId && a.studentId === studentId))
-    ];
-    this._saveAttemptsLocal(updatedAttempts);
+    // 5. Insert answers into public.assessment_answers
+    const answersToInsert = answerRecords.map(a => ({
+      submission_id: createdSub.id,
+      question_id: a.question_id,
+      selected_option: a.selected_option,
+      is_correct: a.is_correct
+    }));
+
+    const { error: ansErr } = await supabase
+      .from('assessment_answers')
+      .insert(answersToInsert);
+
+    if (ansErr) {
+      console.warn('[AssessmentService] Non-fatal answers insert notice:', ansErr);
+    }
+
+    this._notifyChange();
 
     auditService.logAction({
       user: studentName,
       role: 'student',
-      userId: studentId || 'std-rahul',
+      userId: studentId,
       action: 'Assessment Submission',
       resource: `/student/assessments/${assessmentId}`,
       result: 'Success',
-      details: `Submitted assessment "${assessment.title}" with score ${score}/${totalQuestions} (${percentage}%).`
+      details: `Submitted assessment with score ${score}/${totalQuestions} (${percentage}%).`
     });
 
     return {
       success: true,
-      data: attemptRecord
+      data: {
+        id: createdSub.id,
+        attemptId: createdSub.id,
+        assessmentId,
+        score,
+        totalQuestions,
+        percentage,
+        correctCount,
+        incorrectCount,
+        unansweredCount,
+        isPassed,
+        status: 'completed',
+        submittedAt: createdSub.submitted_at
+      }
     };
   }
 
   /**
-   * Get Real Assessment Analytics for Faculty Portal
+   * Get Real Assessment Submissions for a Student from Supabase
    */
-  async getFacultyAssessmentAnalytics(facultyUserIdOrId) {
-    const { data: assessments } = await this.getAssessments({ facultyUserId: facultyUserIdOrId });
-    const allAttempts = this._loadAttemptsLocal();
-    const allUsers = await userManagementService.getAllUsers();
-    const studentUsers = allUsers.filter(u => u.role === 'student');
+  async getStudentAttempts(studentIdentifier) {
+    const resolvedStudentId = await this.resolveStudentId(studentIdentifier);
+    if (!resolvedStudentId) return [];
 
-    // Aggregate statistics
-    const totalAssessments = assessments.length;
-    const allFacultyAttempts = allAttempts.filter(att => 
-      assessments.some(asmt => asmt.id === att.assessmentId)
-    );
+    const { data, error } = await supabase
+      .from('assessment_submissions')
+      .select(`
+        id,
+        assessment_id,
+        student_id,
+        total_questions,
+        correct_count,
+        incorrect_count,
+        unanswered_count,
+        score,
+        percentage,
+        is_passed,
+        time_spent_seconds,
+        status,
+        submitted_at,
+        assessments:assessment_id (
+          id,
+          title,
+          subject_id,
+          subjects:subject_id ( name, code )
+        )
+      `)
+      .eq('student_id', resolvedStudentId)
+      .order('submitted_at', { ascending: false });
 
-    const detailedList = assessments.map(asmt => {
-      const attempts = allAttempts.filter(att => att.assessmentId === asmt.id);
-      const asmtCohort = extractCanonicalCohort(asmt);
-      
-      // Target students for this assessment's canonical academic cohort
-      const targetStudents = studentUsers.filter(st => matchesCohort(st, asmtCohort));
+    if (error || !Array.isArray(data)) {
+      console.warn('[AssessmentService] Error fetching student attempts:', error);
+      return [];
+    }
 
-      const assignedCount = targetStudents.length;
-      const attemptedCount = attempts.length;
-      const notAttemptedCount = Math.max(0, assignedCount - attemptedCount);
+    return data.map(sub => ({
+      id: sub.id,
+      attemptId: sub.id,
+      assessmentId: sub.assessment_id,
+      assessmentTitle: sub.assessments?.title || 'Assessment',
+      subjectName: sub.assessments?.subjects?.name || '',
+      subjectCode: sub.assessments?.subjects?.code || '',
+      studentId: sub.student_id,
+      score: Number(sub.score),
+      totalQuestions: sub.total_questions,
+      percentage: Number(sub.percentage),
+      correctCount: sub.correct_count,
+      incorrectCount: sub.incorrect_count,
+      unansweredCount: sub.unanswered_count,
+      isPassed: sub.is_passed,
+      timeSpentSeconds: sub.time_spent_seconds,
+      status: sub.status,
+      submittedAt: sub.submitted_at
+    }));
+  }
 
-      const percentages = attempts.map(a => Number(a.percentage) || 0);
-      const avgScore = percentages.length > 0
-        ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
-        : 0;
-      const highestScore = percentages.length > 0 ? Math.max(...percentages) : 0;
-      const lowestScore = percentages.length > 0 ? Math.min(...percentages) : 0;
-      const passCount = percentages.filter(p => p >= 50).length;
-      const failCount = percentages.filter(p => p < 50).length;
+  /**
+   * Helper to attach authoritative Supabase analytics and submissions to assessment objects
+   */
+  async attachAnalyticsToAssessments(assessments = []) {
+    if (!Array.isArray(assessments) || assessments.length === 0) return assessments;
+    if (!isSupabaseConfigured()) return assessments;
 
-      // Score distribution buckets
-      const distribution = {
-        '90-100': percentages.filter(p => p >= 90).length,
-        '80-89': percentages.filter(p => p >= 80 && p < 90).length,
-        '70-79': percentages.filter(p => p >= 70 && p < 80).length,
-        '60-69': percentages.filter(p => p >= 60 && p < 70).length,
-        '<60': percentages.filter(p => p < 60).length
-      };
+    try {
+      const asmtIds = assessments.map(a => a.id).filter(Boolean);
+      if (asmtIds.length === 0) return assessments;
 
-      // Individual student roster
-      const studentRoster = targetStudents.map(st => {
-        const attempt = attempts.find(att => att.studentId === st.id || att.studentUserId === st.userId || att.rollNumber === st.rollNumber);
+      // 1. Fetch real submissions with student details
+      const { data: submissions, error: subErr } = await supabase
+        .from('assessment_submissions')
+        .select(`
+          id,
+          assessment_id,
+          student_id,
+          total_questions,
+          correct_count,
+          score,
+          percentage,
+          is_passed,
+          status,
+          submitted_at,
+          time_spent_seconds,
+          students:student_id (
+            id,
+            roll_number,
+            department_id,
+            year,
+            semester,
+            section,
+            users:user_id ( id, full_name, email )
+          )
+        `)
+        .in('assessment_id', asmtIds);
+
+      if (subErr) {
+        console.warn('[AssessmentService] Submissions fetch error:', subErr);
+      }
+      const allSubs = submissions || [];
+
+      // 2. Fetch distinct cohort students
+      const deptIds = [...new Set(assessments.map(a => a.department_id || a.departmentId).filter(Boolean))];
+      let allStudents = [];
+      if (deptIds.length > 0) {
+        const { data: stdData, error: stdErr } = await supabase
+          .from('students')
+          .select(`
+            id,
+            roll_number,
+            department_id,
+            year,
+            semester,
+            section,
+            users:user_id ( id, full_name, email )
+          `)
+          .in('department_id', deptIds);
+
+        if (!stdErr && Array.isArray(stdData)) {
+          allStudents = stdData;
+        }
+      }
+
+      // 3. Enrich each assessment
+      return assessments.map(asmt => {
+        const deptId = asmt.department_id || asmt.departmentId;
+        const asmtSubs = allSubs.filter(s => s.assessment_id === asmt.id);
+        const enrolled = allStudents.filter(st =>
+          st.department_id === deptId &&
+          Number(st.year) === Number(asmt.year) &&
+          Number(st.semester) === Number(asmt.semester) &&
+          String(st.section).toUpperCase().trim() === String(asmt.section).toUpperCase().trim()
+        );
+
+        const assignedCount = enrolled.length;
+        const attemptedCount = asmtSubs.length;
+        const notAttemptedCount = Math.max(0, assignedCount - attemptedCount);
+
+        const percentages = asmtSubs.map(s => Number(s.percentage) || 0);
+        const avgScore = percentages.length > 0
+          ? Math.round(percentages.reduce((sum, p) => sum + p, 0) / percentages.length)
+          : 0;
+        const highestScore = percentages.length > 0 ? Math.max(...percentages) : 0;
+        const lowestScore = percentages.length > 0 ? Math.min(...percentages) : 0;
+        const passCount = percentages.filter(p => p >= 50).length;
+        const failCount = percentages.filter(p => p < 50).length;
+
+        const distribution = {
+          '90-100': percentages.filter(p => p >= 90).length,
+          '80-89': percentages.filter(p => p >= 80 && p < 90).length,
+          '70-79': percentages.filter(p => p >= 70 && p < 80).length,
+          '60-69': percentages.filter(p => p >= 60 && p < 70).length,
+          '<60': percentages.filter(p => p < 60).length
+        };
+
+        const attempts = asmtSubs.map(s => {
+          const st = s.students || {};
+          const u = st.users || {};
+          return {
+            id: s.id,
+            attemptId: s.id,
+            assessmentId: s.assessment_id,
+            studentId: s.student_id,
+            studentName: u.full_name || `Student ${st.roll_number || ''}`,
+            rollNumber: st.roll_number || '',
+            email: u.email || '',
+            score: Number(s.score),
+            totalQuestions: s.total_questions || asmt.questionCount || asmt.totalMarks || 10,
+            percentage: Number(s.percentage),
+            isPassed: s.is_passed,
+            status: s.status || 'completed',
+            submittedAt: s.submitted_at
+          };
+        });
+
+        const studentRoster = enrolled.map(st => {
+          const attempt = attempts.find(att => att.studentId === st.id || att.rollNumber === st.roll_number);
+          const u = st.users || {};
+          return {
+            id: st.id,
+            name: u.full_name || `Student ${st.roll_number}`,
+            rollNumber: st.roll_number,
+            email: u.email || '',
+            status: attempt ? 'Completed' : 'Pending',
+            hasAttempted: Boolean(attempt),
+            score: attempt ? attempt.score : null,
+            percentage: attempt ? `${attempt.percentage}%` : null,
+            percentageNum: attempt ? attempt.percentage : null,
+            isPassed: attempt ? attempt.isPassed : null,
+            submittedAt: attempt ? attempt.submittedAt : null
+          };
+        });
+
+        const formattedAvgScore = attempts.length > 0 ? `${avgScore}%` : '0%';
+
+        const analyticsObj = {
+          assignedCount,
+          totalStudents: assignedCount,
+          studentsCount: assignedCount,
+          attemptedCount,
+          submittedCount: attemptedCount,
+          notAttemptedCount,
+          completionRate: assignedCount > 0 ? Math.round((attemptedCount / assignedCount) * 100) : 0,
+          averageScore: formattedAvgScore,
+          averageScoreNum: avgScore,
+          highestScore,
+          lowestScore,
+          passCount,
+          failCount,
+          distribution,
+          attempts,
+          studentRoster
+        };
+
         return {
-          id: st.id || st.userId,
-          name: st.name,
-          rollNumber: st.rollNumber || '23CS001',
-          email: st.email,
-          status: attempt ? 'Completed' : 'Not Attempted',
-          score: attempt ? `${attempt.score}/${attempt.totalQuestions}` : '—',
-          percentage: attempt ? `${attempt.percentage}%` : '—',
-          correctCount: attempt ? attempt.correctCount : 0,
-          incorrectCount: attempt ? attempt.incorrectCount : 0,
-          unansweredCount: attempt ? attempt.unansweredCount : 0,
-          submittedAt: attempt ? attempt.submittedAt : null
+          ...asmt,
+          ...analyticsObj,
+          analytics: analyticsObj
         };
       });
+    } catch (err) {
+      console.warn('[AssessmentService] Error attaching analytics to assessments:', err);
+      return assessments;
+    }
+  }
 
-      return {
-        ...asmt,
-        assignedCount,
-        attemptedCount,
-        notAttemptedCount,
-        averageScoreNum: avgScore,
-        averageScore: `${avgScore}%`,
-        highestScore: `${highestScore}%`,
-        lowestScore: `${lowestScore}%`,
-        passCount,
-        failCount,
-        distribution,
-        studentRoster
-      };
+  /**
+   * Get fresh authoritative analytics for a single assessment
+   */
+  async getAssessmentAnalytics(assessmentId) {
+    if (!assessmentId) return null;
+    const { data } = await this.getAssessments({ includeAnalytics: false });
+    const match = (data || []).find(a => a.id === assessmentId);
+    if (!match) return null;
+    const enriched = await this.attachAnalyticsToAssessments([match]);
+    return enriched[0] || null;
+  }
+
+  /**
+   * Get Real Assessment Analytics for Faculty Portal dynamically calculated from Supabase
+   */
+  async getFacultyAssessmentAnalytics(facultyUserIdOrId) {
+    const { data: assessments } = await this.getAssessments({
+      facultyUserId: facultyUserIdOrId,
+      includeAnalytics: true
     });
 
+    if (!assessments || assessments.length === 0) {
+      return {
+        totalAssessments: 0,
+        totalAttempts: 0,
+        allFacultyAttempts: [],
+        detailedList: [],
+        assessments: []
+      };
+    }
+
+    const allFacultyAttempts = assessments.flatMap(a => a.attempts || []);
+
     return {
-      totalAssessments,
+      totalAssessments: assessments.length,
       totalAttempts: allFacultyAttempts.length,
-      assessments: detailedList
+      allFacultyAttempts,
+      detailedList: assessments,
+      assessments: assessments
     };
+  }
+
+  /**
+   * Delete Assessment from Supabase
+   * Tables: public.assessments (cascade deletes questions, submissions, answers)
+   */
+  async deleteAssessment(assessmentId, currentUser = null) {
+    if (!assessmentId) throw new Error('Assessment ID is required to delete.');
+
+    const { error } = await supabase
+      .from('assessments')
+      .delete()
+      .eq('id', assessmentId);
+
+    if (error) {
+      console.error('[AssessmentService] Failed to delete assessment from Supabase:', error);
+      throw new Error(`Failed to delete assessment: ${error.message}`);
+    }
+
+    this._notifyChange();
+
+    auditService.logAction({
+      user: currentUser?.name || 'Faculty Member',
+      role: 'faculty',
+      userId: currentUser?.id || currentUser?.userId || 'FACULTY',
+      action: 'Delete Assessment',
+      resource: `/faculty/assessments/${assessmentId}`,
+      result: 'Success',
+      details: `Deleted assessment [${assessmentId}]`
+    });
+
+    return { success: true };
   }
 }
 

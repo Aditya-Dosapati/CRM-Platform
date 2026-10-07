@@ -127,7 +127,15 @@ export default function AdminFacultyAssignments() {
       setFacultyList(facultyUsers);
       setStudentList(studentUsers);
 
-      if (deptsRes?.data) setDepartments(deptsRes.data);
+      if (deptsRes?.data && deptsRes.data.length > 0) {
+        setDepartments(deptsRes.data);
+        setFormData(prev => (prev.departmentId.startsWith('dept-') ? {
+          ...prev,
+          departmentId: deptsRes.data[0].id,
+          department: deptsRes.data[0].code || 'CSE',
+          branch: deptsRes.data[0].code || 'CSE'
+        } : prev));
+      }
       if (subsRes?.error) {
         setSubjectsError(subsRes.error?.message || 'Unable to load subjects');
       } else if (subsRes?.data) {
@@ -492,11 +500,21 @@ export default function AdminFacultyAssignments() {
       const department = resolveDepartment(formData.department || formData.departmentId);
       const branchDisplayName = getBranchDisplay(department, branch);
 
+      // Resolve real department UUID from loaded departments
+      const matchingDept = departments.find(d => 
+        d.id === formData.departmentId ||
+        d.code === branch ||
+        (branch === 'AIML' && d.code === 'AIML') ||
+        (branch === 'AIDS' && d.code === 'AIDS') ||
+        (branch === 'CSE' && d.code === 'CSE')
+      );
+      const targetDeptId = matchingDept?.id || formData.departmentId;
+
       // 1. If EDITING existing assignment
       if (editingAssignmentId) {
         await facultyAssignmentService.updateAssignment(editingAssignmentId, {
           facultyId,
-          departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+          departmentId: targetDeptId,
           department: department,
           departmentCode: branchDisplayName,
           branch: branch,
@@ -522,7 +540,7 @@ export default function AdminFacultyAssignments() {
       // 2. If CREATING new assignment -> check conflict
       const conflictCheck = await facultyAssignmentService.checkConflict({
         subjectId: formData.subjectId,
-        departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+        departmentId: targetDeptId,
         department: department,
         branch: branch,
         year: Number(formData.year),
@@ -541,7 +559,7 @@ export default function AdminFacultyAssignments() {
             newAssignment: {
               ...formData,
               facultyId,
-              departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+              departmentId: targetDeptId,
               department: department,
               departmentCode: branchDisplayName,
               branch: branch,
@@ -559,7 +577,7 @@ export default function AdminFacultyAssignments() {
       await facultyAssignmentService.createAssignment({
         ...formData,
         facultyId,
-        departmentId: branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse',
+        departmentId: targetDeptId,
         department: department,
         departmentCode: branchDisplayName,
         branch: branch,

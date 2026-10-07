@@ -141,6 +141,47 @@ serve(async (req: Request) => {
     }
 
     // =========================================================================
+    // ACTION 0B: ADMIN RUN DDL/MIGRATION SQL
+    // =========================================================================
+    if (action === 'execute_sql') {
+      const dbUrl = Deno.env.get('SUPABASE_DB_URL') || '';
+      if (!dbUrl) {
+        return new Response(
+          JSON.stringify({ error: 'SUPABASE_DB_URL is not set in environment.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { default: postgres } = await import("https://deno.land/x/postgresjs@v3.4.4/mod.js");
+      const sql = postgres(dbUrl);
+
+      try {
+        const sqlQuery = body.sql;
+        if (!sqlQuery || typeof sqlQuery !== 'string') {
+          await sql.end();
+          return new Response(
+            JSON.stringify({ error: 'No SQL query provided in request body.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        await sql.unsafe(sqlQuery);
+        await sql.end();
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'SQL migration executed successfully.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (sqlErr: any) {
+        await sql.end();
+        return new Response(
+          JSON.stringify({ error: sqlErr.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // =========================================================================
     // ACTION 1: SINGLE USER PROVISIONING
     // =========================================================================
     if (action === 'single') {

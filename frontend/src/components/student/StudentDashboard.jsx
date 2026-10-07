@@ -36,25 +36,27 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
     const fetchDashboardSubjects = async () => {
       setLoadingSubjects(true);
       try {
-        const studentId = currentUser?.id || currentUser?.userId;
-        const studentProfile = extractCanonicalCohort(currentUser);
+        const userIdentifier = currentUser?.id || currentUser?.userId;
+        const dbProfile = await assessmentService.getStudentAcademicProfile(userIdentifier);
+        const activeStudent = dbProfile || currentUser;
+        const resolvedStudentId = activeStudent?.id || activeStudent?.studentId || userIdentifier;
 
-        const [loadedSubjects, asmtRes] = await Promise.all([
-          facultyAssignmentService.getStudentAssignedSubjects(studentId, studentProfile),
-          assessmentService.getAssessments({ student: studentProfile })
+        const [loadedSubjects, asmtRes, myAttempts] = await Promise.all([
+          facultyAssignmentService.getStudentAssignedSubjects(resolvedStudentId, activeStudent),
+          assessmentService.getAssessments({ student: activeStudent, studentId: resolvedStudentId }),
+          assessmentService.getStudentAttempts(resolvedStudentId)
         ]);
 
-        const localAttempts = assessmentService._loadAttemptsLocal();
-        const myAttempts = localAttempts.filter(att => 
-          att.studentId === studentId || att.studentUserId === studentId
-        );
-
         const totalAsmts = asmtRes?.data?.length || 0;
-        const completedAsmts = myAttempts.length;
+        const attemptsList = myAttempts || [];
+        const completedAsmts = attemptsList.length;
+        const avgScore = completedAsmts > 0
+          ? Math.round(attemptsList.reduce((acc, a) => acc + (Number(a.percentage) || 0), 0) / completedAsmts)
+          : null;
 
         if (isMounted) {
           if (loadedSubjects) setSubjects(loadedSubjects);
-          setAsmtStats({ completed: completedAsmts, total: totalAsmts });
+          setAsmtStats({ completed: completedAsmts, total: totalAsmts, averageScore: avgScore });
         }
       } catch (err) {
         console.warn('StudentDashboard: could not load dynamic subjects:', err);
@@ -95,9 +97,9 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '82.4%' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>{hasSubjects ? '↑ Active Semester' : 'No graded evaluations yet'}</span>
+          <div className="kpi-value">{asmtStats.averageScore !== null ? `${asmtStats.averageScore}%` : '—'}</div>
+          <div className={`kpi-trend ${asmtStats.averageScore !== null ? 'positive' : 'neutral'}`}>
+            <span>{asmtStats.completed > 0 ? `${asmtStats.completed} Graded Assessment${asmtStats.completed === 1 ? '' : 's'}` : 'No graded evaluations yet'}</span>
           </div>
         </div>
 
@@ -109,9 +111,9 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               <UserCheck size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '91%' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>{hasSubjects ? 'Good Standing' : 'Tracking pending'}</span>
+          <div className="kpi-value">—</div>
+          <div className="kpi-trend neutral">
+            <span>Tracking in progress</span>
           </div>
         </div>
 
@@ -124,8 +126,8 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
             </div>
           </div>
           <div className="kpi-value">{asmtStats.completed} / {asmtStats.total}</div>
-          <div className="kpi-trend positive">
-            <span>{asmtStats.total > 0 ? `${asmtStats.completed} Completed` : 'Scheduled'}</span>
+          <div className={`kpi-trend ${asmtStats.completed > 0 ? 'positive' : 'neutral'}`}>
+            <span>{asmtStats.total > 0 ? `${asmtStats.completed} Completed` : 'No Assessments Scheduled'}</span>
           </div>
         </div>
 
@@ -137,9 +139,9 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               <Award size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '8.42' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>{hasSubjects ? 'Institutional Scale' : 'Cumulative'}</span>
+          <div className="kpi-value">—</div>
+          <div className="kpi-trend neutral">
+            <span>Pending semester tabulation</span>
           </div>
         </div>
 

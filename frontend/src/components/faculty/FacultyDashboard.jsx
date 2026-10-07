@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
+import assessmentService from '../../services/assessmentService';
 import authService from '../../services/authService';
 import {
   Users,
@@ -19,38 +20,57 @@ import EmptyState from '../common/EmptyState';
 
 export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
   const [classes, setClasses] = useState([]);
+  const [activeAsmtsCount, setActiveAsmtsCount] = useState(0);
+  const [avgPerformance, setAvgPerformance] = useState(null);
   const [loading, setLoading] = useState(true);
   const currentUser = authService.getCurrentUser();
 
   useEffect(() => {
     let isMounted = true;
-    const fetchClasses = async () => {
+    const fetchDashboardData = async () => {
       setLoading(true);
       try {
         const facultyId = currentUser?.id || currentUser?.userId;
-        const assigned = await facultyAssignmentService.getFacultyAssignedClasses(facultyId);
+        const [assigned, asmtRes, analytics] = await Promise.all([
+          facultyAssignmentService.getFacultyAssignedClasses(facultyId),
+          assessmentService.getAssessments({ facultyUserId: facultyId }),
+          assessmentService.getFacultyAssessmentAnalytics(facultyId)
+        ]);
+
         if (isMounted) {
           setClasses(assigned || []);
+          const publishedAsmts = (asmtRes?.data || []).filter(a => a.status === 'published');
+          setActiveAsmtsCount(publishedAsmts.length);
+
+          const attempts = analytics?.allFacultyAttempts || [];
+          if (attempts.length > 0) {
+            const avg = Math.round(attempts.reduce((sum, a) => sum + (Number(a.percentage) || 0), 0) / attempts.length);
+            setAvgPerformance(avg);
+          } else {
+            setAvgPerformance(null);
+          }
         }
       } catch (e) {
-        console.warn('FacultyDashboard: could not load faculty assignments:', e);
+        console.warn('FacultyDashboard: could not load dashboard data:', e);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
-    fetchClasses();
+    fetchDashboardData();
 
     const handleUpdate = () => {
-      fetchClasses();
+      fetchDashboardData();
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('gmrit_assignments_updated', handleUpdate);
+      window.addEventListener('gmrit_assessments_updated', handleUpdate);
     }
 
     return () => { 
       isMounted = false; 
       if (typeof window !== 'undefined') {
         window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+        window.removeEventListener('gmrit_assessments_updated', handleUpdate);
       }
     };
   }, [currentUser?.id, currentUser?.userId]);
@@ -111,9 +131,9 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasClasses ? '78.6%' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>{hasClasses ? 'Continuous CIE Metric' : 'No Students Enrolled'}</span>
+          <div className="kpi-value">{avgPerformance !== null ? `${avgPerformance}%` : '—'}</div>
+          <div className={`kpi-trend ${avgPerformance !== null ? 'positive' : 'neutral'}`}>
+            <span>{avgPerformance !== null ? 'Continuous Evaluation' : 'No graded submissions'}</span>
           </div>
         </div>
 
@@ -124,22 +144,22 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
               <UserCheck size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasClasses ? '87.4%' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>{hasClasses ? 'Above 75% threshold' : 'Pending Sessions'}</span>
+          <div className="kpi-value">—</div>
+          <div className="kpi-trend neutral">
+            <span>Tracking in progress</span>
           </div>
         </div>
 
-        <div className="kpi-card">
+        <div className="kpi-card" onClick={() => onNavigate('assessments')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
             <span className="kpi-label">Active Assessments</span>
             <div className="kpi-icon-wrap">
               <CheckSquare size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasClasses ? '0' : '—'}</div>
-          <div className="kpi-trend neutral">
-            <span>Scheduled</span>
+          <div className="kpi-value">{loading ? '...' : activeAsmtsCount}</div>
+          <div className={`kpi-trend ${activeAsmtsCount > 0 ? 'positive' : 'neutral'}`}>
+            <span>{activeAsmtsCount > 0 ? `${activeAsmtsCount} Active in Curriculum` : 'None Scheduled'}</span>
           </div>
         </div>
       </div>
