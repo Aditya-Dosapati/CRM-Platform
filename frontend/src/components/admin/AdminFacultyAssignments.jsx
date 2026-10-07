@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Users,
   Plus,
@@ -61,6 +62,8 @@ export default function AdminFacultyAssignments() {
   const [studentList, setStudentList] = useState([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(null); // assignment object to delete
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   const [conflictData, setConflictData] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
@@ -68,7 +71,7 @@ export default function AdminFacultyAssignments() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState(null);
   const [formData, setFormData] = useState({
-    departmentId: 'dept-cse',
+    departmentId: '',
     department: 'CSE',
     branch: 'CSE',
     regulation: 'AR23',
@@ -129,7 +132,7 @@ export default function AdminFacultyAssignments() {
 
       if (deptsRes?.data && deptsRes.data.length > 0) {
         setDepartments(deptsRes.data);
-        setFormData(prev => (prev.departmentId.startsWith('dept-') ? {
+        setFormData(prev => (!prev.departmentId || prev.departmentId.startsWith('dept-') ? {
           ...prev,
           departmentId: deptsRes.data[0].id,
           department: deptsRes.data[0].code || 'CSE',
@@ -300,10 +303,22 @@ export default function AdminFacultyAssignments() {
   const handleOpenAddForm = () => {
     setFormError(null);
     setEditingAssignmentId(null);
+
+    // Default to selected faculty's department if available
+    const facDeptId = selectedFaculty?.department_id || selectedFaculty?.departmentId;
+    const facDeptName = selectedFaculty?.department || selectedFaculty?.branch;
+    const matchingDept = departments.find(d => 
+      (facDeptId && d.id === facDeptId) ||
+      (facDeptName && (d.code === facDeptName || d.name === facDeptName || d.branch === facDeptName))
+    ) || departments[0];
+
+    const initDeptId = matchingDept?.id || (departments[0]?.id || '');
+    const initBranch = matchingDept?.code || 'CSE';
+
     setFormData({
-      departmentId: 'dept-cse',
-      department: 'CSE',
-      branch: 'CSE',
+      departmentId: initDeptId,
+      department: initBranch,
+      branch: initBranch,
       regulation: 'AR23',
       academicYear: '2025-2026',
       year: 4,
@@ -318,12 +333,21 @@ export default function AdminFacultyAssignments() {
   const handleOpenEditForm = (assignment) => {
     setFormError(null);
     setEditingAssignmentId(assignment.id);
+
     const branch = resolveBranch(assignment.branch || assignment.branchId || assignment.departmentCode || assignment.departmentId);
-    const dept = resolveDepartment(assignment.department || assignment.departmentCode || assignment.departmentId);
+    const matchingDept = departments.find(d => 
+      d.id === assignment.departmentId ||
+      d.code === branch ||
+      d.code === assignment.department
+    );
+
+    const deptId = matchingDept?.id || assignment.departmentId;
+    const branchCode = matchingDept?.code || branch;
+
     setFormData({
-      departmentId: assignment.departmentId || (branch === 'AIML' ? 'dept-aiml' : branch === 'AIDS' ? 'dept-aids' : 'dept-cse'),
-      department: dept,
-      branch: branch,
+      departmentId: deptId,
+      department: branchCode,
+      branch: branchCode,
       regulation: assignment.regulation || 'AR23',
       academicYear: assignment.academicYear || '2025-2026',
       year: Number(assignment.year) || 4,
@@ -338,10 +362,40 @@ export default function AdminFacultyAssignments() {
   const handleFormChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
+
+      if (field === 'departmentId') {
+        const matchingDept = departments.find(d => d.id === value);
+        if (matchingDept) {
+          updated.department = matchingDept.code;
+          updated.branch = matchingDept.code;
+        }
+        updated.subjectId = '';
+      } else if (field === 'branch' || field === 'department') {
+        const branchVal = value;
+        const matchingDept = departments.find(d => 
+          d.code === branchVal ||
+          (branchVal === 'AIML' && (d.code === 'AIML' || d.code?.includes('AIML'))) ||
+          (branchVal === 'AIDS' && (d.code === 'AIDS' || d.code?.includes('AIDS'))) ||
+          (branchVal === 'CSE' && d.code === 'CSE')
+        );
+        if (matchingDept) {
+          updated.departmentId = matchingDept.id;
+        }
+        updated.branch = branchVal;
+        updated.department = branchVal;
+        updated.subjectId = '';
+      }
+
       if (field === 'year') {
         const numYear = Number(String(value).replace(/\D/g, '')) || 1;
         updated.semester = (numYear * 2) - 1; // e.g. Year 3 -> Semester 5
+        updated.subjectId = '';
       }
+
+      if (field === 'semester' || field === 'regulation') {
+        updated.subjectId = '';
+      }
+
       return updated;
     });
   };
@@ -354,34 +408,16 @@ export default function AdminFacultyAssignments() {
     // Resolve the selected department record
     const selectedDept = departments.find(d => 
       d.id === formData.departmentId || 
-      d.code === formData.departmentId ||
-      d.name === formData.departmentId
+      d.code === formData.branch ||
+      d.code === formData.department
     ) || MASTER_DEPARTMENTS.find(d => 
       d.id === formData.departmentId || 
-      d.code === formData.departmentId ||
-      d.name === formData.departmentId
+      d.code === formData.branch ||
+      d.code === formData.department
     );
 
-    const selectedDeptCode = (selectedDept?.code || formData.departmentId || '').toUpperCase();
+    const selectedDeptCode = (selectedDept?.code || formData.branch || formData.department || '').toUpperCase();
     const selectedDeptId = String(selectedDept?.id || formData.departmentId || '').toLowerCase();
-    const selectedDeptName = (selectedDept?.name || '').toLowerCase();
-    
-    const isCse = 
-      selectedDeptCode === 'CSE' ||
-      selectedDeptCode === 'AIML' ||
-      selectedDeptCode === 'AIDS' ||
-      selectedDeptCode.includes('CSE') ||
-      selectedDeptCode.includes('AIML') ||
-      selectedDeptCode.includes('AIDS') ||
-      selectedDeptCode.includes('CS') ||
-      selectedDeptName.includes('cse') ||
-      selectedDeptName.includes('computer') ||
-      selectedDeptName.includes('artificial intelligence') ||
-      selectedDeptName.includes('machine learning') ||
-      selectedDeptName.includes('data science') ||
-      selectedDeptId.includes('cse') ||
-      selectedDeptId.includes('aiml') ||
-      selectedDeptId.includes('aids');
 
     // Normalize Form Filters
     const formSem = Number(String(formData.semester || '').replace(/\D/g, '')) || null;
@@ -389,36 +425,28 @@ export default function AdminFacultyAssignments() {
     const formReg = String(formData.regulation || '').toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
 
     return subjects.filter(s => {
-      // 1. Department Filter (Matches department ID, code, or CSE curriculum)
-      if (formData.departmentId && formData.departmentId !== 'All') {
+      // 1. Department Filter (Matches department ID, codes, or subject department junction)
+      if (selectedDeptId || selectedDeptCode) {
         const sDeptId = String(s.departmentId || s.department_id || '').toLowerCase();
-        const sDeptCode = String(s.departmentCode || s.deptCode || '').toUpperCase();
-        const sDeptName = String(s.department || s.departmentName || '').toLowerCase();
+        const sDeptCodes = Array.isArray(s.departmentCodes) ? s.departmentCodes.map(c => c.toUpperCase()) : [];
+        const sDeptIds = Array.isArray(s.departmentIds) ? s.departmentIds.map(id => String(id).toLowerCase()) : [];
 
-        const directIdMatch = sDeptId && (sDeptId === selectedDeptId || sDeptId === String(formData.departmentId).toLowerCase());
-        const codeMatch = sDeptCode && (sDeptCode === selectedDeptCode);
-        const nameMatch = sDeptName && selectedDeptName && (sDeptName.includes(selectedDeptName) || selectedDeptName.includes(sDeptName));
+        const directIdMatch = sDeptId && (sDeptId === selectedDeptId);
+        const arrayIdMatch = sDeptIds.includes(selectedDeptId);
+        const codeMatch = sDeptCodes.includes(selectedDeptCode);
 
-        // In GMRIT CSE syllabus, subjects include CORE CSE & approved curriculum electives
-        const cseDeptMatch = isCse && (
-          sDeptId === 'dept-cse' ||
-          sDeptId === 'dept-aiml' ||
-          sDeptId === 'dept-aids' ||
-          sDeptId.includes('cse') ||
-          sDeptId.includes('aiml') ||
-          sDeptId.includes('aids') ||
-          sDeptCode === 'CSE' ||
-          sDeptCode === 'AIML' ||
-          sDeptCode === 'AIDS' ||
-          (!s.departmentId && !s.department_id && !s.department)
-        );
+        // Pattern-based fallback for curriculum subject codes
+        const patternMatch = 
+          (selectedDeptCode === 'AIML' && (s.code?.startsWith('23ML') || s.code?.includes('ML'))) ||
+          (selectedDeptCode === 'AIDS' && (s.code?.startsWith('23DS') || s.code?.includes('DS'))) ||
+          (selectedDeptCode === 'CSE' && (s.code?.startsWith('23CS') || s.code?.startsWith('23IT')));
 
-        if (!directIdMatch && !codeMatch && !nameMatch && !cseDeptMatch) {
+        if (!directIdMatch && !arrayIdMatch && !codeMatch && !patternMatch) {
           return false;
         }
       }
 
-      // 2. Semester Filter (Numeric normalized: "Semester 5" / "5" / 5)
+      // 2. Semester Filter
       if (formSem) {
         const sSem = Number(String(s.semester || '').replace(/\D/g, '')) || null;
         if (sSem && sSem !== formSem) {
@@ -426,7 +454,7 @@ export default function AdminFacultyAssignments() {
         }
       }
 
-      // 3. Year Filter (If subject explicitly defines a year field)
+      // 3. Year Filter
       if (formYear && s.year) {
         const sYear = Number(String(s.year).replace(/\D/g, '')) || null;
         if (sYear && sYear !== formYear) {
@@ -434,7 +462,7 @@ export default function AdminFacultyAssignments() {
         }
       }
 
-      // 4. Regulation Filter (Normalized: AR23, R20, R23)
+      // 4. Regulation Filter
       if (formReg && s.regulation) {
         const sReg = String(s.regulation).toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
         if (sReg) {
@@ -449,17 +477,24 @@ export default function AdminFacultyAssignments() {
 
       return true;
     });
-  }, [subjects, departments, formData.departmentId, formData.semester, formData.year, formData.regulation, subjectsError]);
+  }, [subjects, departments, formData.departmentId, formData.branch, formData.department, formData.semester, formData.year, formData.regulation, subjectsError]);
 
   // Dynamic Mapped Students preview for the selected academic cohort
   const mappedStudentsPreview = useMemo(() => {
     const branch = resolveBranch(formData.branch || formData.departmentId);
-    const department = resolveDepartment(formData.department || formData.departmentId);
+    const department = resolveDepartment(formData.department || formData.departmentId || branch);
     const branchDisplayName = getBranchDisplay(department, branch);
+
+    const matchingDept = departments.find(d => 
+      (formData.departmentId && d.id === formData.departmentId) ||
+      (d.code === branch)
+    );
+    const targetDeptId = matchingDept?.id || formData.departmentId;
 
     const targetCohort = extractCanonicalCohort({
       department,
       branch,
+      departmentId: targetDeptId,
       year: formData.year,
       semester: formData.semester,
       section: formData.section,
@@ -469,7 +504,17 @@ export default function AdminFacultyAssignments() {
 
     if (!targetCohort) return null;
 
-    const matching = studentList.filter(s => matchesCohort(s, targetCohort));
+    const matching = studentList.filter(s => {
+      if (targetDeptId && s.departmentId && s.departmentId.length > 20) {
+        const matchDept = String(s.departmentId).toLowerCase() === String(targetDeptId).toLowerCase();
+        const matchYear = Number(s.year) === Number(targetCohort.year);
+        const matchSem = Number(s.semester) === Number(targetCohort.semester);
+        const matchSec = String(s.section || 'A').toUpperCase().trim() === String(targetCohort.section).toUpperCase().trim();
+        return matchDept && matchYear && matchSem && matchSec;
+      }
+      return matchesCohort(s, targetCohort);
+    });
+
     const displayCount = matching.length;
     const yearSuffix = targetCohort.year === 1 ? '1st' : targetCohort.year === 2 ? '2nd' : targetCohort.year === 3 ? '3rd' : `${targetCohort.year}th`;
     return {
@@ -481,7 +526,7 @@ export default function AdminFacultyAssignments() {
       section: targetCohort.section,
       academicYear: targetCohort.academicYear
     };
-  }, [studentList, formData]);
+  }, [studentList, formData, departments]);
 
   // Submit Add or Edit Assignment Form
   const handleSaveAssignment = async (e) => {
@@ -497,18 +542,28 @@ export default function AdminFacultyAssignments() {
 
       const facultyId = selectedFaculty.id || selectedFaculty.userId;
       const branch = resolveBranch(formData.branch || formData.departmentId);
-      const department = resolveDepartment(formData.department || formData.departmentId);
+      const department = resolveDepartment(formData.department || formData.departmentId || branch);
       const branchDisplayName = getBranchDisplay(department, branch);
 
-      // Resolve real department UUID from loaded departments
-      const matchingDept = departments.find(d => 
-        d.id === formData.departmentId ||
-        d.code === branch ||
-        (branch === 'AIML' && d.code === 'AIML') ||
-        (branch === 'AIDS' && d.code === 'AIDS') ||
-        (branch === 'CSE' && d.code === 'CSE')
-      );
-      const targetDeptId = matchingDept?.id || formData.departmentId;
+      // Resolve real department UUID authoritatively
+      let targetDeptId = null;
+      if (branch === 'AIML') {
+        const aimlDept = departments.find(d => d.code === 'AIML' || d.code?.includes('AIML'));
+        targetDeptId = aimlDept?.id || '835f1428-d1ec-47b9-87e0-d281feba4234';
+      } else if (branch === 'AIDS') {
+        const aidsDept = departments.find(d => d.code === 'AIDS' || d.code?.includes('AIDS'));
+        targetDeptId = aidsDept?.id || 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c';
+      } else if (branch === 'CSE') {
+        const cseDept = departments.find(d => d.code === 'CSE');
+        targetDeptId = cseDept?.id || 'b9cce72e-288c-4091-88a7-fcb31a08863f';
+      } else {
+        const matchingDept = departments.find(d => 
+          d.id === formData.departmentId ||
+          d.code === branch ||
+          d.code === department
+        );
+        targetDeptId = matchingDept?.id || formData.departmentId;
+      }
 
       // 1. If EDITING existing assignment
       if (editingAssignmentId) {
@@ -625,19 +680,20 @@ export default function AdminFacultyAssignments() {
   // Confirm Delete / Remove Assignment
   const handleConfirmRemoveAssignment = async () => {
     if (!showDeleteModal) return;
-    setFormSubmitting(true);
+    setDeleteLoading(true);
+    setDeleteError(null);
     try {
       await facultyAssignmentService.deleteAssignment(showDeleteModal.id, currentUser);
       setShowDeleteModal(null);
       setFeedback({
         type: 'success',
-        message: 'Assignment removed.'
+        message: 'Assignment removed successfully.'
       });
       await loadData();
     } catch (err) {
-      alert(`Failed to remove assignment: ${err.message}`);
+      setDeleteError(err.message || 'Failed to remove assignment from database.');
     } finally {
-      setFormSubmitting(false);
+      setDeleteLoading(false);
     }
   };
 
@@ -1246,7 +1302,10 @@ export default function AdminFacultyAssignments() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setShowDeleteModal(a)}
+                            onClick={() => {
+                              setDeleteError(null);
+                              setShowDeleteModal(a);
+                            }}
                             className="btn btn-secondary btn-sm"
                             style={{ padding: '4px 10px', fontSize: '12px', fontWeight: 600, color: '#dc2626' }}
                             title="Remove assignment"
@@ -1343,12 +1402,24 @@ export default function AdminFacultyAssignments() {
                           <label className="input-label" style={{ fontSize: '12px', fontWeight: 700 }}>Department *</label>
                           <select
                             className="input-field"
-                            value={formData.department || 'CSE'}
-                            onChange={(e) => handleFormChange('department', e.target.value)}
+                            value={formData.departmentId || ''}
+                            onChange={(e) => handleFormChange('departmentId', e.target.value)}
                             required
                             style={{ fontSize: '12.5px', height: '38px' }}
                           >
-                            <option value="CSE">CSE</option>
+                            {departments.length > 0 ? (
+                              departments.map(d => (
+                                <option key={d.id} value={d.id}>
+                                  {d.code} — {d.name}
+                                </option>
+                              ))
+                            ) : (
+                              <>
+                                <option value="835f1428-d1ec-47b9-87e0-d281feba4234">AIML — CSE - Artificial Intelligence and Machine Learning</option>
+                                <option value="b9cce72e-288c-4091-88a7-fcb31a08863f">CSE — Computer Science and Engineering</option>
+                                <option value="e126f2f2-8159-4c22-8d86-4ff57ee3d66c">AIDS — CSE - Artificial Intelligence and Data Science</option>
+                              </>
+                            )}
                           </select>
                         </div>
 
@@ -1361,9 +1432,9 @@ export default function AdminFacultyAssignments() {
                             required
                             style={{ fontSize: '12.5px', height: '38px' }}
                           >
+                            <option value="AIML">AIML (CSE-AIML)</option>
                             <option value="CSE">CSE</option>
-                            <option value="AIML">AIML</option>
-                            <option value="AIDS">AIDS</option>
+                            <option value="AIDS">AIDS (CSE-AIDS)</option>
                           </select>
                         </div>
 
@@ -1575,40 +1646,86 @@ export default function AdminFacultyAssignments() {
         </div>
       )}
 
-      {/* CONFLICT DETECTION & REPLACE WARNING MODAL */}
-      {showConflictModal && conflictData && (
-        <div className="modal-overlay" onClick={() => setShowConflictModal(false)}>
-          <div className="modal-container" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ borderBottomColor: '#fed7aa' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* CONFLICT DETECTION & REPLACE WARNING MODAL (PORTAL TO DOCUMENT.BODY) */}
+      {showConflictModal && conflictData && typeof document !== 'undefined' && createPortal(
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={() => {
+            if (!formSubmitting) {
+              setShowConflictModal(false);
+              setConflictData(null);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '520px',
+              width: '100%',
+              backgroundColor: 'var(--color-surface, #ffffff)',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--color-border)',
+              overflow: 'hidden'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ padding: '18px 22px', borderBottom: '1px solid #fed7aa' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '38px',
+                  height: '38px',
                   borderRadius: '50%',
                   backgroundColor: '#fff7ed',
                   color: '#ea580c',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '1px solid #ffedd5'
+                  border: '1px solid #ffedd5',
+                  flexShrink: 0
                 }}>
                   <AlertTriangle size={20} />
                 </div>
                 <div>
-                  <h3 className="modal-title" style={{ fontSize: '15.5px', fontWeight: 800, color: '#9a3412' }}>
+                  <h3 className="modal-title" style={{ fontSize: '16px', fontWeight: 800, color: '#9a3412', margin: 0 }}>
                     Assignment Conflict Detected
                   </h3>
-                  <p className="modal-subtitle" style={{ fontSize: '12px', color: '#c2410c' }}>
+                  <p className="modal-subtitle" style={{ fontSize: '12px', color: '#c2410c', margin: '2px 0 0' }}>
                     Section is already assigned to another faculty member
                   </p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={() => setShowConflictModal(false)}>
-                <X size={16} />
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  if (!formSubmitting) {
+                    setShowConflictModal(false);
+                    setConflictData(null);
+                  }
+                }}
+                disabled={formSubmitting}
+                style={{ background: 'none', border: 'none', cursor: formSubmitting ? 'not-allowed' : 'pointer', color: 'var(--color-text)', opacity: 0.6, padding: '4px' }}
+              >
+                <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="modal-body" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{
                 padding: '12px 14px',
                 backgroundColor: 'var(--color-bg)',
@@ -1628,12 +1745,12 @@ export default function AdminFacultyAssignments() {
                 </div>
               </div>
 
-              <p style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.85, margin: 0 }}>
-                Do you want to cancel or replace the existing assignment for {selectedFaculty?.name || 'this faculty'}?
+              <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.85, margin: 0 }}>
+                Do you want to replace the existing assignment for {selectedFaculty?.name || 'this faculty'}?
               </p>
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="modal-footer" style={{ padding: '14px 22px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
@@ -1642,6 +1759,7 @@ export default function AdminFacultyAssignments() {
                   setConflictData(null);
                 }}
                 disabled={formSubmitting}
+                style={{ padding: '7px 16px', fontSize: '13px' }}
               >
                 Cancel
               </button>
@@ -1650,56 +1768,150 @@ export default function AdminFacultyAssignments() {
                 className="btn btn-primary btn-sm"
                 onClick={handleConfirmConflictReplace}
                 disabled={formSubmitting}
-                style={{ backgroundColor: '#ea580c', borderColor: '#ea580c' }}
+                style={{ backgroundColor: '#ea580c', borderColor: '#ea580c', padding: '7px 18px', fontSize: '13px', fontWeight: 700 }}
               >
                 {formSubmitting ? 'Replacing...' : 'Replace Existing Assignment'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* REMOVE ASSIGNMENT CONFIRMATION MODAL */}
-      {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(null)}>
-          <div className="modal-container" style={{ maxWidth: '460px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* REMOVE ASSIGNMENT CONFIRMATION MODAL (PORTAL TO DOCUMENT.BODY) */}
+      {showDeleteModal && typeof document !== 'undefined' && createPortal(
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={() => {
+            if (!deleteLoading) {
+              setShowDeleteModal(null);
+              setDeleteError(null);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remove-assignment-title"
+        >
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '480px',
+              width: '100%',
+              backgroundColor: 'var(--color-surface, #ffffff)',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--color-border)',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ padding: '18px 22px', borderBottom: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '38px',
+                  height: '38px',
                   borderRadius: '50%',
                   backgroundColor: '#fee2e2',
                   color: '#dc2626',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  flexShrink: 0
                 }}>
-                  <Trash2 size={16} />
+                  <Trash2 size={18} />
                 </div>
                 <div>
-                  <h3 className="modal-title" style={{ fontSize: '15px', fontWeight: 800 }}>
+                  <h3 id="remove-assignment-title" style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: 'var(--color-text)' }}>
                     Remove Assignment?
                   </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.6, margin: '2px 0 0' }}>
+                    Confirm subject unassignment
+                  </p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={() => setShowDeleteModal(null)}>
-                <X size={16} />
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  if (!deleteLoading) {
+                    setShowDeleteModal(null);
+                    setDeleteError(null);
+                  }
+                }}
+                disabled={deleteLoading}
+                title="Cancel and close"
+                style={{ background: 'none', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', color: 'var(--color-text)', opacity: 0.6, padding: '4px' }}
+              >
+                <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body">
-              <p style={{ fontSize: '13px', color: 'var(--color-text)', lineHeight: 1.5, margin: 0 }}>
-                Are you sure you want to remove <strong>{showDeleteModal.subjectName}</strong> (Section {showDeleteModal.section}) from <strong>{selectedFaculty?.name || showDeleteModal.facultyName}</strong>?
+            <div className="modal-body" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <p style={{ fontSize: '13.5px', color: 'var(--color-text)', lineHeight: 1.5, margin: 0 }}>
+                Are you sure you want to remove this assignment from <strong>{selectedFaculty?.name || showDeleteModal.facultyName}</strong>?
+              </p>
+
+              <div style={{
+                padding: '12px 14px',
+                backgroundColor: 'var(--color-bg)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--color-primary)' }}>
+                  {showDeleteModal.subjectName} ({showDeleteModal.subjectCode})
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.75 }}>
+                  {showDeleteModal.departmentCode || showDeleteModal.branch || 'CSE-AIML'} • {showDeleteModal.year === 1 ? '1st' : showDeleteModal.year === 2 ? '2nd' : showDeleteModal.year === 3 ? '3rd' : `${showDeleteModal.year}th`} Year • Semester {showDeleteModal.semester} • <strong>Section {showDeleteModal.section}</strong> • {showDeleteModal.regulation || 'AR23'}
+                </div>
+              </div>
+
+              {deleteError && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  fontSize: '12.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              <p style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.6, margin: 0 }}>
+                Note: This will unlink the faculty member from active teaching rosters. Assessments, submissions, and student history are safely preserved in the database.
               </p>
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="modal-footer" style={{ padding: '14px 22px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={() => setShowDeleteModal(null)}
-                disabled={formSubmitting}
+                onClick={() => {
+                  setShowDeleteModal(null);
+                  setDeleteError(null);
+                }}
+                disabled={deleteLoading}
+                style={{ padding: '7px 16px', fontSize: '13px' }}
               >
                 Cancel
               </button>
@@ -1707,14 +1919,35 @@ export default function AdminFacultyAssignments() {
                 type="button"
                 className="btn btn-primary btn-sm"
                 onClick={handleConfirmRemoveAssignment}
-                disabled={formSubmitting}
-                style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                disabled={deleteLoading}
+                style={{
+                  backgroundColor: '#dc2626',
+                  borderColor: '#dc2626',
+                  color: '#ffffff',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 18px',
+                  fontSize: '13px',
+                  fontWeight: 700
+                }}
               >
-                {formSubmitting ? 'Removing...' : 'Remove Assignment'}
+                {deleteLoading ? (
+                  <>
+                    <RotateCw size={14} className="spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Remove Assignment</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

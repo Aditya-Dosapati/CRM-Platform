@@ -108,6 +108,22 @@ class FacultyAssignmentService {
 
     // Check by code (e.g. CSE, AIML, AIDS)
     const normalizedCode = clean.replace(/^dept-/i, '').replace(/^CSE-/i, '').toUpperCase();
+    if (normalizedCode === 'AIML' || clean.toUpperCase().includes('AIML') || clean.toLowerCase() === '835f1428-d1ec-47b9-87e0-d281feba4234') {
+      const { data: aiml } = await supabase.from('departments').select('id').ilike('code', 'AIML').maybeSingle();
+      if (aiml?.id) return aiml.id;
+      return '835f1428-d1ec-47b9-87e0-d281feba4234';
+    }
+    if (normalizedCode === 'AIDS' || clean.toUpperCase().includes('AIDS') || clean.toLowerCase() === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c') {
+      const { data: aids } = await supabase.from('departments').select('id').ilike('code', 'AIDS').maybeSingle();
+      if (aids?.id) return aids.id;
+      return 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c';
+    }
+    if (normalizedCode === 'CSE' || clean.toUpperCase().includes('CSE') || clean.toLowerCase() === 'b9cce72e-288c-4091-88a7-fcb31a08863f') {
+      const { data: cse } = await supabase.from('departments').select('id').ilike('code', 'CSE').maybeSingle();
+      if (cse?.id) return cse.id;
+      return 'b9cce72e-288c-4091-88a7-fcb31a08863f';
+    }
+
     const { data: byCode } = await supabase
       .from('departments')
       .select('id, code')
@@ -115,20 +131,6 @@ class FacultyAssignmentService {
       .maybeSingle();
 
     if (byCode?.id) return byCode.id;
-
-    // If searching for CSE-AIML or AIML
-    if (normalizedCode === 'AIML' || clean.includes('AIML')) {
-      const { data: aiml } = await supabase.from('departments').select('id').ilike('code', 'AIML').maybeSingle();
-      if (aiml?.id) return aiml.id;
-    }
-    if (normalizedCode === 'AIDS' || clean.includes('AIDS')) {
-      const { data: aids } = await supabase.from('departments').select('id').ilike('code', 'AIDS').maybeSingle();
-      if (aids?.id) return aids.id;
-    }
-    if (normalizedCode === 'CSE' || clean.includes('CSE')) {
-      const { data: cse } = await supabase.from('departments').select('id').ilike('code', 'CSE').maybeSingle();
-      if (cse?.id) return cse.id;
-    }
 
     return clean;
   }
@@ -406,9 +408,23 @@ class FacultyAssignmentService {
       throw new Error('Please select a valid Faculty member, Subject, and Department.');
     }
 
+    const targetBranch = resolveBranch(assignmentData.branch || assignmentData.branchId || assignmentData.departmentCode || assignmentData.department || departmentId);
+    let resolvedDeptId = await this.resolveDepartmentId(departmentId);
+
+    // Safeguard: strictly enforce correct department UUID according to selected branch
+    if (targetBranch === 'AIML') {
+      const aimlId = await this.resolveDepartmentId('AIML');
+      if (aimlId) resolvedDeptId = aimlId;
+    } else if (targetBranch === 'AIDS') {
+      const aidsId = await this.resolveDepartmentId('AIDS');
+      if (aidsId) resolvedDeptId = aidsId;
+    } else if (targetBranch === 'CSE') {
+      const cseId = await this.resolveDepartmentId('CSE');
+      if (cseId) resolvedDeptId = cseId;
+    }
+
     const resolvedFacId = await this.resolveFacultyId(facultyId);
     const resolvedSubId = await this.resolveSubjectId(subjectId);
-    const resolvedDeptId = await this.resolveDepartmentId(departmentId);
 
     if (!resolvedFacId) throw new Error('Could not resolve faculty identifier in database.');
     if (!resolvedSubId) throw new Error('Could not resolve subject in database.');
@@ -509,7 +525,21 @@ class FacultyAssignmentService {
 
     const resolvedFacId = updateData.facultyId ? await this.resolveFacultyId(updateData.facultyId) : undefined;
     const resolvedSubId = updateData.subjectId ? await this.resolveSubjectId(updateData.subjectId) : undefined;
-    const resolvedDeptId = updateData.departmentId ? await this.resolveDepartmentId(updateData.departmentId) : undefined;
+    let resolvedDeptId = updateData.departmentId ? await this.resolveDepartmentId(updateData.departmentId) : undefined;
+
+    if (updateData.branch || updateData.department) {
+      const targetBranch = resolveBranch(updateData.branch || updateData.department || updateData.departmentId);
+      if (targetBranch === 'AIML') {
+        const aimlId = await this.resolveDepartmentId('AIML');
+        if (aimlId) resolvedDeptId = aimlId;
+      } else if (targetBranch === 'AIDS') {
+        const aidsId = await this.resolveDepartmentId('AIDS');
+        if (aidsId) resolvedDeptId = aidsId;
+      } else if (targetBranch === 'CSE') {
+        const cseId = await this.resolveDepartmentId('CSE');
+        if (cseId) resolvedDeptId = cseId;
+      }
+    }
 
     const patch = {
       updated_at: new Date().toISOString()
