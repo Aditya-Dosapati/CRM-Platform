@@ -7,26 +7,29 @@ export const MASTER_BRANCHES = [
     department: 'CSE',
     displayName: 'CSE',
     name: 'Computer Science and Engineering',
-    id: 'dept-cse'
+    id: 'dept-cse',
+    dbId: 'b9cce72e-288c-4091-88a7-fcb31a08863f'
   },
   {
     branch: 'AIML',
-    department: 'CSE',
+    department: 'AIML',
     displayName: 'CSE-AIML',
     name: 'CSE - Artificial Intelligence and Machine Learning',
-    id: 'dept-aiml'
+    id: 'dept-aiml',
+    dbId: '835f1428-d1ec-47b9-87e0-d281feba4234'
   },
   {
     branch: 'AIDS',
-    department: 'CSE',
+    department: 'AIDS',
     displayName: 'CSE-AIDS',
     name: 'CSE - Artificial Intelligence and Data Science',
-    id: 'dept-aids'
+    id: 'dept-aids',
+    dbId: 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c'
   }
 ];
 
 export const CANONICAL_DEPARTMENTS = MASTER_BRANCHES.map(b => ({
-  id: b.id,
+  id: b.dbId || b.id,
   code: b.displayName,
   name: b.name,
   branch: b.branch,
@@ -34,15 +37,15 @@ export const CANONICAL_DEPARTMENTS = MASTER_BRANCHES.map(b => ({
 }));
 
 export const DYNAMIC_DEPARTMENT_MAP = new Map([
-  ['dept-cse', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE' }],
-  ['dept-aiml', { branch: 'AIML', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'CSE' }],
-  ['dept-aids', { branch: 'AIDS', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'CSE' }],
-  ['b9cce72e-288c-4091-88a7-fcb31a08863f', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE' }],
-  ['835f1428-d1ec-47b9-87e0-d281feba4234', { branch: 'AIML', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'CSE' }],
-  ['e126f2f2-8159-4c22-8d86-4ff57ee3d66c', { branch: 'AIDS', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'CSE' }],
-  ['a0000000-0000-0000-0000-000000000001', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE' }],
-  ['a0000000-0000-0000-0000-000000000002', { branch: 'AIML', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'CSE' }],
-  ['a0000000-0000-0000-0000-000000000003', { branch: 'AIDS', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'CSE' }]
+  ['dept-cse', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE', id: 'b9cce72e-288c-4091-88a7-fcb31a08863f' }],
+  ['dept-aiml', { branch: 'AIML', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'AIML', id: '835f1428-d1ec-47b9-87e0-d281feba4234' }],
+  ['dept-aids', { branch: 'AIDS', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'AIDS', id: 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' }],
+  ['b9cce72e-288c-4091-88a7-fcb31a08863f', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE', id: 'b9cce72e-288c-4091-88a7-fcb31a08863f' }],
+  ['835f1428-d1ec-47b9-87e0-d281feba4234', { branch: 'AIML', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'AIML', id: '835f1428-d1ec-47b9-87e0-d281feba4234' }],
+  ['e126f2f2-8159-4c22-8d86-4ff57ee3d66c', { branch: 'AIDS', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'AIDS', id: 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' }],
+  ['a0000000-0000-0000-0000-000000000001', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE', id: 'b9cce72e-288c-4091-88a7-fcb31a08863f' }],
+  ['a0000000-0000-0000-0000-000000000002', { branch: 'AIML', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'AIML', id: '835f1428-d1ec-47b9-87e0-d281feba4234' }],
+  ['a0000000-0000-0000-0000-000000000003', { branch: 'AIDS', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'AIDS', id: 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' }]
 ]);
 
 export function registerDepartments(deptList) {
@@ -51,24 +54,79 @@ export function registerDepartments(deptList) {
     if (!item) continue;
     const resolved = normalizeBranch(item.code || item.name || item.id);
     if (item.id) {
-      DYNAMIC_DEPARTMENT_MAP.set(String(item.id).toLowerCase(), resolved);
+      DYNAMIC_DEPARTMENT_MAP.set(String(item.id).toLowerCase(), {
+        ...resolved,
+        id: item.id,
+        code: item.code || resolved.branch,
+        department: item.code || resolved.branch
+      });
     }
   }
 }
 
 /**
  * Resolves the database department code.
- * Preserves 'CSE' as the base department.
+ * Preserves AIML, AIDS, and CSE separately according to the database schema.
  */
 export function resolveDepartment(input) {
   if (!input) return 'CSE';
   if (typeof input === 'object') {
-    return resolveDepartment(input.department || input.departmentCode || input.department_code || input.departmentId || input.department_id || 'CSE');
+    const rawDeptId = input.department_id || input.departmentId;
+    if (rawDeptId) {
+      const lower = String(rawDeptId).toLowerCase().trim();
+      if (DYNAMIC_DEPARTMENT_MAP.has(lower)) {
+        const mapped = DYNAMIC_DEPARTMENT_MAP.get(lower);
+        if (mapped?.department) return mapped.department;
+        if (mapped?.branch) return mapped.branch;
+      }
+      if (lower === '835f1428-d1ec-47b9-87e0-d281feba4234' || lower === 'dept-aiml') return 'AIML';
+      if (lower === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' || lower === 'dept-aids') return 'AIDS';
+      if (lower === 'b9cce72e-288c-4091-88a7-fcb31a08863f' || lower === 'dept-cse') return 'CSE';
+    }
+    return resolveDepartment(input.department || input.departmentCode || input.department_code || input.branch || input.branchId || 'CSE');
   }
+
   const raw = String(input).trim();
-  if (raw === 'dept-cse' || raw === 'dept-aiml' || raw === 'dept-aids') return 'CSE';
-  if (raw === 'a0000000-0000-0000-0000-000000000001' || raw === 'a0000000-0000-0000-0000-000000000002' || raw === 'a0000000-0000-0000-0000-000000000003') return 'CSE';
-  if (raw === 'Computer Science and Engineering' || raw === 'Computer Science & Engineering') return 'CSE';
+  const lower = raw.toLowerCase();
+  const upper = raw.toUpperCase();
+
+  if (DYNAMIC_DEPARTMENT_MAP.has(lower)) {
+    const mapped = DYNAMIC_DEPARTMENT_MAP.get(lower);
+    if (mapped?.department) return mapped.department;
+    if (mapped?.branch) return mapped.branch;
+  }
+
+  if (
+    lower === '835f1428-d1ec-47b9-87e0-d281feba4234' ||
+    lower === 'dept-aiml' ||
+    upper === 'AIML' ||
+    upper === 'CSE-AIML' ||
+    upper === 'CSE_AIML' ||
+    upper.includes('MACHINE LEARNING')
+  ) {
+    return 'AIML';
+  }
+
+  if (
+    lower === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' ||
+    lower === 'dept-aids' ||
+    upper === 'AIDS' ||
+    upper === 'CSE-AIDS' ||
+    upper === 'CSE_AIDS' ||
+    upper.includes('DATA SCIENCE')
+  ) {
+    return 'AIDS';
+  }
+
+  if (
+    lower === 'b9cce72e-288c-4091-88a7-fcb31a08863f' ||
+    lower === 'dept-cse' ||
+    upper === 'CSE' ||
+    upper.includes('COMPUTER SCIENCE')
+  ) {
+    return 'CSE';
+  }
+
   return 'CSE';
 }
 
@@ -334,7 +392,7 @@ export function extractCanonicalCohort(entity) {
     branch,
     branchDisplayName,
     branchId: branch,
-    departmentId: isUuidDept ? String(rawDeptId).trim() : matchedMaster.id,
+    departmentId: isUuidDept ? String(rawDeptId).trim() : (matchedMaster.dbId || matchedMaster.id),
     departmentCode: branchDisplayName,
     departmentName: matchedMaster.name,
     year,

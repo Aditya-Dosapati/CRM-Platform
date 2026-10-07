@@ -53,6 +53,7 @@ export const MASTER_SUBJECTS = [
   { id: 'sub-nlp-6', code: '23ML601', name: 'Natural Language Processing', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
 
   // Semester 7 (4th Year)
+  { id: 'sub-llm-7', code: '23ML002', name: 'Large Language Models', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: '835f1428-d1ec-47b9-87e0-d281feba4234' },
   { id: 'sub-ai-7', code: '23ML302', name: 'Artificial Intelligence', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
   { id: 'sub-nlp-7', code: '23CSC13', name: 'Natural Language Processing', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
   { id: 'sub-ml-7', code: '23CS502', name: 'Machine Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
@@ -80,9 +81,13 @@ class AcademicDataService {
         if (!error && Array.isArray(data) && data.length > 0) {
           const formatted = data.map(item => {
             const canonical = normalizeBranch(item.code || item.name || item.id);
+            const rawCode = (item.code || '').trim().toUpperCase();
             return {
               id: item.id,
-              code: canonical.code,
+              code: rawCode || canonical.branch, // Authoritative DB code: 'AIML', 'AIDS', 'CSE'
+              rawCode: rawCode,
+              branch: canonical.branch,          // 'AIML', 'AIDS', 'CSE'
+              displayCode: canonical.code,       // Display: 'CSE-AIML', 'CSE-AIDS', 'CSE'
               name: item.name || canonical.name
             };
           });
@@ -123,22 +128,35 @@ class AcademicDataService {
           credits,
           subject_type,
           elective_group,
-          regulation
+          regulation,
+          subject_departments (
+            department_id,
+            departments ( id, code, name )
+          )
         `).order('name', { ascending: true });
 
         const { data, error } = await query;
         if (!error && Array.isArray(data) && data.length > 0) {
-          supabaseSubjects = data.map(s => ({
-            id: s.id,
-            code: s.code || '',
-            name: s.name || '',
-            semester: Number(s.semester) || 1,
-            credits: Number(s.credits) || 3,
-            subjectType: s.subject_type || 'CORE',
-            electiveGroup: s.elective_group || null,
-            regulation: s.regulation || 'AR23',
-            departmentId: departmentIdOrCode || 'dept-cse'
-          }));
+          supabaseSubjects = data.map(s => {
+            const sDepts = s.subject_departments || [];
+            const deptIds = sDepts.map(sd => sd.department_id).filter(Boolean);
+            const deptCodes = sDepts.map(sd => sd.departments?.code?.toUpperCase()).filter(Boolean);
+            const primaryDeptId = deptIds[0] || s.department_id || null;
+            return {
+              id: s.id,
+              code: s.code || '',
+              name: s.name || '',
+              semester: Number(s.semester) || 1,
+              credits: Number(s.credits) || 3,
+              subjectType: s.subject_type || 'CORE',
+              electiveGroup: s.elective_group || null,
+              regulation: s.regulation || 'AR23',
+              departmentId: primaryDeptId,
+              departmentIds: deptIds,
+              departmentCodes: deptCodes,
+              subjectDepartments: sDepts
+            };
+          });
         }
       } catch (err) {
         console.warn('[AcademicDataService] Exception querying subjects from Supabase, using master catalogue:', err);
@@ -172,37 +190,22 @@ class AcademicDataService {
         targetDept?.code || departmentIdOrCode
       ).toUpperCase();
 
-      const targetName = String(
-        targetDept?.name || ''
+      const targetId = String(
+        targetDept?.id || departmentIdOrCode
       ).toLowerCase();
 
-      const isCseTarget =
-        targetCode === 'CSE' ||
-        targetCode === 'AIML' ||
-        targetCode === 'AIDS' ||
-        targetName.includes('computer') ||
-        targetName.includes('cse');
-
       filtered = allDistinctSubjects.filter(s => {
-        if (!s.departmentId) return true;
+        // Direct ID match
+        if (s.departmentId && String(s.departmentId).toLowerCase() === targetId) return true;
+        if (Array.isArray(s.departmentIds) && s.departmentIds.some(id => String(id).toLowerCase() === targetId)) return true;
 
-        if (
-          s.departmentId === departmentIdOrCode ||
-          s.departmentId === targetDept.id
-        ) {
-          return true;
-        }
+        // Code match
+        if (Array.isArray(s.departmentCodes) && s.departmentCodes.some(c => c.toUpperCase() === targetCode)) return true;
 
-        if (
-          isCseTarget &&
-          (
-            s.departmentId === 'dept-cse' ||
-            s.departmentId === 'dept-aiml' ||
-            s.departmentId === 'dept-aids'
-          )
-        ) {
-          return true;
-        }
+        // Pattern match fallback for legacy / master data
+        if (targetCode.includes('AIML') && (s.code?.startsWith('23ML') || s.departmentId === 'dept-aiml')) return true;
+        if (targetCode.includes('AIDS') && (s.code?.startsWith('23DS') || s.departmentId === 'dept-aids')) return true;
+        if (targetCode === 'CSE' && (s.code?.startsWith('23CS') || s.departmentId === 'dept-cse')) return true;
 
         return false;
       });
