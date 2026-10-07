@@ -135,8 +135,95 @@ class AuthService {
   }
 
   /**
+   * Enrich base user profile with real database records from public.students or public.faculty
+   */
+  async enrichUserWithAcademicData(baseUser) {
+    if (!baseUser || !baseUser.id) return baseUser;
+    const role = (baseUser.role || '').toLowerCase().trim();
+
+    if (role === 'student') {
+      try {
+        const { data: stRow } = await supabase
+          .from('students')
+          .select(`
+            id,
+            user_id,
+            roll_number,
+            department_id,
+            year,
+            semester,
+            section,
+            program,
+            departments:department_id ( id, code, name )
+          `)
+          .eq('user_id', baseUser.id)
+          .maybeSingle();
+
+        if (stRow) {
+          const deptCode = stRow.departments?.code || 'CSE';
+          const deptName = stRow.departments?.name || '';
+          return {
+            ...baseUser,
+            studentId: stRow.id,
+            rollNumber: stRow.roll_number || '',
+            departmentId: stRow.department_id,
+            departmentCode: deptCode,
+            departmentName: deptName,
+            department: deptName || deptCode,
+            branch: deptCode,
+            branchId: deptCode,
+            year: Number(stRow.year) || 4,
+            semester: Number(stRow.semester) || 7,
+            section: String(stRow.section || 'A').toUpperCase().trim(),
+            program: stRow.program || 'B.Tech',
+            academicYear: stRow.academic_year || '2025-2026',
+            regulation: stRow.regulation || 'AR23'
+          };
+        }
+      } catch (err) {
+        console.warn('[AuthService] Could not enrich student profile from public.students:', err);
+      }
+    } else if (role === 'faculty') {
+      try {
+        const { data: facRow } = await supabase
+          .from('faculty')
+          .select(`
+            id,
+            user_id,
+            employee_id,
+            department_id,
+            designation,
+            departments:department_id ( id, code, name )
+          `)
+          .eq('user_id', baseUser.id)
+          .maybeSingle();
+
+        if (facRow) {
+          const deptCode = facRow.departments?.code || 'CSE';
+          const deptName = facRow.departments?.name || '';
+          return {
+            ...baseUser,
+            facultyId: facRow.id,
+            employeeId: facRow.employee_id || '',
+            departmentId: facRow.department_id,
+            departmentCode: deptCode,
+            departmentName: deptName,
+            department: deptName || deptCode,
+            branch: deptCode,
+            designation: facRow.designation || 'Assistant Professor'
+          };
+        }
+      } catch (err) {
+        console.warn('[AuthService] Could not enrich faculty profile from public.faculty:', err);
+      }
+    }
+
+    return baseUser;
+  }
+
+  /**
    * Query user profile and verified backend role from public.users table.
-   * STRICT: Resolves role directly from public.users without guessing or fallback.
+   * STRICT: Resolves role directly from public.users and enriches from academic tables.
    */
   async getBackendProfile(userId, email) {
     if (!isSupabaseConfigured()) {
@@ -155,7 +242,7 @@ class AuthService {
         if (error) {
           console.error('[AuthService] Error querying public.users by ID:', error.message);
         } else if (data) {
-          return {
+          const base = {
             ...data,
             id: data.id,
             userId: data.id,
@@ -164,6 +251,7 @@ class AuthService {
             status: data.status || 'Active',
             mustChangePassword: Boolean(data.must_change_password)
           };
+          return await this.enrichUserWithAcademicData(base);
         }
       }
 
@@ -175,18 +263,10 @@ class AuthService {
           .eq('email', email.toLowerCase().trim())
           .maybeSingle();
 
-        console.log('[AuthService] Profile query by Email:', {
-          email,
-          rowCount: data ? 1 : 0,
-          errorCode: error?.code || null,
-          errorMessage: error?.message || null,
-          resolvedRole: data?.role || null
-        });
-
         if (error) {
           console.error('[AuthService] Error querying public.users by email:', error.message);
         } else if (data) {
-          return {
+          const base = {
             ...data,
             id: data.id,
             userId: data.id,
@@ -195,6 +275,7 @@ class AuthService {
             status: data.status || 'Active',
             mustChangePassword: Boolean(data.must_change_password)
           };
+          return await this.enrichUserWithAcademicData(base);
         }
       }
     } catch (err) {
@@ -355,7 +436,7 @@ class AuthService {
 
     const mustChangePassword = Boolean(profile.must_change_password);
 
-    const userObj = {
+    let userObj = {
       userId: profile.id || authData.user.id,
       id: profile.id || authData.user.id,
       name: profile.name || profile.full_name || authData.user.email.split('@')[0],
@@ -367,6 +448,8 @@ class AuthService {
       avatar: (profile.name || profile.full_name || 'U').slice(0, 2).toUpperCase()
     };
 
+    userObj = await this.enrichUserWithAcademicData(userObj);
+
     const session = {
       sessionId: authData.session?.access_token ? `sess_${authData.session.access_token.slice(-10)}` : `sess_${Date.now()}`,
       userId: userObj.userId,
@@ -374,7 +457,23 @@ class AuthService {
       name: userObj.name,
       email: userObj.email,
       mustChangePassword: mustChangePassword,
-      loginTimestamp: new Date().toISOString()
+      loginTimestamp: new Date().toISOString(),
+      studentId: userObj.studentId || null,
+      facultyId: userObj.facultyId || null,
+      rollNumber: userObj.rollNumber || null,
+      employeeId: userObj.employeeId || null,
+      departmentId: userObj.departmentId || null,
+      departmentCode: userObj.departmentCode || null,
+      departmentName: userObj.departmentName || null,
+      branch: userObj.branch || null,
+      branchId: userObj.branchId || null,
+      year: userObj.year || null,
+      semester: userObj.semester || null,
+      section: userObj.section || null,
+      program: userObj.program || null,
+      academicYear: userObj.academicYear || null,
+      regulation: userObj.regulation || null,
+      designation: userObj.designation || null
     };
 
     this.saveSession(session);
@@ -790,7 +889,23 @@ class AuthService {
       email: this.currentSession.email,
       role: this.currentSession.role,
       mustChangePassword: Boolean(this.currentSession.mustChangePassword),
-      status: 'Active'
+      status: 'Active',
+      studentId: this.currentSession.studentId || null,
+      facultyId: this.currentSession.facultyId || null,
+      rollNumber: this.currentSession.rollNumber || null,
+      employeeId: this.currentSession.employeeId || null,
+      departmentId: this.currentSession.departmentId || null,
+      departmentCode: this.currentSession.departmentCode || null,
+      departmentName: this.currentSession.departmentName || null,
+      branch: this.currentSession.branch || null,
+      branchId: this.currentSession.branchId || null,
+      year: this.currentSession.year || null,
+      semester: this.currentSession.semester || null,
+      section: this.currentSession.section || null,
+      program: this.currentSession.program || null,
+      academicYear: this.currentSession.academicYear || null,
+      regulation: this.currentSession.regulation || null,
+      designation: this.currentSession.designation || null
     };
   }
 

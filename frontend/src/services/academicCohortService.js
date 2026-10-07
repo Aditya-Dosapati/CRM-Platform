@@ -37,6 +37,9 @@ export const DYNAMIC_DEPARTMENT_MAP = new Map([
   ['dept-cse', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE' }],
   ['dept-aiml', { branch: 'AIML', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'CSE' }],
   ['dept-aids', { branch: 'AIDS', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'CSE' }],
+  ['b9cce72e-288c-4091-88a7-fcb31a08863f', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE' }],
+  ['835f1428-d1ec-47b9-87e0-d281feba4234', { branch: 'AIML', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'CSE' }],
+  ['e126f2f2-8159-4c22-8d86-4ff57ee3d66c', { branch: 'AIDS', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'CSE' }],
   ['a0000000-0000-0000-0000-000000000001', { branch: 'CSE', code: 'CSE', name: 'Computer Science and Engineering', department: 'CSE' }],
   ['a0000000-0000-0000-0000-000000000002', { branch: 'AIML', code: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', department: 'CSE' }],
   ['a0000000-0000-0000-0000-000000000003', { branch: 'AIDS', code: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', department: 'CSE' }]
@@ -78,6 +81,18 @@ export function resolveBranch(input) {
   if (!input) return 'CSE';
 
   if (typeof input === 'object') {
+    // Check direct department_id or departmentId UUID in dynamic map first
+    const directDeptId = input.department_id || input.departmentId;
+    if (directDeptId && typeof directDeptId === 'string') {
+      const lowerDept = directDeptId.toLowerCase().trim();
+      if (DYNAMIC_DEPARTMENT_MAP.has(lowerDept)) {
+        const mapped = DYNAMIC_DEPARTMENT_MAP.get(lowerDept);
+        if (typeof mapped === 'string') return resolveBranch(mapped);
+        if (mapped && mapped.branch) return mapped.branch;
+        if (mapped && mapped.code) return resolveBranch(mapped.code);
+      }
+    }
+
     const candidates = [
       input.branch,
       input.branchId,
@@ -311,13 +326,15 @@ export function extractCanonicalCohort(entity) {
   const regulation = normalizeRegulation(entity.regulation);
 
   const matchedMaster = MASTER_BRANCHES.find(b => b.branch === branch) || MASTER_BRANCHES[0];
+  const rawDeptId = entity.departmentId || entity.department_id;
+  const isUuidDept = rawDeptId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(rawDeptId).trim());
 
   return {
     department,
     branch,
     branchDisplayName,
     branchId: branch,
-    departmentId: matchedMaster.id,
+    departmentId: isUuidDept ? String(rawDeptId).trim() : matchedMaster.id,
     departmentCode: branchDisplayName,
     departmentName: matchedMaster.name,
     year,

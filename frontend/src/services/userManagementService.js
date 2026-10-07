@@ -665,22 +665,13 @@ class UserManagementService {
       }
     }
 
-    const localUsers = this._loadLocalStore();
-    const userMap = new Map();
-
-    DEFAULT_USERS.forEach((u) =>
-      userMap.set(u.email.toLowerCase(), u)
-    );
-
-    localUsers.forEach((u) =>
-      userMap.set(u.email.toLowerCase(), u)
-    );
-
-    supabaseUsers.forEach((u) =>
-      userMap.set(u.email.toLowerCase(), u)
-    );
-
-    const rawMerged = Array.from(userMap.values());
+    let rawMerged = [];
+    if (supabaseUsers && supabaseUsers.length > 0) {
+      rawMerged = supabaseUsers;
+    } else {
+      const localUsers = this._loadLocalStore();
+      rawMerged = localUsers.length > 0 ? localUsers : [];
+    }
 
     const canonicalUsers = rawMerged.map((u) => {
       const rawRole = (u.role || 'student').toLowerCase().trim();

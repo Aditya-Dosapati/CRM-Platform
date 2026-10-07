@@ -23,9 +23,9 @@ export default function StudentAssessments({ onOpenRagQuery }) {
   const [timeLeft, setTimeLeft] = useState(1200); // in seconds
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeScorecard, setActiveScorecard] = useState(null); // attempt result view
+  const [studentRecord, setStudentRecord] = useState(null);
 
   const currentUser = authService.getCurrentUser();
-  const currentStudentId = currentUser?.id || currentUser?.userId || 'std-rahul';
 
   useEscapeKey(() => {
     if (activeScorecard) {
@@ -37,22 +37,26 @@ export default function StudentAssessments({ onOpenRagQuery }) {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const studentProfile = extractCanonicalCohort(currentUser);
+      const userIdentifier = currentUser?.id || currentUser?.userId;
+      const dbProfile = await assessmentService.getStudentAcademicProfile(userIdentifier);
+      const activeStudent = dbProfile || currentUser;
+      setStudentRecord(activeStudent);
 
-      const asmtRes = await assessmentService.getAssessments({ student: studentProfile });
-      const localAttempts = assessmentService._loadAttemptsLocal();
-      const myAttempts = localAttempts.filter(att => 
-        att.studentId === currentStudentId || att.studentUserId === currentStudentId
-      );
+      const resolvedStudentId = activeStudent?.id || activeStudent?.studentId || userIdentifier;
+
+      const [asmtRes, myAttempts] = await Promise.all([
+        assessmentService.getAssessments({ student: activeStudent, studentId: resolvedStudentId }),
+        assessmentService.getStudentAttempts(resolvedStudentId)
+      ]);
 
       setAssessments(asmtRes?.data || []);
-      setAttempts(myAttempts);
+      setAttempts(myAttempts || []);
     } catch (err) {
       console.warn('[StudentAssessments] Error loading assessments:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, currentStudentId]);
+  }, [currentUser]);
 
   useEffect(() => {
     loadData();
@@ -110,11 +114,12 @@ export default function StudentAssessments({ onOpenRagQuery }) {
     setIsSubmitting(true);
 
     try {
+      const resolvedStudentId = studentRecord?.id || studentRecord?.studentId || currentUser?.studentId || currentUser?.id || currentUser?.userId;
       const result = await assessmentService.submitAttempt({
         assessmentId: activeQuiz.id,
-        studentId: currentStudentId,
-        studentName: currentUser?.name || 'Rahul Kumar',
-        rollNumber: currentUser?.rollNumber || '23CS001',
+        studentId: resolvedStudentId,
+        studentName: studentRecord?.fullName || currentUser?.name || 'Student',
+        rollNumber: studentRecord?.rollNumber || currentUser?.rollNumber || '',
         answers: selectedAnswers,
         timeSpentSeconds: (activeQuiz.duration * 60) - timeLeft
       });
@@ -129,7 +134,7 @@ export default function StudentAssessments({ onOpenRagQuery }) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeQuiz, isSubmitting, currentStudentId, currentUser, selectedAnswers, timeLeft, loadData]);
+  }, [activeQuiz, isSubmitting, studentRecord, currentUser, selectedAnswers, timeLeft, loadData]);
 
   // Exam Countdown Timer
   useEffect(() => {

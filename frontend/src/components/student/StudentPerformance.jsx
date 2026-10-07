@@ -1,37 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import academicDataService from '../../services/academicDataService';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
+import assessmentService from '../../services/assessmentService';
 import authService from '../../services/authService';
 import { BarChart2, TrendingUp, AlertTriangle, CheckCircle2, Award, Sparkles, Activity, UserCheck, CheckSquare, BookOpen } from 'lucide-react';
 import EmptyState from '../common/EmptyState';
 
 export default function StudentPerformance({ onOpenRagQuery }) {
   const [subjects, setSubjects] = useState([]);
+  const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const currentUser = authService.getCurrentUser();
 
   useEffect(() => {
     let isMounted = true;
-    const fetchSubjects = async () => {
+    const fetchPerformanceData = async () => {
       setLoading(true);
       try {
         const studentId = currentUser?.id || currentUser?.userId;
-        const loadedSubs = await facultyAssignmentService.getStudentAssignedSubjects(studentId, currentUser);
+        const [loadedSubs, loadedAttempts] = await Promise.all([
+          facultyAssignmentService.getStudentAssignedSubjects(studentId, currentUser),
+          assessmentService.getStudentAttempts(studentId)
+        ]);
         if (isMounted) {
           setSubjects(loadedSubs || []);
+          setAttempts(loadedAttempts || []);
         }
       } catch (e) {
-        console.warn('StudentPerformance: could not load subjects:', e);
+        console.warn('StudentPerformance: could not load performance data:', e);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
-    fetchSubjects();
+    fetchPerformanceData();
     return () => { isMounted = false; };
   }, [currentUser]);
 
   const hasSubjects = subjects && subjects.length > 0;
+  const completedCount = attempts.length;
+  const avgScore = completedCount > 0
+    ? Math.round(attempts.reduce((sum, a) => sum + (Number(a.percentage) || 0), 0) / completedCount)
+    : null;
 
   return (
     <div className="page-content">
@@ -54,7 +64,7 @@ export default function StudentPerformance({ onOpenRagQuery }) {
         </div>
 
         <button
-          onClick={() => onOpenRagQuery("Analyze my strengths and weaknesses across all semester 4 subjects")}
+          onClick={() => onOpenRagQuery("Analyze my strengths and weaknesses across all semester subjects")}
           className="btn btn-primary"
         >
           <Sparkles size={14} />
@@ -71,9 +81,9 @@ export default function StudentPerformance({ onOpenRagQuery }) {
               <Award size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '8.42' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>{hasSubjects ? 'Current Scale' : 'Cumulative'}</span>
+          <div className="kpi-value">—</div>
+          <div className="kpi-trend neutral">
+            <span>Pending SEE Tabulation</span>
           </div>
         </div>
 
@@ -84,22 +94,22 @@ export default function StudentPerformance({ onOpenRagQuery }) {
               <UserCheck size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '91%' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>Good Standing</span>
+          <div className="kpi-value">—</div>
+          <div className="kpi-trend neutral">
+            <span>Tracking in progress</span>
           </div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Average Marks</span>
+            <span className="kpi-label">Average Score</span>
             <div className="kpi-icon-wrap">
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '82.4%' : '—'}</div>
-          <div className="kpi-trend positive">
-            <span>Continuous Evaluation</span>
+          <div className="kpi-value">{avgScore !== null ? `${avgScore}%` : '—'}</div>
+          <div className={`kpi-trend ${avgScore !== null ? 'positive' : 'neutral'}`}>
+            <span>{completedCount > 0 ? `${completedCount} Evaluation${completedCount === 1 ? '' : 's'}` : 'No graded evaluations'}</span>
           </div>
         </div>
 
@@ -110,9 +120,9 @@ export default function StudentPerformance({ onOpenRagQuery }) {
               <CheckSquare size={16} />
             </div>
           </div>
-          <div className="kpi-value">0</div>
-          <div className="kpi-trend neutral">
-            <span>0% Completion Rate</span>
+          <div className="kpi-value">{completedCount}</div>
+          <div className={`kpi-trend ${completedCount > 0 ? 'positive' : 'neutral'}`}>
+            <span>{completedCount > 0 ? 'Graded Submissions' : 'No Submissions'}</span>
           </div>
         </div>
       </div>

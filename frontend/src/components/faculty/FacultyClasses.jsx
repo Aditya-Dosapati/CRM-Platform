@@ -69,7 +69,15 @@ export default function FacultyClasses({ onOpenRagQuery }) {
   const sectionStudents = useMemo(() => {
     if (!students || students.length === 0 || !currentClass) return [];
     const cCohort = extractCanonicalCohort(currentClass);
-    return students.filter(s => matchesCohort(s, cCohort));
+    return students.filter(s => {
+      const directMatch = (
+        (s.departmentId === currentClass.departmentId || s.departmentCode === currentClass.departmentCode || s.branchId === currentClass.branch) &&
+        Number(s.year) === Number(currentClass.year) &&
+        Number(s.semester) === Number(currentClass.semester) &&
+        String(s.section).toUpperCase() === String(currentClass.section).toUpperCase()
+      );
+      return directMatch || (cCohort && matchesCohort(s, cCohort));
+    });
   }, [students, currentClass]);
 
   const filteredStudents = useMemo(() => {

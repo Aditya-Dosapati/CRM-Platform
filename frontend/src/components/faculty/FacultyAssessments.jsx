@@ -45,7 +45,7 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
   const [editingQuestionIdx, setEditingQuestionIdx] = useState(null);
 
   const currentUser = authService.getCurrentUser();
-  const activeFacultyId = currentUser?.id || currentUser?.userId || 'fac-anand';
+  const activeFacultyId = currentUser?.facultyId || currentUser?.id || currentUser?.userId || 'fac-anand';
 
   useEscapeKey(() => {
     if (showAnalyticsModal) {
@@ -55,13 +55,26 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
     }
   }, showCreateModal || Boolean(showAnalyticsModal));
 
+  // Open Analytics modal and refresh fresh analytics in background
+  const handleOpenAnalytics = async (asmt) => {
+    setShowAnalyticsModal(asmt);
+    try {
+      const fresh = await assessmentService.getAssessmentAnalytics(asmt.id);
+      if (fresh) {
+        setShowAnalyticsModal(prev => (prev && prev.id === asmt.id ? { ...prev, ...fresh } : prev));
+      }
+    } catch (err) {
+      console.warn('[FacultyAssessments] Error refreshing assessment analytics:', err);
+    }
+  };
+
   // Load Faculty Assignments, Resources, and Existing Assessments
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [classesData, asmtRes, resData] = await Promise.all([
         facultyAssignmentService.getFacultyAssignedClasses(activeFacultyId),
-        assessmentService.getAssessments({ facultyUserId: activeFacultyId }),
+        assessmentService.getAssessments({ facultyUserId: activeFacultyId, includeAnalytics: true }),
         ragDocumentService.getDocuments({ uploadedBy: activeFacultyId })
       ]);
 
@@ -213,7 +226,7 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
       setSelectedSubjectKey(newSubKey);
       setSelectedAssignmentId(firstCls.assignmentId || firstCls.id);
       if (!title || title.includes('Quiz') || title.includes('Concepts') || title.includes('Assessment')) {
-        setTitle(`${firstCls.name || 'Subject'} — Unit 1 Important Concepts Quiz`);
+        setTitle(`${firstCls.subjectName || firstCls.name || 'Subject'} — Unit 1 Important Concepts Quiz`);
       }
     } else {
       setSelectedSubjectKey('');
@@ -232,7 +245,7 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
       const firstMatch = matching[0];
       setSelectedAssignmentId(firstMatch.assignmentId || firstMatch.id);
       if (!title || title.includes('Quiz') || title.includes('Concepts') || title.includes('Assessment')) {
-        setTitle(`${firstMatch.name || 'Subject'} — Unit 1 Important Concepts Quiz`);
+        setTitle(`${firstMatch.subjectName || firstMatch.name || 'Subject'} — Unit 1 Important Concepts Quiz`);
       }
     } else {
       setSelectedAssignmentId('');
@@ -385,8 +398,8 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
   const handleDeleteAssessment = async (id, asmtTitle) => {
     if (confirm(`Delete assessment "${asmtTitle}"? This cannot be undone.`)) {
       try {
+        await assessmentService.deleteAssessment(id, currentUser);
         const remaining = assessments.filter(a => a.id !== id);
-        assessmentService._saveAssessmentsLocal(remaining);
         setAssessments(remaining);
       } catch (err) {
         alert(`Error deleting assessment: ${err.message}`);
@@ -459,8 +472,8 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
                   <div style={{ display: 'flex', gap: '20px', fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.85, flexWrap: 'wrap' }}>
                     <span>Questions: <strong>{a.questionCount || (a.questions?.length || 10)} MCQs</strong></span>
                     <span>Duration: <strong>{a.duration || 20} Mins</strong></span>
-                    <span>Students: <strong>{a.studentsCount || 0}</strong></span>
-                    <span>Attempted: <strong>{a.submittedCount || 0} / {a.studentsCount || 0}</strong></span>
+                    <span>Students: <strong>{a.studentsCount || a.assignedCount || a.totalStudents || 0}</strong></span>
+                    <span>Attempted: <strong>{a.submittedCount || a.attemptedCount || 0} / {a.studentsCount || a.assignedCount || a.totalStudents || 0}</strong></span>
                     <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
                       Avg Score: {a.averageScore || '0%'}
                     </span>
@@ -469,7 +482,7 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <button
-                    onClick={() => setShowAnalyticsModal(a)}
+                    onClick={() => handleOpenAnalytics(a)}
                     className="btn btn-secondary btn-sm"
                     style={{ fontWeight: 600 }}
                   >
@@ -1094,19 +1107,19 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
                 <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>ASSIGNED</span>
                   <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', marginTop: '2px' }}>
-                    {showAnalyticsModal.studentsCount || 0} Students
+                    {showAnalyticsModal.studentsCount || showAnalyticsModal.assignedCount || 0} Students
                   </p>
                 </div>
                 <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>ATTEMPTED</span>
                   <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-primary)', marginTop: '2px' }}>
-                    {showAnalyticsModal.submittedCount || showAnalyticsModal.attempts?.length || 0}
+                    {showAnalyticsModal.submittedCount || showAnalyticsModal.attemptedCount || showAnalyticsModal.attempts?.length || 0}
                   </p>
                 </div>
                 <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>NOT ATTEMPTED</span>
                   <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', opacity: 0.8, marginTop: '2px' }}>
-                    {Math.max(0, (showAnalyticsModal.studentsCount || 0) - (showAnalyticsModal.submittedCount || showAnalyticsModal.attempts?.length || 0))}
+                    {Math.max(0, (showAnalyticsModal.studentsCount || showAnalyticsModal.assignedCount || 0) - (showAnalyticsModal.submittedCount || showAnalyticsModal.attemptedCount || showAnalyticsModal.attempts?.length || 0))}
                   </p>
                 </div>
                 <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
