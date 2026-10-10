@@ -142,7 +142,8 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
           documentType: 'pyq'
         });
         if (isMounted) {
-          setSubjectPYQs(docs || []);
+          const list = Array.isArray(docs) ? docs : (docs?.data || []);
+          setSubjectPYQs(list);
         }
       } catch (e) {
         if (isMounted) setSubjectPYQs([]);

@@ -148,13 +148,115 @@ export default function App() {
     const sess = authService.getCurrentSession();
     return Boolean(sess?.isFirstLogin || user?.mustChangePassword);
   });
-  const [currentView, setCurrentView] = useState('dashboard');
+
+  // Collapsible Sidebar State (persisted in localStorage)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('gmrit_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('gmrit_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Helper to extract view from URL hash
+  const parseRouteFromUrl = () => {
+    if (typeof window === 'undefined') return { view: 'dashboard', props: null };
+    const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+    return { view: hash || 'dashboard', props: null };
+  };
+
+  // Active role computed from session
+  const activeRole = session?.role || currentUser?.role || 'student';
+
+  // Navigation & View State (initialized from URL hash with RBAC validation)
+  const [currentView, setCurrentView] = useState(() => {
+    const { view } = parseRouteFromUrl();
+    const currentSess = authService.getCurrentSession();
+    if (!currentSess) return 'dashboard';
+    const role = currentSess.role || 'student';
+    return accessControl.isRouteAllowed(role, view) ? view : 'dashboard';
+  });
   const [currentViewProps, setCurrentViewProps] = useState(null);
 
-  const handleNavigate = (view, props = null) => {
+  // History-aware Navigation Handler
+  const handleNavigate = (view, props = null, options = {}) => {
+    const { replace = false } = options;
+
+    // Enforce Role-Based Access Control Guard
+    if (!accessControl.isRouteAllowed(activeRole, view)) {
+      console.warn(`[RBAC] Access denied: "${view}" is not authorized for role "${activeRole}".`);
+      return;
+    }
+
     setCurrentView(view);
     setCurrentViewProps(props);
+
+    const targetHash = `#/${view}`;
+    const historyState = { view, props, role: activeRole };
+
+    if (replace) {
+      window.history.replaceState(historyState, '', targetHash);
+    } else {
+      const isSameHash = window.location.hash === targetHash;
+      const isSameProps = JSON.stringify(currentViewProps) === JSON.stringify(props);
+      if (!isSameHash || !isSameProps) {
+        window.history.pushState(historyState, '', targetHash);
+      }
+    }
   };
+
+  // Synchronize history state on mount or role change
+  useEffect(() => {
+    if (isLoggedIn) {
+      const { view } = parseRouteFromUrl();
+      const validView = accessControl.isRouteAllowed(activeRole, view) ? view : 'dashboard';
+      if (currentView !== validView) {
+        setCurrentView(validView);
+      }
+      const currentHistoryState = window.history.state;
+      if (!currentHistoryState || currentHistoryState.view !== validView) {
+        window.history.replaceState({ view: validView, props: currentViewProps, role: activeRole }, '', `#/${validView}`);
+      }
+    }
+  }, [isLoggedIn, activeRole]);
+
+  // Listen for Browser Back and Forward buttons (popstate & hashchange)
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const currentSess = authService.getCurrentSession();
+      if (!currentSess) return;
+
+      const role = currentSess.role || 'student';
+      const targetView = event.state?.view || parseRouteFromUrl().view;
+      const targetProps = event.state?.props || null;
+
+      if (accessControl.isRouteAllowed(role, targetView)) {
+        setCurrentView(targetView);
+        setCurrentViewProps(targetProps);
+      } else {
+        setCurrentView('dashboard');
+        setCurrentViewProps(null);
+        window.history.replaceState({ view: 'dashboard', props: null, role }, '', '#/dashboard');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, [activeRole]);
 
   // Modals & Panels State
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -167,7 +269,6 @@ export default function App() {
   // Live Notifications State
   const [allNotifications, setAllNotifications] = useState({ student: [], faculty: [], admin: [] });
 
-  const activeRole = session?.role || 'student';
   const activeNotifications = allNotifications[activeRole] || [];
   const unreadNotificationCount = activeNotifications.filter(n => !n.read).length;
 
@@ -179,16 +280,21 @@ export default function App() {
     setCurrentUser(user);
     setIsLoggedIn(true);
     setIsFirstLogin(Boolean(firstLoginFlag || user?.mustChangePassword || sessionData?.isFirstLogin));
-    setCurrentView('dashboard');
+    
+    const userRole = sessionData?.role || user?.role || 'student';
+    const { view } = parseRouteFromUrl();
+    const targetView = accessControl.isRouteAllowed(userRole, view) ? view : 'dashboard';
+    
+    setCurrentView(targetView);
     setCurrentViewProps(null);
+    window.history.replaceState({ view: targetView, props: null, role: userRole }, '', `#/${targetView}`);
   };
 
   // Handle first-login password reset completion
   const handleFirstLoginComplete = (updatedUser) => {
     setCurrentUser(updatedUser);
     setIsFirstLogin(false);
-    setCurrentView('dashboard');
-    setCurrentViewProps(null);
+    handleNavigate('dashboard', null, { replace: true });
   };
 
   // Handle secure logout
@@ -204,6 +310,9 @@ export default function App() {
     setIsFirstLogin(false);
     setCurrentView('dashboard');
     setCurrentViewProps(null);
+    try {
+      window.history.replaceState(null, '', window.location.pathname + '#/login');
+    } catch {}
   };
 
   const handleOpenRagQuery = (queryText) => {
@@ -222,12 +331,16 @@ export default function App() {
     }));
   };
 
-  // Keyboard shortcut Ctrl+K / Cmd+K listener
+  // Global Keyboard Shortcuts (Ctrl+K / Cmd+K for Command Palette, Ctrl+[ for Sidebar Toggle)
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsCommandPaletteOpen(prev => !prev);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+        e.preventDefault();
+        handleToggleSidebarCollapse();
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -312,6 +425,7 @@ export default function App() {
         case 'classes':
           return (
             <FacultyClasses 
+              onNavigate={handleNavigate}
               onOpenRagQuery={handleOpenRagQuery} 
               initialAssignmentId={currentViewProps?.selectedAssignmentId}
               initialSection={currentViewProps?.selectedSection}
@@ -398,6 +512,8 @@ export default function App() {
         onLogout={handleLogout}
         onOpenRag={() => setIsRagChatOpen(true)}
         currentUser={currentUser}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebarCollapse}
       />
 
       {/* Main Content Area */}
@@ -443,7 +559,7 @@ export default function App() {
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
-        onNavigate={setCurrentView}
+        onNavigate={handleNavigate}
         onOpenRagQuery={handleOpenRagQuery}
         activeRole={activeRole}
       />
@@ -453,7 +569,7 @@ export default function App() {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         activeRole={activeRole}
-        onNavigate={setCurrentView}
+        onNavigate={handleNavigate}
         notifications={activeNotifications}
         onMarkAllRead={handleMarkAllNotificationsRead}
       />

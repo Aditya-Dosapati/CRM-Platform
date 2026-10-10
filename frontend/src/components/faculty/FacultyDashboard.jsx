@@ -249,76 +249,155 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '14px'
+            gap: '16px'
           }}>
             {classes.map((cls, idx) => {
-              const yearText = `${cls.year}${cls.year === 1 ? 'st' : cls.year === 2 ? 'nd' : cls.year === 3 ? 'rd' : 'th'} Year`;
-              const subLine = `${cls.departmentCode || 'CSE'} • ${yearText} • Semester ${cls.semester} • Section ${cls.section}`;
+              const courseName = cls.name || cls.subjectName || 'Assigned Course';
+              const courseCode = cls.code || cls.subjectCode || '—';
+              const yearText = cls.year ? `${cls.year}${cls.year === 1 ? 'st' : cls.year === 2 ? 'nd' : cls.year === 3 ? 'rd' : 'th'} Year` : '4th Year';
+              const branchDisplay = cls.branchDisplayName || cls.departmentCode || cls.branch || 'CSE';
+              const cohortInfo = `${branchDisplay} · ${yearText} · Semester ${cls.semester || 7} · Section ${cls.section || 'A'}`;
+              const creditsVal = cls.credits || cls.subjectCredits || 3;
+              const regVal = cls.regulation || 'AR23';
+              const acadYearVal = cls.academicYear || '2025–2026';
+              const isActive = cls.isActive !== false;
 
               return (
-                <div key={cls.assignmentId || cls.id || idx} className={`card card-interactive stagger-${idx + 1}`} style={{ padding: '18px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span className="badge badge-blue">{cls.code}</span>
-                      <span className="badge badge-purple" style={{ fontWeight: 800 }}>
-                        Section {cls.section}
-                      </span>
-                    </div>
-                    <span className="badge badge-green" style={{ fontWeight: 700 }}>
-                      Active
+                <div 
+                  key={cls.assignmentId || cls.id || idx} 
+                  className={`card card-interactive stagger-${idx + 1}`} 
+                  style={{ 
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-xs)',
+                    transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                >
+                  {/* 1. Course Name (prominent heading) & Course Code */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    justifyContent: 'space-between', 
+                    gap: '10px',
+                    marginBottom: '8px' 
+                  }}>
+                    <h3 style={{ 
+                      fontSize: '17px', 
+                      fontWeight: 800, 
+                      color: 'var(--color-text)', 
+                      letterSpacing: '-0.3px',
+                      margin: 0,
+                      lineHeight: 1.3,
+                      wordBreak: 'break-word'
+                    }}>
+                      {courseName}
+                    </h3>
+                    <span 
+                      className="badge badge-blue"
+                      style={{
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontWeight: 700,
+                        fontSize: '11.5px',
+                        padding: '3px 8px',
+                        flexShrink: 0
+                      }}
+                    >
+                      {courseCode}
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text)', marginBottom: '4px' }}>
-                    {cls.name}
-                  </h3>
-
-                  <div style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700, marginBottom: '12px' }}>
-                    {subLine}
+                  {/* 2. Section & Status Badges */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <span className="badge badge-purple" style={{ fontWeight: 800, fontSize: '11px', padding: '2px 8px' }}>
+                      Section {cls.section || 'A'}
+                    </span>
+                    <span 
+                      className={isActive ? 'badge badge-green' : 'badge badge-gray'} 
+                      style={{ fontWeight: 700, fontSize: '11px', padding: '2px 8px' }}
+                    >
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
 
+                  {/* 3. Cohort Information */}
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: 'var(--color-text)', 
+                    opacity: 0.82, 
+                    fontWeight: 600, 
+                    marginBottom: '14px',
+                    lineHeight: 1.4
+                  }}>
+                    {cohortInfo}
+                  </div>
+
+                  {/* 4. Course Details 2x2 Grid */}
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr',
-                    gap: '8px',
-                    padding: '10px 12px',
+                    gap: '10px 12px',
+                    padding: '12px 14px',
                     backgroundColor: 'var(--color-bg)',
-                    borderRadius: 'var(--radius-sm)',
-                    marginBottom: '14px',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: '16px',
                     border: '1px solid var(--color-border)'
                   }}>
                     <div>
-                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>CREDITS</span>
-                      <p style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.credits || 3} Credits</p>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.65, display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, marginBottom: '2px' }}>
+                        Credits
+                      </span>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
+                        {creditsVal} Credits
+                      </p>
                     </div>
                     <div>
-                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>REGULATION</span>
-                      <p style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.regulation || 'AR23'}</p>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.65, display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, marginBottom: '2px' }}>
+                        Regulation
+                      </span>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
+                        {regVal}
+                      </p>
                     </div>
                     <div>
-                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>DEPARTMENT</span>
-                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>{cls.departmentCode || 'CSE'}</p>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.65, display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, marginBottom: '2px' }}>
+                        Department / Branch
+                      </span>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
+                        {branchDisplay}
+                      </p>
                     </div>
                     <div>
-                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)', display: 'block' }}>ACADEMIC YEAR</span>
-                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)', margin: 0 }}>{cls.academicYear || '2025-2026'}</p>
+                      <span style={{ fontSize: '10.5px', color: 'var(--color-text)', opacity: 0.65, display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, marginBottom: '2px' }}>
+                        Academic Year
+                      </span>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)', margin: 0 }}>
+                        {acadYearVal}
+                      </p>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  {/* 5. Actions */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
                     <button 
-                      onClick={() => onNavigate('students', { selectedAssignmentId: cls.assignmentId || cls.id, selectedSection: cls.section })} 
+                      type="button"
+                      onClick={() => onNavigate('classes', { selectedAssignmentId: cls.assignmentId || cls.id, selectedSection: cls.section })} 
                       className="btn btn-secondary btn-sm" 
-                      style={{ flex: 1, fontWeight: 700 }}
+                      style={{ flex: 1, fontWeight: 700, justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}
                     >
-                      View Students
+                      <Users size={13} />
+                      <span>View Students</span>
                     </button>
                     <button 
-                      onClick={() => onNavigate('analytics', { selectedAssignmentId: cls.assignmentId || cls.id })} 
+                      type="button"
+                      onClick={() => onNavigate('analytics', { selectedAssignmentId: cls.assignmentId || cls.id, selectedSection: cls.section })} 
                       className="btn btn-secondary btn-sm" 
-                      style={{ flex: 1, fontWeight: 700 }}
+                      style={{ flex: 1, fontWeight: 700, justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}
                     >
-                      Analytics
+                      <BarChart2 size={13} />
+                      <span>Analytics</span>
                     </button>
                   </div>
                 </div>

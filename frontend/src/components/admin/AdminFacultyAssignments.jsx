@@ -162,6 +162,15 @@ export default function AdminFacultyAssignments() {
 
   useEffect(() => {
     loadData();
+    const handleUpdate = () => {
+      loadData();
+    };
+    window.addEventListener('gmrit_users_updated', handleUpdate);
+    window.addEventListener('gmrit_assignments_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('gmrit_users_updated', handleUpdate);
+      window.removeEventListener('gmrit_assignments_updated', handleUpdate);
+    };
   }, [loadData]);
 
   // Map assignments per faculty for multi-key lookup

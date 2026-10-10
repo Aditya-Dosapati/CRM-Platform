@@ -71,58 +71,26 @@ export function registerDepartments(deptList) {
 export function resolveDepartment(input) {
   if (!input) return 'CSE';
   if (typeof input === 'object') {
-    const rawDeptId = input.department_id || input.departmentId;
-    if (rawDeptId) {
-      const lower = String(rawDeptId).toLowerCase().trim();
-      if (DYNAMIC_DEPARTMENT_MAP.has(lower)) {
-        const mapped = DYNAMIC_DEPARTMENT_MAP.get(lower);
-        if (mapped?.department) return mapped.department;
-        if (mapped?.branch) return mapped.branch;
+    if (input.department && typeof input.department === 'string') {
+      const dUpper = input.department.toUpperCase().trim();
+      if (dUpper === 'CSE' || dUpper.includes('COMPUTER SCIENCE')) {
+        return 'CSE';
       }
-      if (lower === '835f1428-d1ec-47b9-87e0-d281feba4234' || lower === 'dept-aiml') return 'AIML';
-      if (lower === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' || lower === 'dept-aids') return 'AIDS';
-      if (lower === 'b9cce72e-288c-4091-88a7-fcb31a08863f' || lower === 'dept-cse') return 'CSE';
     }
-    return resolveDepartment(input.department || input.departmentCode || input.department_code || input.branch || input.branchId || 'CSE');
   }
 
-  const raw = String(input).trim();
-  const lower = raw.toLowerCase();
+  const raw = String(typeof input === 'object' ? (input.department || input.departmentName || input.departmentCode || 'CSE') : input).trim();
   const upper = raw.toUpperCase();
 
-  if (DYNAMIC_DEPARTMENT_MAP.has(lower)) {
-    const mapped = DYNAMIC_DEPARTMENT_MAP.get(lower);
-    if (mapped?.department) return mapped.department;
-    if (mapped?.branch) return mapped.branch;
-  }
-
   if (
-    lower === '835f1428-d1ec-47b9-87e0-d281feba4234' ||
-    lower === 'dept-aiml' ||
-    upper === 'AIML' ||
-    upper === 'CSE-AIML' ||
-    upper === 'CSE_AIML' ||
-    upper.includes('MACHINE LEARNING')
-  ) {
-    return 'AIML';
-  }
-
-  if (
-    lower === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' ||
-    lower === 'dept-aids' ||
-    upper === 'AIDS' ||
-    upper === 'CSE-AIDS' ||
-    upper === 'CSE_AIDS' ||
-    upper.includes('DATA SCIENCE')
-  ) {
-    return 'AIDS';
-  }
-
-  if (
-    lower === 'b9cce72e-288c-4091-88a7-fcb31a08863f' ||
-    lower === 'dept-cse' ||
     upper === 'CSE' ||
-    upper.includes('COMPUTER SCIENCE')
+    upper === 'AIML' ||
+    upper === 'AIDS' ||
+    upper === 'CSE-AIML' ||
+    upper === 'CSE-AIDS' ||
+    upper.includes('COMPUTER SCIENCE') ||
+    upper.includes('MACHINE LEARNING') ||
+    upper.includes('DATA SCIENCE')
   ) {
     return 'CSE';
   }
@@ -139,7 +107,21 @@ export function resolveBranch(input) {
   if (!input) return 'CSE';
 
   if (typeof input === 'object') {
-    // Check direct department_id or departmentId UUID in dynamic map first
+    // Check explicit branch or departmentCode first
+    if (input.branch && typeof input.branch === 'string') {
+      const bRes = resolveBranch(input.branch);
+      if (bRes === 'AIML' || bRes === 'AIDS') return bRes;
+    }
+    if (input.branchId && typeof input.branchId === 'string') {
+      const bRes = resolveBranch(input.branchId);
+      if (bRes === 'AIML' || bRes === 'AIDS') return bRes;
+    }
+    if (input.departmentCode && typeof input.departmentCode === 'string') {
+      const bRes = resolveBranch(input.departmentCode);
+      if (bRes === 'AIML' || bRes === 'AIDS') return bRes;
+    }
+
+    // Check direct department_id or departmentId UUID in dynamic map
     const directDeptId = input.department_id || input.departmentId;
     if (directDeptId && typeof directDeptId === 'string') {
       const lowerDept = directDeptId.toLowerCase().trim();

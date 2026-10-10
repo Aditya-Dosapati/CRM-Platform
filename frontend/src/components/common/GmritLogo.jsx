@@ -4,19 +4,30 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
   const isSmall = size === 'small';
   const isLarge = size === 'large';
 
-  const boxSize = isLarge ? '48px' : isSmall ? '32px' : '38px';
-  const svgSize = isLarge ? '30' : isSmall ? '20' : '24';
+  const boxSize = isLarge ? '44px' : isSmall ? '30px' : '36px';
+  const svgSize = isLarge ? '26' : isSmall ? '18' : '22';
 
   return (
-    <div className="gmrit-logo-container" style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
+    <div 
+      className="gmrit-logo-container" 
+      title={collapsed ? "GMR CRM — Academic Management Platform" : undefined}
+      style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '9px', 
+        userSelect: 'none',
+        minWidth: 0,
+        overflow: 'hidden'
+      }}
+    >
       {/* Clean Modern GMRIT Emblem */}
       <div 
         style={{
           width: boxSize,
           height: boxSize,
-          borderRadius: '10px',
+          borderRadius: '8px',
           background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.22)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -30,8 +41,8 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
           position: 'absolute',
           top: 0,
           right: 0,
-          width: '12px',
-          height: '12px',
+          width: '10px',
+          height: '10px',
           background: '#EA580C',
           clipPath: 'polygon(100% 0, 0 0, 100% 100%)'
         }} />
@@ -58,25 +69,30 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
       </div>
 
       {!collapsed && (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', lineHeight: 1.15 }}>
             <span style={{
               fontWeight: 800,
-              fontSize: isLarge ? '18px' : isSmall ? '14px' : '15px',
+              fontSize: isLarge ? '17px' : isSmall ? '13.5px' : '14.5px',
               letterSpacing: '-0.2px',
               color: '#111827',
-              fontFamily: "'Plus Jakarta Sans', sans-serif"
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              whiteSpace: 'nowrap'
             }}>
               GMR <span style={{ color: '#2563EB' }}>CRM</span>
             </span>
           </div>
           {showSubtitle && (
             <span style={{
-              fontSize: '11px',
+              fontSize: '10.5px',
               fontWeight: 500,
               color: '#6B7280',
               letterSpacing: '0.1px',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.25,
+              marginTop: '1.5px'
             }}>
               Academic Management Platform
             </span>

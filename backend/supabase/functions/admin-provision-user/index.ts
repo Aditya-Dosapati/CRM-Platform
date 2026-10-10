@@ -545,6 +545,209 @@ serve(async (req: Request) => {
       );
     }
 
+    // =========================================================================
+    // ACTION 4: DELETE USER (AUTH + PROFILE + ACADEMIC RECORDS CASCADE)
+    // =========================================================================
+    if (action === 'delete_user') {
+      const { userId, email: targetEmailParam } = body;
+      const cleanTargetId = userId ? String(userId).trim() : '';
+      const cleanTargetEmail = targetEmailParam ? String(targetEmailParam).trim().toLowerCase() : '';
+
+      if (!cleanTargetId && !cleanTargetEmail) {
+        return new Response(
+          JSON.stringify({ error: 'User ID or Email is required for deletion.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 1. Locate the target user in public.users
+      let targetUser = null;
+      if (cleanTargetId) {
+        const { data, error: findErr } = await supabaseAdmin
+          .from('users')
+          .select('id, email, full_name, role, status')
+          .eq('id', cleanTargetId)
+          .maybeSingle();
+
+        if (!findErr && data) {
+          targetUser = data;
+        }
+      }
+
+      if (!targetUser && cleanTargetEmail) {
+        const { data, error: findErr } = await supabaseAdmin
+          .from('users')
+          .select('id, email, full_name, role, status')
+          .eq('email', cleanTargetEmail)
+          .maybeSingle();
+
+        if (!findErr && data) {
+          targetUser = data;
+        }
+      }
+
+      const targetId = targetUser?.id || cleanTargetId;
+      const targetEmail = (targetUser?.email || cleanTargetEmail || '').toLowerCase().trim();
+      const targetRole = (targetUser?.role || '').toLowerCase().trim();
+
+      // 2. Safety Rule: Administrator cannot delete their own active account
+      if (targetId === callerUid || (targetEmail && targetEmail === callerData.user.email?.toLowerCase())) {
+        return new Response(
+          JSON.stringify({ error: '403 Forbidden: Administrators cannot delete their own active account.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 3. Clean up dependent academic records safely
+      try {
+        if (targetRole === 'student' || (!targetRole && targetId)) {
+          let stQuery = supabaseAdmin.from('students').select('id, user_id');
+          if (targetId) {
+            stQuery = stQuery.or(`id.eq.${targetId},user_id.eq.${targetId}`);
+          }
+          const { data: stRecs } = await stQuery;
+          if (stRecs && stRecs.length > 0) {
+            for (const stRec of stRecs) {
+              const { data: subs } = await supabaseAdmin
+                .from('assessment_submissions')
+                .select('id')
+                .eq('student_id', stRec.id);
+
+              if (subs && subs.length > 0) {
+                const subIds = subs.map((s: any) => s.id);
+                await supabaseAdmin.from('assessment_answers').delete().in('submission_id', subIds);
+                await supabaseAdmin.from('assessment_submissions').delete().eq('student_id', stRec.id);
+              }
+
+              await supabaseAdmin.from('students').delete().eq('id', stRec.id);
+            }
+          }
+        }
+
+        if (targetRole === 'faculty' || (!targetRole && targetId)) {
+          let facQuery = supabaseAdmin.from('faculty').select('id, user_id');
+          if (targetId) {
+            facQuery = facQuery.or(`id.eq.${targetId},user_id.eq.${targetId}`);
+          }
+          const { data: facRecs } = await facQuery;
+          if (facRecs && facRecs.length > 0) {
+            for (const facRec of facRecs) {
+              await supabaseAdmin.from('faculty_assignments').delete().eq('faculty_id', facRec.id);
+              await supabaseAdmin.from('assessments').delete().eq('faculty_id', facRec.id);
+              await supabaseAdmin.from('faculty').delete().eq('id', facRec.id);
+            }
+          }
+        }
+
+        // 4. Delete profile from public.users
+        if (targetId) {
+          await supabaseAdmin.from('users').delete().eq('id', targetId);
+        }
+        if (targetEmail) {
+          await supabaseAdmin.from('users').delete().eq('email', targetEmail);
+        }
+
+        // 5. Delete authentication account via Supabase Auth Admin API
+        let authDeleted = false;
+        let authErrorMsg = null;
+        let authUserIdToDelete = targetId;
+
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
+        if (!isUuid && targetEmail) {
+          try {
+            const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+            const match = userList?.users?.find(u => u.email?.toLowerCase() === targetEmail);
+            if (match?.id) {
+              authUserIdToDelete = match.id;
+            }
+          } catch (e) {
+            console.warn('[admin-provision-user] Error listing auth users:', e);
+          }
+        }
+
+        if (authUserIdToDelete && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authUserIdToDelete)) {
+          try {
+            const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(authUserIdToDelete);
+            if (authDelErr) {
+              authErrorMsg = authDelErr.message;
+              console.warn(`[admin-provision-user] auth.admin.deleteUser warning: ${authDelErr.message}`);
+            } else {
+              authDeleted = true;
+            }
+          } catch (err: any) {
+            authErrorMsg = err.message;
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            userId: targetId,
+            email: targetEmail,
+            role: targetRole,
+            authDeleted,
+            authErrorMsg,
+            message: `User ${targetEmail || targetId} permanently deleted from database and authentication.`
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (delErr: any) {
+        return new Response(
+          JSON.stringify({ error: `Deletion failed: ${delErr.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // =========================================================================
+    // ACTION 5: SET USER STATUS (ACTIVE | INACTIVE | PENDING | REJECTED)
+    // =========================================================================
+    if (action === 'set_user_status' || action === 'set_status') {
+      const { userId, status: statusParam } = body;
+      const cleanStatus = (statusParam || '').toLowerCase().trim();
+
+      if (!userId || !['active', 'inactive', 'pending', 'rejected', 'suspended'].includes(cleanStatus)) {
+        return new Response(
+          JSON.stringify({ error: 'Valid userId and status (active, inactive, pending, rejected, suspended) are required.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Update public.users
+      const { data: updatedUser, error: updateErr } = await supabaseAdmin
+        .from('users')
+        .update({ status: cleanStatus })
+        .eq('id', userId)
+        .select('id, email, full_name, role, status')
+        .single();
+
+      if (updateErr) {
+        return new Response(
+          JSON.stringify({ error: `Failed to update status: ${updateErr.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Update auth user metadata
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: { status: cleanStatus }
+        });
+      } catch (e) {
+        console.warn('[admin-provision-user] Could not update auth user metadata:', e);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          user: updatedUser,
+          status: cleanStatus,
+          message: `User status successfully updated to ${cleanStatus}.`
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: `Unknown action: ${action}` }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

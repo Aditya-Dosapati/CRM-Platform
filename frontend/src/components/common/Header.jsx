@@ -16,24 +16,48 @@ export default function Header({
 
   return (
     <header className="header-bar">
-      {/* Left: Page Title & Subtitle */}
-      <div>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px', margin: 0 }}>
+      {/* Left: Page Title & Subtitle with Robust Overflow Protection */}
+      <div className="header-title-container" style={{ minWidth: 0, flex: 1, marginRight: '16px' }}>
+        <h1 
+          style={{ 
+            fontSize: '17px', 
+            fontWeight: 800, 
+            color: 'var(--text-primary)', 
+            letterSpacing: '-0.3px', 
+            margin: 0,
+            lineHeight: 1.25,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+          title={pageTitle}
+        >
           {pageTitle}
         </h1>
-        <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: '1px 0 0 0' }}>
+        <p 
+          style={{ 
+            fontSize: '11.5px', 
+            color: 'var(--text-muted)', 
+            margin: '2px 0 0 0',
+            lineHeight: 1.3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+          title={pageSubtitle}
+        >
           {pageSubtitle}
         </p>
       </div>
 
       {/* Right: Notification & Read-Only Authenticated User Identity */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
 
         {/* Notification Bell */}
         <button
           onClick={onOpenNotifications}
           className="btn-icon"
-          style={{ position: 'relative', width: '32px', height: '32px' }}
+          style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0 }}
           title="Notifications"
           aria-label={`Notifications (${notificationCount} unread)`}
           onMouseEnter={(e) => {
@@ -76,7 +100,7 @@ export default function Header({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '9px',
             cursor: 'pointer',
             padding: '4px 10px 4px 6px',
             borderRadius: 'var(--radius-md)',
@@ -84,7 +108,9 @@ export default function Header({
             border: '1px solid var(--border-subtle)',
             boxShadow: 'var(--shadow-xs)',
             transition: 'transform var(--transition-spring), border-color var(--transition-smooth), background-color var(--transition-smooth), box-shadow var(--transition-spring)',
-            userSelect: 'none'
+            userSelect: 'none',
+            maxWidth: '220px',
+            minWidth: 0
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = 'var(--border-light)';
@@ -103,8 +129,8 @@ export default function Header({
         >
           {/* Avatar Circle */}
           <div style={{
-            width: '30px',
-            height: '30px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
             backgroundColor: activeRole === 'student' ? 'var(--pastel-blue-bg)' : activeRole === 'faculty' ? 'var(--pastel-green-bg)' : 'var(--pastel-purple-bg)',
             border: `1px solid ${activeRole === 'student' ? 'var(--pastel-blue-border)' : activeRole === 'faculty' ? 'var(--pastel-green-border)' : 'var(--pastel-purple-border)'}`,
@@ -112,7 +138,7 @@ export default function Header({
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 700,
-            fontSize: '11.5px',
+            fontSize: '11px',
             color: activeRole === 'student' ? 'var(--primary-blue)' : activeRole === 'faculty' ? 'var(--pastel-green-text)' : 'var(--pastel-purple-text)',
             flexShrink: 0
           }}>
@@ -120,18 +146,33 @@ export default function Header({
           </div>
 
           {/* User Name & Role indicator */}
-          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+            <span style={{ 
+              fontSize: '12px', 
+              fontWeight: 700, 
+              color: 'var(--text-primary)', 
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
               {currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : 'User')}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', minWidth: 0 }}>
               <span style={{
-                width: '6px',
-                height: '6px',
+                width: '5.5px',
+                height: '5.5px',
                 borderRadius: '50%',
-                backgroundColor: roleDotColor
+                backgroundColor: roleDotColor,
+                flexShrink: 0
               }} />
-              <span style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <span style={{ 
+                fontSize: '10px', 
+                fontWeight: 600, 
+                color: 'var(--text-muted)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
                 {roleLabel}
               </span>
             </div>
