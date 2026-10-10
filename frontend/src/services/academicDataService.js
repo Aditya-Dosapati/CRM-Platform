@@ -364,6 +364,14 @@ class AcademicDataService {
   }
 
   /**
+   * Fetch authorized course resources for logged-in student mapped to their cohort.
+   */
+  async getStudentResources(studentUserId, studentProfile = null, filters = {}) {
+    const { ragDocumentService } = await import('./ragDocumentService.js');
+    return ragDocumentService.getStudentResources(studentUserId, studentProfile, filters);
+  }
+
+  /**
    * Fetch verified student profile with department / branch details from public.students.
    * Resolves existing branch/stream, semester, year, FSI status, and career path.
    */

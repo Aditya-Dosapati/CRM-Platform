@@ -1,21 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, Bell, Shield, KeyRound, Check, Smartphone, 
-  Mail, Building2, GraduationCap, CheckCircle2, AlertCircle 
+  Mail, Building2, GraduationCap, CheckCircle2, AlertCircle, Edit2 
 } from 'lucide-react';
 import authService from '../../services/authService';
+import EditProfileModal from '../profile/EditProfileModal';
 
 export default function StudentSettings() {
-  const currentUser = authService.getCurrentUser() || {
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser() || {
     name: "Rahul Kumar",
     userId: "23A81A0501",
+    rollNumber: "23A81A0501",
     email: "student@gmrit.edu.in",
     department: "Computer Science & Engineering",
     program: "B.Tech",
     year: "II Year",
     section: "CSE-A",
-    cgpa: 8.42
-  };
+    cgpa: 8.42,
+    role: "student"
+  });
+
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [profileFeedback, setProfileFeedback] = useState(null);
 
   const [notifications, setNotifications] = useState({
     assignmentAlerts: true,
@@ -28,6 +34,28 @@ export default function StudentSettings() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordFeedback, setPasswordFeedback] = useState(null);
+
+  // Sync profile when global events or auth changes fire
+  useEffect(() => {
+    const handleProfileUpdate = (e) => {
+      if (e?.detail?.user) {
+        setCurrentUser(e.detail.user);
+      } else {
+        const fresh = authService.getCurrentUser();
+        if (fresh) setCurrentUser(fresh);
+      }
+    };
+
+    window.addEventListener('gmrit_user_profile_updated', handleProfileUpdate);
+    const unsub = authService.onAuthStateChange((event, user) => {
+      if (user) setCurrentUser(user);
+    });
+
+    return () => {
+      window.removeEventListener('gmrit_user_profile_updated', handleProfileUpdate);
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
 
   const handlePasswordUpdate = (e) => {
     e.preventDefault();
@@ -66,35 +94,75 @@ export default function StudentSettings() {
         </p>
       </div>
 
+      {profileFeedback && (
+        <div style={{
+          padding: '11px 16px',
+          borderRadius: 'var(--radius-md, 8px)',
+          backgroundColor: '#F0FDF4',
+          border: '1px solid #BBF7D0',
+          color: '#166534',
+          fontSize: '13px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        }}>
+          <CheckCircle2 size={16} color="#166534" />
+          <span style={{ fontWeight: 600 }}>{profileFeedback.message}</span>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
         {/* Left Column: Profile & Security */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Institutional Profile Card */}
           <div className="card" style={{ padding: '22px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
-              <div style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--pastel-blue-bg)',
-                color: 'var(--primary-blue)',
-                fontWeight: 800,
-                fontSize: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid var(--pastel-blue-border)'
-              }}>
-                {currentUser.avatar || 'ST'}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--pastel-blue-bg)',
+                  color: 'var(--primary-blue)',
+                  fontWeight: 800,
+                  fontSize: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid var(--pastel-blue-border)'
+                }}>
+                  {currentUser.avatar || (currentUser.name || 'ST').slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {currentUser.name}
+                  </h3>
+                  <span className="badge badge-blue" style={{ marginTop: '2px' }}>
+                    Roll No: {currentUser.rollNumber || currentUser.userId}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {currentUser.name}
-                </h3>
-                <span className="badge badge-blue" style={{ marginTop: '2px' }}>
-                  Roll No: {currentUser.userId || currentUser.rollNumber}
-                </span>
-              </div>
+
+              {/* Edit Profile Button */}
+              <button
+                type="button"
+                id="student-edit-profile-btn"
+                onClick={() => setShowEditProfileModal(true)}
+                className="btn btn-secondary btn-sm"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12.5px',
+                  padding: '6px 12px',
+                  fontWeight: 600
+                }}
+              >
+                <Edit2 size={13} />
+                <span>Edit Profile</span>
+              </button>
             </div>
 
             <div style={{
@@ -255,6 +323,20 @@ export default function StudentSettings() {
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal Dialog */}
+      <EditProfileModal
+        isOpen={showEditProfileModal}
+        onClose={() => setShowEditProfileModal(false)}
+        currentUser={currentUser}
+        activeRole="student"
+        onProfileUpdated={(updated) => {
+          setCurrentUser(updated);
+          setProfileFeedback({ type: 'success', message: 'Your student profile has been updated successfully.' });
+          setTimeout(() => setProfileFeedback(null), 4000);
+        }}
+      />
     </div>
   );
 }
+

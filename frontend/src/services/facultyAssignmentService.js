@@ -2,6 +2,8 @@
 // Fully Database-Driven Architecture backed by Supabase public.faculty_assignments
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import auditService from './auditService.js';
+import authService from './authService.js';
+import userManagementService from './userManagementService.js';
 import {
   resolveDepartment,
   resolveBranch,
@@ -11,12 +13,163 @@ import {
   normalizeSection,
   normalizeAcademicYear,
   normalizeRegulation,
-  extractCanonicalCohort
+  extractCanonicalCohort,
+  matchesCohort,
+  isUserActive
 } from './academicCohortService.js';
+
+export const DEFAULT_ASSIGNMENTS = [
+  {
+    id: 'assign-anand-cloud-a',
+    assignmentId: 'assign-anand-cloud-a',
+    facultyId: 'fac-anand',
+    facultyUserId: 'fac-anand',
+    facultyName: 'Anand Rao',
+    facultyEmail: 'faculty@gmrit.edu.in',
+    facultyEmployeeId: 'FAC550',
+    facultyDesignation: 'Associate Professor',
+    facultyStatus: 'Active',
+    subjectId: 'sub-cloud-devops',
+    subjectName: 'Cloud Computing & DevOps',
+    subjectCode: '23CSC11',
+    subjectCredits: 3,
+    subjectType: 'CORE',
+    departmentId: 'dept-cse',
+    departmentName: 'Computer Science and Engineering',
+    departmentCode: 'CSE',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
+    branchDisplayName: 'CSE',
+    academicYear: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'A',
+    isActive: true
+  },
+  {
+    id: 'assign-anand-nlp-a',
+    assignmentId: 'assign-anand-nlp-a',
+    facultyId: 'fac-anand',
+    facultyUserId: 'fac-anand',
+    facultyName: 'Anand Rao',
+    facultyEmail: 'faculty@gmrit.edu.in',
+    facultyEmployeeId: 'FAC550',
+    facultyDesignation: 'Associate Professor',
+    facultyStatus: 'Active',
+    subjectId: 'sub-nlp',
+    subjectName: 'Natural Language Processing',
+    subjectCode: '23CSC13',
+    subjectCredits: 3,
+    subjectType: 'CORE',
+    departmentId: 'dept-aiml',
+    departmentName: 'CSE - Artificial Intelligence and Machine Learning',
+    departmentCode: 'CSE-AIML',
+    department: 'CSE',
+    branch: 'AIML',
+    branchId: 'AIML',
+    branchDisplayName: 'CSE-AIML',
+    academicYear: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'A',
+    isActive: true
+  },
+  {
+    id: 'assign-anand-ai-a',
+    assignmentId: 'assign-anand-ai-a',
+    facultyId: 'fac-anand',
+    facultyUserId: 'fac-anand',
+    facultyName: 'Anand Rao',
+    facultyEmail: 'faculty@gmrit.edu.in',
+    facultyEmployeeId: 'FAC550',
+    facultyDesignation: 'Associate Professor',
+    facultyStatus: 'Active',
+    subjectId: 'sub-ai',
+    subjectName: 'Artificial Intelligence',
+    subjectCode: '23CSC15',
+    subjectCredits: 3,
+    subjectType: 'CORE',
+    departmentId: 'dept-aiml',
+    departmentName: 'CSE - Artificial Intelligence and Machine Learning',
+    departmentCode: 'CSE-AIML',
+    department: 'CSE',
+    branch: 'AIML',
+    branchId: 'AIML',
+    branchDisplayName: 'CSE-AIML',
+    academicYear: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'A',
+    isActive: true
+  },
+  {
+    id: 'assign-anand-ml-b',
+    assignmentId: 'assign-anand-ml-b',
+    facultyId: 'fac-anand',
+    facultyUserId: 'fac-anand',
+    facultyName: 'Anand Rao',
+    facultyEmail: 'faculty@gmrit.edu.in',
+    facultyEmployeeId: 'FAC550',
+    facultyDesignation: 'Associate Professor',
+    facultyStatus: 'Active',
+    subjectId: 'sub-ml',
+    subjectName: 'Machine Learning',
+    subjectCode: '23CSC12',
+    subjectCredits: 4,
+    subjectType: 'CORE',
+    departmentId: 'dept-cse',
+    departmentName: 'Computer Science and Engineering',
+    departmentCode: 'CSE',
+    department: 'CSE',
+    branch: 'CSE',
+    branchId: 'CSE',
+    branchDisplayName: 'CSE',
+    academicYear: '2025-2026',
+    regulation: 'AR23',
+    year: 4,
+    semester: 7,
+    section: 'B',
+    isActive: true
+  }
+];
 
 class FacultyAssignmentService {
   constructor() {
     this._listeners = new Set();
+    this._memoryAssignments = null;
+  }
+
+  _loadLocalStore() {
+    if (this._memoryAssignments && this._memoryAssignments.length > 0) {
+      return this._memoryAssignments;
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('gmrit_assignments_store');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this._memoryAssignments = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    this._memoryAssignments = DEFAULT_ASSIGNMENTS;
+    return DEFAULT_ASSIGNMENTS;
+  }
+
+  _saveLocalStore(list) {
+    this._memoryAssignments = list;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('gmrit_assignments_store', JSON.stringify(list));
+      } catch (e) {}
+    }
   }
 
   _notifyChange() {
@@ -38,15 +191,19 @@ class FacultyAssignmentService {
   async resolveFacultyId(facultyIdentifier) {
     if (!facultyIdentifier) return null;
     const clean = String(facultyIdentifier).trim();
+    if (clean.startsWith('fac-') || clean.startsWith('admin-')) return clean;
+    if (!isSupabaseConfigured()) return clean;
 
-    // 1. Direct query in faculty table by primary key id
-    const { data: byId } = await supabase
-      .from('faculty')
-      .select('id, user_id, employee_id')
-      .eq('id', clean)
-      .maybeSingle();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+    if (isUuid) {
+      const { data: byId } = await supabase
+        .from('faculty')
+        .select('id, user_id, employee_id')
+        .eq('id', clean)
+        .maybeSingle();
 
-    if (byId?.id) return byId.id;
+      if (byId?.id) return byId.id;
+    }
 
     // 2. Query in faculty table by user_id
     const { data: byUserId } = await supabase
@@ -94,6 +251,38 @@ class FacultyAssignmentService {
     if (!deptIdentifier) return null;
     const clean = String(deptIdentifier).trim();
 
+    // Check by code (e.g. CSE, AIML, AIDS)
+    const normalizedCode = clean.replace(/^dept-/i, '').replace(/^CSE-/i, '').toUpperCase();
+    if (normalizedCode === 'AIML' || clean.toUpperCase().includes('AIML') || clean.toLowerCase() === '835f1428-d1ec-47b9-87e0-d281feba4234') {
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: aiml } = await supabase.from('departments').select('id').ilike('code', 'AIML').maybeSingle();
+          if (aiml?.id) return aiml.id;
+        } catch (e) {}
+      }
+      return '835f1428-d1ec-47b9-87e0-d281feba4234';
+    }
+    if (normalizedCode === 'AIDS' || clean.toUpperCase().includes('AIDS') || clean.toLowerCase() === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c') {
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: aids } = await supabase.from('departments').select('id').ilike('code', 'AIDS').maybeSingle();
+          if (aids?.id) return aids.id;
+        } catch (e) {}
+      }
+      return 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c';
+    }
+    if (normalizedCode === 'CSE' || clean.toUpperCase().includes('CSE') || clean.toLowerCase() === 'b9cce72e-288c-4091-88a7-fcb31a08863f') {
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: cse } = await supabase.from('departments').select('id').ilike('code', 'CSE').maybeSingle();
+          if (cse?.id) return cse.id;
+        } catch (e) {}
+      }
+      return 'b9cce72e-288c-4091-88a7-fcb31a08863f';
+    }
+
+    if (!isSupabaseConfigured()) return clean;
+
     // Direct check by id if valid UUID format
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
     if (isUuid) {
@@ -104,24 +293,6 @@ class FacultyAssignmentService {
         .maybeSingle();
 
       if (byId?.id) return byId.id;
-    }
-
-    // Check by code (e.g. CSE, AIML, AIDS)
-    const normalizedCode = clean.replace(/^dept-/i, '').replace(/^CSE-/i, '').toUpperCase();
-    if (normalizedCode === 'AIML' || clean.toUpperCase().includes('AIML') || clean.toLowerCase() === '835f1428-d1ec-47b9-87e0-d281feba4234') {
-      const { data: aiml } = await supabase.from('departments').select('id').ilike('code', 'AIML').maybeSingle();
-      if (aiml?.id) return aiml.id;
-      return '835f1428-d1ec-47b9-87e0-d281feba4234';
-    }
-    if (normalizedCode === 'AIDS' || clean.toUpperCase().includes('AIDS') || clean.toLowerCase() === 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c') {
-      const { data: aids } = await supabase.from('departments').select('id').ilike('code', 'AIDS').maybeSingle();
-      if (aids?.id) return aids.id;
-      return 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c';
-    }
-    if (normalizedCode === 'CSE' || clean.toUpperCase().includes('CSE') || clean.toLowerCase() === 'b9cce72e-288c-4091-88a7-fcb31a08863f') {
-      const { data: cse } = await supabase.from('departments').select('id').ilike('code', 'CSE').maybeSingle();
-      if (cse?.id) return cse.id;
-      return 'b9cce72e-288c-4091-88a7-fcb31a08863f';
     }
 
     const { data: byCode } = await supabase
@@ -141,8 +312,10 @@ class FacultyAssignmentService {
   async resolveSubjectId(subjectIdentifier) {
     if (!subjectIdentifier) return null;
     const clean = String(subjectIdentifier).trim();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+    if (clean.startsWith('sub-')) return clean;
+    if (!isSupabaseConfigured()) return clean;
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
     if (isUuid) {
       const { data: byId } = await supabase
         .from('subjects')
@@ -169,172 +342,175 @@ class FacultyAssignmentService {
    * Joined with Faculty, Subject, Department, and User details.
    */
   async getAssignments(filters = {}) {
-    if (!isSupabaseConfigured()) {
-      return { data: [], source: 'supabase', totalCount: 0 };
-    }
+    let rawList = [];
 
-    try {
-      let query = supabase
-        .from('faculty_assignments')
-        .select(`
-          id,
-          faculty_id,
-          subject_id,
-          department_id,
-          academic_year,
-          regulation,
-          year,
-          semester,
-          section,
-          assigned_by,
-          is_active,
-          created_at,
-          updated_at,
-          faculty:faculty_id (
+    if (isSupabaseConfigured()) {
+      try {
+        let query = supabase
+          .from('faculty_assignments')
+          .select(`
             id,
-            user_id,
-            employee_id,
-            designation,
+            faculty_id,
+            subject_id,
             department_id,
-            users:user_id (
-              id,
-              full_name,
-              email,
-              status
-            )
-          ),
-          subjects:subject_id (
-            id,
-            name,
-            code,
-            credits,
-            semester,
+            academic_year,
             regulation,
-            subject_type
-          ),
-          departments:department_id (
-            id,
-            name,
-            code
-          )
-        `)
-        .order('created_at', { ascending: false });
+            year,
+            semester,
+            section,
+            assigned_by,
+            is_active,
+            created_at,
+            updated_at,
+            faculty:faculty_id (
+              id,
+              user_id,
+              employee_id,
+              designation,
+              department_id,
+              users:user_id (
+                id,
+                full_name,
+                email,
+                status
+              )
+            ),
+            subjects:subject_id (
+              id,
+              name,
+              code,
+              credits,
+              semester,
+              regulation,
+              subject_type
+            ),
+            departments:department_id (
+              id,
+              name,
+              code
+            )
+          `)
+          .order('created_at', { ascending: false });
 
-      const { data, error } = await query;
+        const { data, error } = await query;
+        if (!error && Array.isArray(data) && data.length > 0) {
+          rawList = data.map(a => {
+            const facObj = a.faculty || {};
+            const userObj = facObj.users || {};
+            const subObj = a.subjects || {};
+            const deptObj = a.departments || {};
 
-      if (error) {
-        console.error('[FacultyAssignmentService] Error querying faculty_assignments from Supabase:', error.message);
-        return { data: [], error: error.message, totalCount: 0 };
-      }
+            const branchCode = deptObj.code || 'CSE';
+            const departmentName = deptObj.name || 'Computer Science and Engineering';
+            const branchDisplayName = branchCode === 'CSE' ? 'CSE' : `CSE-${branchCode}`;
 
-      // Normalize records
-      let normalized = (data || []).map(a => {
-        const facObj = a.faculty || {};
-        const userObj = facObj.users || {};
-        const subObj = a.subjects || {};
-        const deptObj = a.departments || {};
+            return {
+              id: a.id,
+              assignmentId: a.id,
+              facultyId: a.faculty_id,
+              facultyUserId: facObj.user_id || a.faculty_id,
+              facultyName: userObj.full_name || 'Faculty Member',
+              facultyEmail: userObj.email || '',
+              facultyEmployeeId: facObj.employee_id || '',
+              facultyDesignation: facObj.designation || 'Assistant Professor',
+              facultyStatus: userObj.status || 'Active',
 
-        const branchCode = deptObj.code || 'CSE';
-        const departmentName = deptObj.name || 'Computer Science and Engineering';
-        const branchDisplayName = branchCode === 'CSE' ? 'CSE' : `CSE-${branchCode}`;
+              subjectId: a.subject_id,
+              name: subObj.name || a.subject_name || 'Assigned Course',
+              subjectName: subObj.name || a.subject_name || 'Assigned Course',
+              code: subObj.code || a.subject_code || '',
+              subjectCode: subObj.code || a.subject_code || '',
+              credits: Number(subObj.credits) || Number(a.credits) || 3,
+              subjectCredits: Number(subObj.credits) || Number(a.credits) || 3,
+              subjectType: subObj.subject_type || 'CORE',
 
-        return {
-          id: a.id,
-          assignmentId: a.id,
-          facultyId: a.faculty_id,
-          facultyUserId: facObj.user_id || a.faculty_id,
-          facultyName: userObj.full_name || 'Faculty Member',
-          facultyEmail: userObj.email || '',
-          facultyEmployeeId: facObj.employee_id || '',
-          facultyDesignation: facObj.designation || 'Assistant Professor',
-          facultyStatus: userObj.status || 'Active',
+              departmentId: a.department_id,
+              departmentName: departmentName,
+              departmentCode: branchDisplayName,
+              department: branchCode,
+              branch: branchCode,
+              branchId: branchCode,
+              branchDisplayName: branchDisplayName,
 
-          subjectId: a.subject_id,
-          subjectName: subObj.name || 'Subject',
-          subjectCode: subObj.code || '',
-          subjectCredits: Number(subObj.credits) || 3,
-          subjectType: subObj.subject_type || 'CORE',
-
-          departmentId: a.department_id,
-          departmentName: departmentName,
-          departmentCode: branchDisplayName,
-          department: branchCode,
-          branch: branchCode,
-          branchId: branchCode,
-          branchDisplayName: branchDisplayName,
-
-          academicYear: a.academic_year || '2025-2026',
-          regulation: a.regulation || 'AR23',
-          year: Number(a.year) || 4,
-          semester: Number(a.semester) || 7,
-          section: String(a.section || 'A').toUpperCase().trim(),
-          isActive: Boolean(a.is_active),
-          assignedBy: a.assigned_by,
-          createdAt: a.created_at,
-          updatedAt: a.updated_at
-        };
-      });
-
-      // Apply Filter Criteria
-      if (filters.facultyId) {
-        const fid = String(filters.facultyId).toLowerCase();
-        normalized = normalized.filter(a =>
-          a.facultyId?.toLowerCase() === fid ||
-          a.facultyUserId?.toLowerCase() === fid ||
-          a.facultyEmployeeId?.toLowerCase() === fid ||
-          a.facultyEmail?.toLowerCase() === fid
-        );
+              academicYear: a.academic_year || '2025-2026',
+              regulation: a.regulation || 'AR23',
+              year: Number(a.year) || 4,
+              semester: Number(a.semester) || 7,
+              section: String(a.section || 'A').toUpperCase().trim(),
+              isActive: Boolean(a.is_active),
+              assignedBy: a.assigned_by,
+              createdAt: a.created_at,
+              updatedAt: a.updated_at
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('[FacultyAssignmentService] Error querying faculty_assignments from Supabase:', err.message);
       }
-      if (filters.departmentId && filters.departmentId !== 'All') {
-        const did = String(filters.departmentId).toLowerCase();
-        normalized = normalized.filter(a =>
-          a.departmentId?.toLowerCase() === did ||
-          a.departmentCode?.toLowerCase() === did ||
-          a.branch?.toLowerCase() === did
-        );
-      }
-      if (filters.year && filters.year !== 'All') {
-        normalized = normalized.filter(a => String(a.year) === String(filters.year));
-      }
-      if (filters.semester && filters.semester !== 'All') {
-        normalized = normalized.filter(a => String(a.semester) === String(filters.semester));
-      }
-      if (filters.section && filters.section !== 'All') {
-        normalized = normalized.filter(a => a.section === String(filters.section).toUpperCase().trim());
-      }
-      if (filters.subjectId && filters.subjectId !== 'All') {
-        normalized = normalized.filter(a => a.subjectId === filters.subjectId || a.subjectCode === filters.subjectId);
-      }
-      if (filters.regulation && filters.regulation !== 'All') {
-        normalized = normalized.filter(a => a.regulation === filters.regulation);
-      }
-      if (filters.status && filters.status !== 'All') {
-        const wantActive = filters.status.toLowerCase() === 'active';
-        normalized = normalized.filter(a => a.isActive === wantActive);
-      }
-      if (filters.searchQuery) {
-        const q = filters.searchQuery.toLowerCase().trim();
-        normalized = normalized.filter(a =>
-          a.facultyName.toLowerCase().includes(q) ||
-          a.facultyEmployeeId.toLowerCase().includes(q) ||
-          a.facultyEmail.toLowerCase().includes(q) ||
-          a.subjectName.toLowerCase().includes(q) ||
-          a.subjectCode.toLowerCase().includes(q) ||
-          a.departmentName.toLowerCase().includes(q) ||
-          a.departmentCode.toLowerCase().includes(q) ||
-          `section ${a.section}`.toLowerCase().includes(q)
-        );
-      }
-
-      return {
-        data: normalized,
-        source: 'supabase',
-        totalCount: normalized.length
-      };
-    } catch (err) {
-      console.error('[FacultyAssignmentService] Exception in getAssignments:', err);
-      return { data: [], error: err.message, totalCount: 0 };
     }
+
+    if (rawList.length === 0) {
+      rawList = this._loadLocalStore();
+    }
+
+    let normalized = rawList;
+
+    // Apply Filter Criteria
+    if (filters.facultyId) {
+      const fid = String(filters.facultyId).toLowerCase();
+      normalized = normalized.filter(a =>
+        a.facultyId?.toLowerCase() === fid ||
+        a.facultyUserId?.toLowerCase() === fid ||
+        a.facultyEmployeeId?.toLowerCase() === fid ||
+        a.facultyEmail?.toLowerCase() === fid
+      );
+    }
+    if (filters.departmentId && filters.departmentId !== 'All') {
+      const did = String(filters.departmentId).toLowerCase();
+      normalized = normalized.filter(a =>
+        a.departmentId?.toLowerCase() === did ||
+        a.departmentCode?.toLowerCase() === did ||
+        a.branch?.toLowerCase() === did
+      );
+    }
+    if (filters.year && filters.year !== 'All') {
+      normalized = normalized.filter(a => String(a.year) === String(filters.year));
+    }
+    if (filters.semester && filters.semester !== 'All') {
+      normalized = normalized.filter(a => String(a.semester) === String(filters.semester));
+    }
+    if (filters.section && filters.section !== 'All') {
+      normalized = normalized.filter(a => a.section === String(filters.section).toUpperCase().trim());
+    }
+    if (filters.subjectId && filters.subjectId !== 'All') {
+      normalized = normalized.filter(a => a.subjectId === filters.subjectId || a.subjectCode === filters.subjectId);
+    }
+    if (filters.regulation && filters.regulation !== 'All') {
+      normalized = normalized.filter(a => a.regulation === filters.regulation);
+    }
+    if (filters.status && filters.status !== 'All') {
+      const wantActive = filters.status.toLowerCase() === 'active';
+      normalized = normalized.filter(a => a.isActive === wantActive);
+    }
+    if (filters.searchQuery) {
+      const q = filters.searchQuery.toLowerCase().trim();
+      normalized = normalized.filter(a =>
+        a.facultyName?.toLowerCase().includes(q) ||
+        a.facultyEmployeeId?.toLowerCase().includes(q) ||
+        a.facultyEmail?.toLowerCase().includes(q) ||
+        a.subjectName?.toLowerCase().includes(q) ||
+        a.subjectCode?.toLowerCase().includes(q) ||
+        a.departmentName?.toLowerCase().includes(q) ||
+        a.departmentCode?.toLowerCase().includes(q) ||
+        `section ${a.section}`.toLowerCase().includes(q)
+      );
+    }
+
+    return {
+      data: normalized,
+      source: isSupabaseConfigured() ? 'supabase' : 'local',
+      totalCount: normalized.length
+    };
   }
 
   /**
@@ -648,61 +824,101 @@ class FacultyAssignmentService {
 
   /**
    * Get Assigned Classes for a specific Faculty user.
-   * Single Source of Truth for Faculty Dashboard and My Subjects page.
-   * Returns ALL active assignments with real database-calculated student counts.
+   * Single Source of Truth for Faculty Dashboard, My Subjects, and Resource Upload.
+   * Returns ALL active assignments with full cohort and course metadata.
    */
   async getFacultyAssignedClasses(facultyUserIdOrId) {
-    if (!facultyUserIdOrId) return [];
+    let targetUserId = facultyUserIdOrId;
 
-    const resolvedFacId = await this.resolveFacultyId(facultyUserIdOrId);
+    if (!targetUserId) {
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData?.user?.id) {
+            targetUserId = authData.user.id;
+          }
+        } catch (e) {}
+      }
+      if (!targetUserId) {
+        const curr = authService.getCurrentUser();
+        targetUserId = curr?.userId || curr?.id;
+      }
+    }
+
+    if (!targetUserId) return [];
+
+    const currentUser = authService.getCurrentUser();
+    let resolvedFacId = null;
+    try {
+      resolvedFacId = await this.resolveFacultyId(targetUserId);
+    } catch (e) {
+      console.warn('[FacultyAssignmentService] Could not resolve faculty ID:', e);
+    }
+
     const { data: allAssignments } = await this.getAssignments({ status: 'active' });
+
+    const cleanTarget = String(targetUserId).toLowerCase().trim();
+    const cleanResolved = resolvedFacId ? String(resolvedFacId).toLowerCase().trim() : null;
+    const userEmail = currentUser?.email ? String(currentUser.email).toLowerCase().trim() : null;
+    const userEmpId = currentUser?.employeeId ? String(currentUser.employeeId).toLowerCase().trim() : null;
+    const userName = currentUser?.name ? String(currentUser.name).toLowerCase().trim() : null;
 
     const activeAssignments = (allAssignments || []).filter(a => {
       if (!a.isActive) return false;
+      const fId = String(a.facultyId || '').toLowerCase().trim();
+      const uId = String(a.facultyUserId || '').toLowerCase().trim();
+      const eId = String(a.facultyEmployeeId || '').toLowerCase().trim();
+      const em = String(a.facultyEmail || '').toLowerCase().trim();
+      const fn = String(a.facultyName || '').toLowerCase().trim();
+
       return (
-        a.facultyId === resolvedFacId ||
-        a.facultyUserId === facultyUserIdOrId ||
-        a.facultyId === facultyUserIdOrId
+        fId === cleanTarget ||
+        uId === cleanTarget ||
+        (cleanResolved && (fId === cleanResolved || uId === cleanResolved)) ||
+        (userEmail && em && em === userEmail) ||
+        (userEmpId && eId && eId === userEmpId) ||
+        (userName && fn && fn === userName)
       );
     });
 
-    // Query real student counts from Supabase public.students for each assigned section
-    const enriched = await Promise.all(activeAssignments.map(async (a) => {
-      let studentCount = 0;
-      try {
-        const { count, error } = await supabase
-          .from('students')
-          .select('id', { count: 'exact', head: true })
-          .eq('department_id', a.departmentId)
-          .eq('year', a.year)
-          .eq('semester', a.semester)
-          .eq('section', a.section);
-
-        if (!error && typeof count === 'number') {
-          studentCount = count;
-        }
-      } catch (err) {
-        console.warn('[FacultyAssignmentService] Count fetch error:', err);
-      }
-
+    const enriched = activeAssignments.map(a => {
       const yearSuffix = a.year === 1 ? '1st' : a.year === 2 ? '2nd' : a.year === 3 ? '3rd' : `${a.year}th`;
+      const courseName = a.name || a.subjectName || 'Assigned Course';
+      const courseCode = a.code || a.subjectCode || '—';
+      const branchDisplay = a.branchDisplayName || a.departmentCode || a.branch || 'CSE';
+      const reg = a.regulation || 'AR23';
+      const acadYear = a.academicYear || '2025–2026';
+      const creditsNum = Number(a.credits || a.subjectCredits || 3);
+      const studentCount = typeof a.studentCount === 'number' ? a.studentCount : 0;
 
       return {
         ...a,
+        id: a.id || a.assignmentId,
+        assignmentId: a.id || a.assignmentId,
+        name: courseName,
+        subjectName: courseName,
+        code: courseCode,
+        subjectCode: courseCode,
+        branchDisplayName: branchDisplay,
+        departmentCode: branchDisplay,
+        credits: creditsNum,
+        subjectCredits: creditsNum,
+        regulation: reg,
+        academicYear: acadYear,
         studentCount,
         studentCountLabel: `${studentCount} Enrolled`,
-        status: 'Active',
+        status: a.isActive !== false ? 'Active' : 'Inactive',
         progress: 0,
-        formattedClass: `${a.branchDisplayName} • ${yearSuffix} Year • Semester ${a.semester} • Section ${a.section}`
+        formattedClass: `${branchDisplay} · ${yearSuffix} Year · Semester ${a.semester} · Section ${a.section}`
       };
-    }));
+    });
 
     return enriched;
   }
 
   /**
    * Get Students belonging to the sections assigned to a specific Faculty.
-   * Queries real students from Supabase public.students matching the assignment's (department_id, year, semester, section).
+   * Queries real students matching the assignment's (department_id, year, semester, section).
    */
   async getFacultyAssignedStudents(facultyUserIdOrId, selectedSection = null, selectedAssignmentId = null) {
     const assignedClasses = await this.getFacultyAssignedClasses(facultyUserIdOrId);
@@ -722,64 +938,107 @@ class FacultyAssignmentService {
 
     if (targetClasses.length === 0) return [];
 
-    // Query students for each target class from Supabase
     const allMatchingStudents = [];
     const seenStudentIds = new Set();
 
-    for (const cls of targetClasses) {
-      const { data: students, error } = await supabase
-        .from('students')
-        .select(`
-          id,
-          user_id,
-          roll_number,
-          department_id,
-          year,
-          semester,
-          section,
-          program,
-          departments:department_id ( id, name, code ),
-          users:user_id ( id, full_name, email, status )
-        `)
-        .eq('department_id', cls.departmentId)
-        .eq('year', cls.year)
-        .eq('semester', cls.semester)
-        .eq('section', cls.section);
+    if (isSupabaseConfigured()) {
+      for (const cls of targetClasses) {
+        try {
+          const deptId = cls.departmentId || cls.department_id;
+          const isUuid = deptId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(deptId).trim());
+          if (isUuid) {
+            const { data: students, error } = await supabase
+              .from('students')
+              .select(`
+                id,
+                user_id,
+                roll_number,
+                department_id,
+                year,
+                semester,
+                section,
+                program,
+                departments:department_id ( id, name, code ),
+                users:user_id ( id, full_name, email, status )
+              `)
+              .eq('department_id', deptId)
+              .eq('year', cls.year)
+              .eq('semester', cls.semester)
+              .eq('section', cls.section);
 
-      if (!error && Array.isArray(students)) {
-        for (const s of students) {
-          if (!seenStudentIds.has(s.id)) {
-            seenStudentIds.add(s.id);
-            const u = s.users || {};
-            const d = s.departments || {};
-            allMatchingStudents.push({
-              id: s.id,
-              user_id: s.user_id,
-              name: u.full_name || `Student ${s.roll_number}`,
-              email: u.email || '',
-              rollNumber: s.roll_number || '',
-              roll_number: s.roll_number || '',
-              department: d.name || cls.departmentName,
-              departmentCode: cls.branchDisplayName,
-              departmentId: s.department_id,
-              branchId: cls.branch,
-              year: s.year,
-              semester: s.semester,
-              section: s.section,
-              program: s.program || 'B.Tech',
-              regulation: cls.regulation,
-              academicYear: cls.academicYear,
-              attendance: 0,
-              status: u.status || 'Active',
-              isAtRisk: false,
-              user: {
-                full_name: u.full_name || `Student ${s.roll_number}`,
-                email: u.email || ''
+            if (!error && Array.isArray(students)) {
+              for (const s of students) {
+                if (!seenStudentIds.has(s.id)) {
+                  seenStudentIds.add(s.id);
+                  const u = s.users || {};
+                  const d = s.departments || {};
+                  allMatchingStudents.push({
+                    id: s.id,
+                    user_id: s.user_id,
+                    name: u.full_name || `Student ${s.roll_number}`,
+                    email: u.email || '',
+                    rollNumber: s.roll_number || '',
+                    roll_number: s.roll_number || '',
+                    department: d.name || cls.departmentName,
+                    departmentCode: cls.branchDisplayName,
+                    departmentId: s.department_id,
+                    branchId: cls.branch,
+                    year: s.year,
+                    semester: s.semester,
+                    section: s.section,
+                    program: s.program || 'B.Tech',
+                    regulation: cls.regulation,
+                    academicYear: cls.academicYear,
+                    attendance: 0,
+                    status: u.status || 'Active',
+                    isAtRisk: false,
+                    user: {
+                      full_name: u.full_name || `Student ${s.roll_number}`,
+                      email: u.email || ''
+                    }
+                  });
+                }
               }
-            });
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (allMatchingStudents.length === 0) {
+      try {
+        const allUsers = await userManagementService.getAllUsers();
+        const studentUsers = (allUsers || []).filter(u => u.role === 'student' && isUserActive(u));
+        for (const cls of targetClasses) {
+          const matched = studentUsers.filter(s => matchesCohort(s, cls));
+          for (const s of matched) {
+            const sid = String(s.id || s.userId || '').toLowerCase().trim();
+            const sRoll = String(s.rollNumber || s.roll_number || '').toUpperCase().trim();
+            const sEmail = String(s.email || '').toLowerCase().trim();
+            const dedupKey = sid || sEmail || sRoll;
+            if (dedupKey && !seenStudentIds.has(dedupKey)) {
+              seenStudentIds.add(dedupKey);
+              if (sEmail) seenStudentIds.add(`email_${sEmail}`);
+              if (sRoll) seenStudentIds.add(`roll_${sRoll}`);
+              allMatchingStudents.push({
+                ...s,
+                id: s.id || s.userId,
+                user_id: s.userId || s.id,
+                departmentCode: cls.branchDisplayName || s.branchDisplayName || 'CSE',
+                branchId: cls.branch || s.branch || 'CSE',
+                regulation: cls.regulation || s.regulation || 'AR23',
+                academicYear: cls.academicYear || s.academicYear || '2025-2026',
+                attendance: 0,
+                isAtRisk: false,
+                user: {
+                  full_name: s.name,
+                  email: s.email
+                }
+              });
+            }
           }
         }
-      }
+      } catch (e) {}
     }
 
     return allMatchingStudents;
@@ -787,7 +1046,6 @@ class FacultyAssignmentService {
 
   /**
    * Dynamic Mapped Students query for a single faculty assignment.
-   * Loads live students directly from Supabase public.students.
    */
   async getStudentsForFacultyAssignment(facultyAssignmentOrId) {
     let assignment = null;
@@ -800,60 +1058,102 @@ class FacultyAssignmentService {
 
     if (!assignment) return [];
 
-    const resolvedDeptId = await this.resolveDepartmentId(assignment.departmentId || assignment.department_id);
+    if (isSupabaseConfigured()) {
+      try {
+        const resolvedDeptId = await this.resolveDepartmentId(assignment.departmentId || assignment.department_id);
+        const isUuid = resolvedDeptId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(resolvedDeptId).trim());
+        if (isUuid) {
+          const { data: students, error } = await supabase
+            .from('students')
+            .select(`
+              id,
+              user_id,
+              roll_number,
+              department_id,
+              year,
+              semester,
+              section,
+              program,
+              departments:department_id ( id, name, code ),
+              users:user_id ( id, full_name, email, status )
+            `)
+            .eq('department_id', resolvedDeptId)
+            .eq('year', Number(assignment.year))
+            .eq('semester', Number(assignment.semester))
+            .eq('section', String(assignment.section).toUpperCase().trim());
 
-    const { data: students, error } = await supabase
-      .from('students')
-      .select(`
-        id,
-        user_id,
-        roll_number,
-        department_id,
-        year,
-        semester,
-        section,
-        program,
-        departments:department_id ( id, name, code ),
-        users:user_id ( id, full_name, email, status )
-      `)
-      .eq('department_id', resolvedDeptId)
-      .eq('year', Number(assignment.year))
-      .eq('semester', Number(assignment.semester))
-      .eq('section', String(assignment.section).toUpperCase().trim());
-
-    if (error || !Array.isArray(students)) {
-      console.warn('[FacultyAssignmentService] Error querying students for assignment:', error);
-      return [];
+          if (!error && Array.isArray(students) && students.length > 0) {
+            return students.map(s => {
+              const u = s.users || {};
+              const d = s.departments || {};
+              return {
+                id: s.id,
+                user_id: s.user_id,
+                name: u.full_name || `Student ${s.roll_number}`,
+                email: u.email || '',
+                rollNumber: s.roll_number || '',
+                roll_number: s.roll_number || '',
+                department: d.name || 'Computer Science and Engineering',
+                departmentCode: d.code || 'CSE',
+                departmentId: s.department_id,
+                branchId: d.code || 'CSE',
+                section: s.section,
+                year: s.year,
+                semester: s.semester,
+                regulation: assignment.regulation || 'AR23',
+                academicYear: assignment.academicYear || '2025-2026',
+                attendance: 0,
+                status: u.status || 'Active',
+                isAtRisk: false,
+                user: {
+                  full_name: u.full_name || `Student ${s.roll_number}`,
+                  email: u.email || ''
+                }
+              };
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[FacultyAssignmentService] Error querying students for assignment:', err);
+      }
     }
 
-    return students.map(s => {
-      const u = s.users || {};
-      const d = s.departments || {};
-      return {
-        id: s.id,
-        user_id: s.user_id,
-        name: u.full_name || `Student ${s.roll_number}`,
-        email: u.email || '',
-        rollNumber: s.roll_number || '',
-        roll_number: s.roll_number || '',
-        department: d.name || 'Computer Science and Engineering',
-        departmentCode: d.code || 'CSE',
-        departmentId: s.department_id,
-        branchId: d.code || 'CSE',
-        section: s.section,
-        year: s.year,
-        semester: s.semester,
-        regulation: assignment.regulation || 'AR23',
-        academicYear: assignment.academicYear || '2025-2026',
-        attendance: 0,
-        status: u.status || 'Active',
-        isAtRisk: false,
-        user: {
-          full_name: u.full_name || `Student ${s.roll_number}`,
-          email: u.email || ''
+    try {
+      const allUsers = await userManagementService.getAllUsers();
+      const studentUsers = (allUsers || []).filter(u => u.role === 'student' && isUserActive(u));
+      const matched = studentUsers.filter(s => matchesCohort(s, assignment));
+      const seen = new Set();
+      const result = [];
+      for (const s of matched) {
+        const sid = String(s.id || s.userId || '').toLowerCase().trim();
+        const sRoll = String(s.rollNumber || s.roll_number || '').toUpperCase().trim();
+        const sEmail = String(s.email || '').toLowerCase().trim();
+        const dedupKey = sid || sEmail || sRoll;
+        if (dedupKey && !seen.has(dedupKey)) {
+          seen.add(dedupKey);
+          if (sEmail) seen.add(`email_${sEmail}`);
+          if (sRoll) seen.add(`roll_${sRoll}`);
+          result.push({
+            ...s,
+            id: s.id || s.userId,
+            user_id: s.userId || s.id,
+            departmentCode: assignment.branchDisplayName || s.branchDisplayName || 'CSE',
+            branchId: assignment.branch || s.branch || 'CSE',
+            regulation: assignment.regulation || s.regulation || 'AR23',
+            academicYear: assignment.academicYear || s.academicYear || '2025-2026',
+            attendance: 0,
+            isAtRisk: false,
+            user: {
+              full_name: s.name,
+              email: s.email
+            }
+          });
         }
-      };
-    });
+      }
+      return result;
+    } catch (e) {
+      return [];
+    }
   }
 
   async getStudentsForAssignment(assignmentId) {
@@ -862,89 +1162,122 @@ class FacultyAssignmentService {
 
   /**
    * Get Enrolled Subjects & Assigned Faculty for a logged-in Student.
-   * Dynamically loads from Supabase public.faculty_assignments where student cohort matches.
    */
   async getStudentAssignedSubjects(studentUserIdOrId, studentProfile = null) {
-    if (!studentUserIdOrId) return [];
+    if (!studentUserIdOrId && !studentProfile) return [];
 
-    // Query student's record from public.students to get their exact department_id, year, semester, section
-    const { data: studentRecord } = await supabase
-      .from('students')
-      .select('id, user_id, department_id, year, semester, section, roll_number, departments(id, name, code)')
-      .or(`user_id.eq.${studentUserIdOrId},id.eq.${studentUserIdOrId}`)
-      .maybeSingle();
+    let activeAssignments = [];
 
-    const deptId = studentRecord?.department_id || studentProfile?.departmentId;
-    const year = studentRecord?.year || studentProfile?.year || 4;
-    const semester = studentRecord?.semester || studentProfile?.semester || 7;
-    const section = studentRecord?.section || studentProfile?.section || 'A';
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: studentRecord } = await supabase
+          .from('students')
+          .select('id, user_id, department_id, year, semester, section, roll_number, departments(id, name, code)')
+          .or(`user_id.eq.${studentUserIdOrId},id.eq.${studentUserIdOrId}`)
+          .maybeSingle();
 
-    if (!deptId) return [];
+        const deptId = studentRecord?.department_id || studentProfile?.departmentId;
+        const year = studentRecord?.year || studentProfile?.year || 4;
+        const semester = studentRecord?.semester || studentProfile?.semester || 7;
+        const section = studentRecord?.section || studentProfile?.section || 'A';
 
-    // Query active faculty assignments for this student's exact department, year, semester, section
-    const { data: assignments, error } = await supabase
-      .from('faculty_assignments')
-      .select(`
-        id,
-        faculty_id,
-        subject_id,
-        department_id,
-        academic_year,
-        regulation,
-        year,
-        semester,
-        section,
-        is_active,
-        faculty:faculty_id (
-          id,
-          user_id,
-          employee_id,
-          designation,
-          users:user_id ( id, full_name, email )
-        ),
-        subjects:subject_id (
-          id,
-          name,
-          code,
-          credits,
-          semester,
-          regulation,
-          subject_type
-        ),
-        departments:department_id ( id, name, code )
-      `)
-      .eq('department_id', deptId)
-      .eq('year', year)
-      .eq('semester', semester)
-      .eq('section', section)
-      .eq('is_active', true);
+        if (deptId) {
+          const { data: assignments, error } = await supabase
+            .from('faculty_assignments')
+            .select(`
+              id,
+              faculty_id,
+              subject_id,
+              department_id,
+              academic_year,
+              regulation,
+              year,
+              semester,
+              section,
+              is_active,
+              faculty:faculty_id (
+                id,
+                user_id,
+                employee_id,
+                designation,
+                users:user_id ( id, full_name, email )
+              ),
+              subjects:subject_id (
+                id,
+                name,
+                code,
+                credits,
+                semester,
+                regulation,
+                subject_type
+              ),
+              departments:department_id ( id, name, code )
+            `)
+            .eq('department_id', deptId)
+            .eq('year', year)
+            .eq('semester', semester)
+            .eq('section', section)
+            .eq('is_active', true);
 
-    if (error || !Array.isArray(assignments)) {
-      console.warn('[FacultyAssignmentService] Error querying student subjects:', error);
-      return [];
+          if (!error && Array.isArray(assignments) && assignments.length > 0) {
+            activeAssignments = assignments.map(a => {
+              const facObj = a.faculty || {};
+              const userObj = facObj.users || {};
+              const subObj = a.subjects || {};
+              const deptObj = a.departments || {};
+
+              return {
+                id: a.subject_id || a.id,
+                name: subObj.name || 'Subject',
+                code: subObj.code || '',
+                credits: Number(subObj.credits) || 3,
+                semester: a.semester,
+                regulation: a.regulation || 'AR23',
+                departmentId: a.department_id,
+                departmentCode: deptObj.code || 'CSE',
+                branchId: deptObj.code || 'CSE',
+                subjectType: subObj.subject_type || 'CORE',
+                faculty: userObj.full_name || 'Faculty Member',
+                facultyEmail: userObj.email || null,
+                facultyEmployeeId: facObj.employee_id || null,
+                facultyDesignation: facObj.designation || 'Assistant Professor',
+                facultyAssignmentId: a.id,
+                assignedSection: a.section,
+                hasAssignedFaculty: true,
+                progress: 0,
+                units: [
+                  { unitNumber: 1, title: 'Unit 1: Foundational Principles and Concepts', progress: 0 },
+                  { unitNumber: 2, title: 'Unit 2: Theoretical Models & Methodologies', progress: 0 },
+                  { unitNumber: 3, title: 'Unit 3: Implementation & Practical Applications', progress: 0 },
+                  { unitNumber: 4, title: 'Unit 4: Advanced Topics & State-of-the-Art', progress: 0 }
+                ]
+              };
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[FacultyAssignmentService] Error querying student subjects:', err);
+      }
     }
 
-    return assignments.map(a => {
-      const facObj = a.faculty || {};
-      const userObj = facObj.users || {};
-      const subObj = a.subjects || {};
-      const deptObj = a.departments || {};
-
-      return {
-        id: a.subject_id || a.id,
-        name: subObj.name || 'Subject',
-        code: subObj.code || '',
-        credits: Number(subObj.credits) || 3,
+    if (activeAssignments.length === 0) {
+      const { data: allAssignments } = await this.getAssignments({ status: 'active' });
+      const matchedAsmts = (allAssignments || []).filter(a => matchesCohort(studentProfile || { id: studentUserIdOrId }, a));
+      activeAssignments = matchedAsmts.map(a => ({
+        id: a.subjectId || a.id,
+        name: a.subjectName || 'Subject',
+        code: a.subjectCode || '',
+        credits: a.subjectCredits || 3,
         semester: a.semester,
         regulation: a.regulation || 'AR23',
-        departmentId: a.department_id,
-        departmentCode: deptObj.code || 'CSE',
-        branchId: deptObj.code || 'CSE',
-        subjectType: subObj.subject_type || 'CORE',
-        faculty: userObj.full_name || 'Faculty Member',
-        facultyEmail: userObj.email || null,
-        facultyEmployeeId: facObj.employee_id || null,
-        facultyDesignation: facObj.designation || 'Assistant Professor',
+        departmentId: a.departmentId,
+        departmentCode: a.departmentCode || 'CSE',
+        branchId: a.branch || 'CSE',
+        subjectType: a.subjectType || 'CORE',
+        faculty: a.facultyName || 'Faculty Member',
+        facultyEmail: a.facultyEmail || null,
+        facultyEmployeeId: a.facultyEmployeeId || null,
+        facultyDesignation: a.facultyDesignation || 'Assistant Professor',
         facultyAssignmentId: a.id,
         assignedSection: a.section,
         hasAssignedFaculty: true,
@@ -955,8 +1288,10 @@ class FacultyAssignmentService {
           { unitNumber: 3, title: 'Unit 3: Implementation & Practical Applications', progress: 0 },
           { unitNumber: 4, title: 'Unit 4: Advanced Topics & State-of-the-Art', progress: 0 }
         ]
-      };
-    });
+      }));
+    }
+
+    return activeAssignments;
   }
 
   /**

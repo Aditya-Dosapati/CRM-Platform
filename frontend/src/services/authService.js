@@ -27,6 +27,15 @@ class AuthService {
             if (session?.user) {
               const profile = await this.getBackendProfile(session.user.id, session.user.email);
               if (profile && profile.role) {
+                const statusLower = String(profile.status || '').trim().toLowerCase();
+                if (['inactive', 'deactivated', 'suspended', 'disabled', 'rejected', 'pending'].includes(statusLower)) {
+                  await supabase.auth.signOut();
+                  this.saveSession(null);
+                  this.clearStaleStorage();
+                  this.notifyListeners('SIGNED_OUT', null, null);
+                  return;
+                }
+
                 const finalRole = String(profile.role).trim().toLowerCase();
                 if (['admin', 'faculty', 'student'].includes(finalRole)) {
                   const userObj = {
@@ -428,10 +437,10 @@ class AuthService {
       throw new Error("Your registration request was rejected by administrator. Please contact the academic administration.");
     }
 
-    if (accountStatus === 'inactive' || accountStatus === 'deactivated') {
+    if (accountStatus === 'inactive' || accountStatus === 'deactivated' || accountStatus === 'suspended' || accountStatus === 'disabled') {
       await supabase.auth.signOut();
       this.clearStaleStorage();
-      throw new Error("Your account has been deactivated. Please contact administrator.");
+      throw new Error("Your account has been deactivated. Please contact the administrator.");
     }
 
     const mustChangePassword = Boolean(profile.must_change_password);
@@ -602,6 +611,43 @@ class AuthService {
       currentUser.mustChangePassword = false;
     }
     return currentUser;
+  }
+
+  /**
+   * Update profile information for the currently authenticated user.
+   * Synchronizes database, auth session, and local storage caches.
+   */
+  async updateProfile(profileData) {
+    if (!this.currentSession) {
+      throw new Error("Authentication session required to update profile. Please sign in again.");
+    }
+
+    const currentUid = this.currentSession.userId || this.currentSession.id;
+    const currentRole = this.currentSession.role || 'student';
+
+    const result = await userManagementService.updateUserProfile(currentUid, profileData, {
+      callerRole: currentRole,
+      callerId: currentUid
+    });
+
+    // Update active session with newly saved values
+    const updatedSession = {
+      ...this.currentSession,
+      name: result.user?.name || this.currentSession.name,
+      email: result.user?.email || this.currentSession.email,
+      designation: result.user?.designation !== undefined ? result.user.designation : this.currentSession.designation,
+      avatar: (result.user?.name || this.currentSession.name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    };
+
+    this.saveSession(updatedSession);
+    const updatedUser = this.getCurrentUser();
+    this.notifyListeners('PROFILE_UPDATED', updatedUser, updatedSession);
+
+    return {
+      success: true,
+      user: updatedUser,
+      message: result.message || "Profile updated successfully."
+    };
   }
 
   /**
@@ -894,6 +940,7 @@ class AuthService {
       facultyId: this.currentSession.facultyId || null,
       rollNumber: this.currentSession.rollNumber || null,
       employeeId: this.currentSession.employeeId || null,
+      department: this.currentSession.department || this.currentSession.departmentName || this.currentSession.departmentCode || null,
       departmentId: this.currentSession.departmentId || null,
       departmentCode: this.currentSession.departmentCode || null,
       departmentName: this.currentSession.departmentName || null,

@@ -8,13 +8,39 @@ import assessmentService from '../../services/assessmentService';
 import authService from '../../services/authService';
 import EmptyState from '../common/EmptyState';
 
+/**
+ * Null-safe percentage parser
+ * Handles null, undefined, '', '78%', 78, 0, '0%', '—' safely.
+ */
+function parsePercentage(val) {
+  if (val === null || val === undefined || val === '' || val === '—' || val === '-') {
+    return null;
+  }
+  if (typeof val === 'number') {
+    return isNaN(val) ? null : val;
+  }
+  const cleaned = String(val).replace('%', '').trim();
+  if (cleaned === '' || cleaned === '—' || cleaned === '-') return null;
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
+/**
+ * Null-safe percentage formatter
+ */
+function formatPercentage(val) {
+  const parsed = parsePercentage(val);
+  if (parsed === null) return '—';
+  return `${Math.round(parsed * 10) / 10}%`;
+}
+
 export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [assignedStudents, setAssignedStudents] = useState([]);
   const [analyticsData, setAnalyticsData] = useState({ totalAssessments: 0, totalAttempts: 0, assessments: [] });
   const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Completed' | 'Not Attempted'
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Attempted' | 'Not Attempted'
   const [isLoading, setIsLoading] = useState(true);
 
   const currentUser = authService.getCurrentUser();
@@ -33,15 +59,18 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
       setAssignedStudents(students || []);
       setAnalyticsData(analytics || { totalAssessments: 0, totalAttempts: 0, assessments: [] });
 
-      if (analytics?.assessments && analytics.assessments.length > 0 && !selectedAssessmentId) {
-        setSelectedAssessmentId(analytics.assessments[0].id);
+      if (analytics?.assessments && analytics.assessments.length > 0) {
+        setSelectedAssessmentId(prev => {
+          const exists = analytics.assessments.some(a => a.id === prev);
+          return exists ? prev : analytics.assessments[0].id;
+        });
       }
     } catch (err) {
       console.warn('[FacultyAnalytics] Error loading faculty analytics:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [activeFacultyId, selectedAssessmentId]);
+  }, [activeFacultyId]);
 
   useEffect(() => {
     loadData();
@@ -69,9 +98,11 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
   const filteredRoster = useMemo(() => {
     if (!selectedAsmt?.studentRoster) return [];
     return selectedAsmt.studentRoster.filter(st => {
-      if (statusFilter !== 'All' && st.status !== statusFilter) return false;
+      const isAttempted = Boolean(st.hasAttempted || st.status === 'Attempted' || st.status === 'Completed');
+      if (statusFilter === 'Attempted' && !isAttempted) return false;
+      if (statusFilter === 'Not Attempted' && isAttempted) return false;
       if (studentSearch) {
-        const q = studentSearch.toLowerCase();
+        const q = studentSearch.toLowerCase().trim();
         const name = (st.name || '').toLowerCase();
         const roll = (st.rollNumber || '').toLowerCase();
         const email = (st.email || '').toLowerCase();
@@ -81,13 +112,14 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
     });
   }, [selectedAsmt, statusFilter, studentSearch]);
 
-  // Dynamic At-Risk Students derived from real attempts (< 50% or unattempted on past due)
+  // Dynamic At-Risk Students derived from real attempts (< 50% on attempted assessments)
   const atRiskStudents = useMemo(() => {
     if (!selectedAsmt?.studentRoster) return [];
     return selectedAsmt.studentRoster.filter(st => {
-      if (st.status === 'Completed') {
-        const num = Number(st.percentage?.replace('%', '')) || 0;
-        return num < 50;
+      const isAttempted = Boolean(st.hasAttempted || st.status === 'Attempted' || st.status === 'Completed');
+      if (isAttempted) {
+        const pct = parsePercentage(st.percentageNum ?? st.percentage);
+        return pct !== null && pct < 50;
       }
       return false;
     });
@@ -114,7 +146,7 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
         </div>
 
         <button
-          onClick={() => onOpenRagQuery(`Analyze the performance distribution for ${selectedAsmt?.title || 'Natural Language Processing'} and generate targeted remediation strategies for students.`)}
+          onClick={() => onOpenRagQuery?.(`Analyze the performance distribution for ${selectedAsmt?.title || 'Natural Language Processing'} and generate targeted remediation strategies for students.`)}
           className="btn btn-primary"
         >
           <Sparkles size={14} />
@@ -122,90 +154,47 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
         </button>
       </div>
 
-      {/* Top Level Summary Cards (Real Dynamic Metrics) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(12, 1fr)',
-        gap: '20px',
-        marginBottom: '24px'
-      }}>
-        {/* Cohort Overview Card */}
-        <div className="card" style={{ gridColumn: 'span 7' }}>
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Enrolled Cohort Summary</h3>
-              <p className="card-subtitle">Real distribution across your assigned classes</p>
-            </div>
-            <span className="badge badge-blue">{assignedStudents.length} Students Total</span>
+      {/* Top Level Summary Card (Enrolled Cohort Summary) */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Enrolled Cohort Summary</h3>
+            <p className="card-subtitle">Real distribution across your assigned classes and academic cohorts</p>
           </div>
-
-          <div style={{ padding: '16px 10px', borderBottom: '1px solid var(--color-border)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase' }}>COURSES ASSIGNED</span>
-                <p style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary)', marginTop: '4px' }}>
-                  {assignedClasses.length}
-                </p>
-              </div>
-              <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase' }}>STUDENTS ENROLLED</span>
-                <p style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text)', marginTop: '4px' }}>
-                  {assignedStudents.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px', fontSize: '12px', color: 'var(--color-text)', opacity: 0.8 }}>
-            <span>Active Regulation: <strong>AR23 Autonomous</strong></span>
-            <span>Assessments Active: <strong>{analyticsData.totalAssessments} Scheduled</strong></span>
-          </div>
+          <span className="badge badge-blue">{assignedStudents.length} Students Total</span>
         </div>
 
-        {/* Course Allocations List */}
-        <div className="card" style={{ gridColumn: 'span 5' }}>
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Course Allocations</h3>
-              <p className="card-subtitle">Assigned subjects & sections</p>
+        <div style={{ padding: '16px 10px', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase' }}>COURSES ASSIGNED</span>
+              <p style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-primary)', marginTop: '4px' }}>
+                {assignedClasses.length}
+              </p>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase' }}>STUDENTS ENROLLED</span>
+              <p style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text)', marginTop: '4px' }}>
+                {assignedStudents.length}
+              </p>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase' }}>ASSESSMENTS ACTIVE</span>
+              <p style={{ fontSize: '24px', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>
+                {analyticsData.totalAssessments}
+              </p>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7, textTransform: 'uppercase' }}>CURRICULUM REGULATION</span>
+              <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', marginTop: '6px' }}>
+                AR23 Autonomous
+              </p>
             </div>
           </div>
-
-          {assignedClasses.length === 0 ? (
-            <div style={{ padding: '20px 0' }}>
-              <EmptyState
-                icon={BookOpen}
-                title="No Courses Assigned"
-                message="No active subject records found."
-              />
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-              {assignedClasses.map((sub) => (
-                <div key={sub.assignmentId || sub.id} style={{
-                  padding: '10px 12px',
-                  backgroundColor: 'var(--color-bg)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--color-border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>{sub.name}</span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6, display: 'block' }}>
-                      {sub.code} • Section {sub.section}
-                    </span>
-                  </div>
-                  <span className="badge badge-purple">{sub.year}th Year</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ASSESSMENT PERFORMANCE SECTION (Prompt Item 18, 19, 20) */}
+      {/* ASSESSMENT PERFORMANCE SECTION */}
       <div className="card" style={{ marginBottom: '24px', padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
           <div>
@@ -230,7 +219,7 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
               >
                 {analyticsData.assessments.map(a => (
                   <option key={a.id} value={a.id}>
-                    {a.title} (Section {a.section})
+                    {a.title} ({a.branchDisplayName || 'CSE'} • Sec {a.section})
                   </option>
                 ))}
               </select>
@@ -242,7 +231,7 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
           <div style={{ padding: '30px 0' }}>
             <EmptyState
               icon={Award}
-              title="No Assessment Data"
+              title="No Published Assessments"
               message="Create and publish an assessment in the Faculty Assessments module to view live performance diagnostics."
               actionText="Go to Assessments"
               onAction={() => onNavigate('assessments')}
@@ -268,7 +257,7 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
                   {selectedAsmt.title}
                 </h3>
                 <span style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.75 }}>
-                  {selectedAsmt.subjectName} ({selectedAsmt.subjectCode}) • Section {selectedAsmt.section} • Due: {selectedAsmt.dueDate || 'Flexible'}
+                  Subject: <strong>{selectedAsmt.subjectName}</strong> ({selectedAsmt.subjectCode}) • Target: <strong>{selectedAsmt.branchDisplayName || selectedAsmt.departmentCode || 'CSE'} • {selectedAsmt.year}th Year • Sem {selectedAsmt.semester} • Sec {selectedAsmt.section}</strong> • Due: {selectedAsmt.dueDate ? new Date(selectedAsmt.dueDate).toLocaleDateString() : 'Flexible'}
                 </span>
               </div>
               <span className={`badge ${selectedAsmt.status === 'published' ? 'badge-green' : 'badge-orange'}`}>
@@ -276,7 +265,7 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
               </span>
             </div>
 
-            {/* Metric KPI Cards (Prompt Item 18) */}
+            {/* Metric KPI Cards */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(6, 1fr)',
@@ -284,49 +273,49 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
               marginBottom: '24px'
             }}>
               <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>STUDENTS ASSIGNED</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>TOTAL STUDENTS</span>
                 <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', marginTop: '2px' }}>
-                  {selectedAsmt.assignedCount}
+                  {selectedAsmt.totalStudents ?? selectedAsmt.assignedCount ?? 0}
                 </p>
               </div>
 
               <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>ATTEMPTED</span>
                 <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)', marginTop: '2px' }}>
-                  {selectedAsmt.attemptedCount}
+                  {selectedAsmt.attemptedCount ?? selectedAsmt.attempted ?? 0}
                 </p>
               </div>
 
               <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>NOT ATTEMPTED</span>
                 <p style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
-                  {selectedAsmt.notAttemptedCount}
+                  {selectedAsmt.notAttemptedCount ?? selectedAsmt.notAttempted ?? 0}
+                </p>
+              </div>
+
+              <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>COMPLETION %</span>
+                <p style={{ fontSize: '20px', fontWeight: 800, color: '#3b82f6', marginTop: '2px' }}>
+                  {selectedAsmt.completionPercentage || (selectedAsmt.completionRate !== undefined ? `${selectedAsmt.completionRate}%` : '0%')}
                 </p>
               </div>
 
               <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>AVERAGE SCORE</span>
                 <p style={{ fontSize: '20px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>
-                  {selectedAsmt.averageScore}
+                  {selectedAsmt.averageScore || '—'}
                 </p>
               </div>
 
               <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>HIGHEST SCORE</span>
-                <p style={{ fontSize: '20px', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
-                  {selectedAsmt.highestScore}
-                </p>
-              </div>
-
-              <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>LOWEST SCORE</span>
-                <p style={{ fontSize: '20px', fontWeight: 800, color: '#ef4444', marginTop: '2px' }}>
-                  {selectedAsmt.lowestScore}
+                <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.7 }}>HIGHEST / LOWEST</span>
+                <p style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)', marginTop: '4px' }}>
+                  <span style={{ color: '#10b981' }}>{selectedAsmt.highestScore || '—'}</span> / <span style={{ color: '#ef4444' }}>{selectedAsmt.lowestScore || '—'}</span>
                 </p>
               </div>
             </div>
 
-            {/* Score Distribution Chart / Bars (Prompt Item 20) */}
+            {/* Score Distribution Chart / Bars */}
             <div style={{
               backgroundColor: 'var(--color-bg)',
               borderRadius: 'var(--radius-md)',
@@ -356,11 +345,11 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
               </div>
             </div>
 
-            {/* Individual Student Performance Table (Prompt Item 19) */}
+            {/* Individual Student Performance Table */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--color-text)' }}>
-                  Individual Student Performance
+                  Individual Student Performance ({filteredRoster.length} Students)
                 </h4>
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -380,7 +369,7 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
                     style={{ fontSize: '12.5px', height: '34px', width: '150px' }}
                   >
                     <option value="All">All Statuses</option>
-                    <option value="Completed">Completed</option>
+                    <option value="Attempted">Attempted</option>
                     <option value="Not Attempted">Not Attempted</option>
                   </select>
                 </div>
@@ -392,9 +381,9 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
                     <tr>
                       <th>Student Name</th>
                       <th>Roll Number</th>
+                      <th>Status</th>
                       <th>Score</th>
                       <th>Percentage</th>
-                      <th>Status</th>
                       <th>Attempted At</th>
                     </tr>
                   </thead>
@@ -406,32 +395,37 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
                         </td>
                       </tr>
                     ) : (
-                      filteredRoster.map((st) => (
-                        <tr key={st.id || st.rollNumber}>
-                          <td style={{ fontWeight: 700 }}>{st.name}</td>
-                          <td>{st.rollNumber || '23CS001'}</td>
-                          <td>
-                            <strong>{st.score}</strong>
-                          </td>
-                          <td>
-                            {st.percentage !== '—' ? (
-                              <span className={`badge ${Number(st.percentage.replace('%', '')) >= 50 ? 'badge-green' : 'badge-orange'}`}>
-                                {st.percentage}
+                      filteredRoster.map((st) => {
+                        const isAttempted = Boolean(st.hasAttempted || st.status === 'Attempted' || st.status === 'Completed');
+                        const pctVal = parsePercentage(st.percentageNum ?? st.percentage);
+
+                        return (
+                          <tr key={st.id || st.userId || st.rollNumber}>
+                            <td style={{ fontWeight: 700 }}>{st.name || 'Student'}</td>
+                            <td>{st.rollNumber || '—'}</td>
+                            <td>
+                              <span className={`badge ${isAttempted ? 'badge-green' : 'badge-gray'}`}>
+                                {isAttempted ? 'Attempted' : 'Not Attempted'}
                               </span>
-                            ) : (
-                              <span style={{ color: 'var(--color-text)', opacity: 0.5 }}>—</span>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`badge ${st.status === 'Completed' ? 'badge-green' : 'badge-gray'}`}>
-                              {st.status}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: '12px', opacity: 0.75 }}>
-                            {st.submittedAt ? new Date(st.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : '—'}
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                            <td>
+                              <strong>{isAttempted ? (st.score || '—') : '—'}</strong>
+                            </td>
+                            <td>
+                              {pctVal !== null ? (
+                                <span className={`badge ${pctVal >= 50 ? 'badge-green' : 'badge-orange'}`}>
+                                  {formatPercentage(pctVal)}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--color-text)', opacity: 0.5 }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ fontSize: '12px', opacity: 0.75 }}>
+                              {st.submittedAt ? new Date(st.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -459,38 +453,41 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
           <div style={{ padding: '20px 0' }}>
             <EmptyState
               icon={Award}
-              title="All Active Students in Good Standing"
+              title="All Attempted Students in Good Standing"
               message="No students currently falling below the 50% threshold on active assessments."
             />
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-            {atRiskStudents.map((st) => (
-              <div key={st.id || st.rollNumber} style={{
-                padding: '12px 14px',
-                backgroundColor: 'var(--color-bg)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div>
-                  <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>{st.name}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6, display: 'block' }}>
-                    Roll: {st.rollNumber} • Score: {st.score} ({st.percentage})
-                  </span>
+            {atRiskStudents.map((st) => {
+              const pctFormatted = formatPercentage(st.percentageNum ?? st.percentage);
+              return (
+                <div key={st.id || st.rollNumber} style={{
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>{st.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text)', opacity: 0.6, display: 'block' }}>
+                      Roll: {st.rollNumber} • Score: {st.score || '—'} ({pctFormatted})
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onOpenRagQuery?.(`Provide personalized remedial study plan for ${st.name} (Roll: ${st.rollNumber}) who scored ${pctFormatted} in ${selectedAsmt?.title || 'assessment'}`)}
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '11.5px' }}
+                  >
+                    <Sparkles size={12} />
+                    <span>Generate Remedial Plan</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => onOpenRagQuery(`Provide personalized remedial study plan for ${st.name} (Roll: ${st.rollNumber}) who scored ${st.percentage} in ${selectedAsmt?.title}`)}
-                  className="btn btn-secondary btn-sm"
-                  style={{ fontSize: '11.5px' }}
-                >
-                  <Sparkles size={12} />
-                  <span>Generate Remedial Plan</span>
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

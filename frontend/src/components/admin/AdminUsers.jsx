@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Users, Plus, Download, Upload, ShieldAlert, KeyRound, Check, X, Search, 
   Filter, ShieldCheck, Mail, UserX, FileSpreadsheet, AlertTriangle, CheckCircle2, 
-  RotateCw, UserCheck, UserMinus, GraduationCap, Briefcase, ChevronRight, Shield
+  RotateCw, UserCheck, UserMinus, GraduationCap, Briefcase, ChevronRight, Shield,
+  Trash2, Loader2
 } from 'lucide-react';
 import userManagementService from '../../services/userManagementService';
 import academicDataService from '../../services/academicDataService';
-import { getBranchDisplay, resolveBranch } from '../../services/academicCohortService';
+import authService from '../../services/authService';
+import { getBranchDisplay, resolveBranch, normalizeYear, normalizeSection } from '../../services/academicCohortService';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import EmptyState from '../common/EmptyState';
 
@@ -17,6 +20,8 @@ export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'pending' | 'students' | 'faculty' | 'admins'
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [yearFilter, setYearFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
   
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -25,12 +30,25 @@ export default function AdminUsers() {
   const [lastCreatedAccount, setLastCreatedAccount] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(null);
 
+  // Delete Confirmation Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [processingUserId, setProcessingUserId] = useState(null);
+
   // Close modals on Escape key
   useEscapeKey(() => {
-    if (showSuccessModal) setShowSuccessModal(false);
-    else if (showCreateModal) setShowCreateModal(false);
-    else if (showBulkImportModal) setShowBulkImportModal(false);
-  }, showCreateModal || showSuccessModal || showBulkImportModal);
+    if (showDeleteModal) {
+      handleCloseDeleteModal();
+    } else if (showSuccessModal) {
+      setShowSuccessModal(false);
+    } else if (showCreateModal) {
+      setShowCreateModal(false);
+    } else if (showBulkImportModal) {
+      setShowBulkImportModal(false);
+    }
+  }, showCreateModal || showSuccessModal || showBulkImportModal || showDeleteModal);
 
   // Fetch live users and departments from Supabase
   const loadUsersAndDepartments = useCallback(async () => {
@@ -89,19 +107,19 @@ export default function AdminUsers() {
     };
   }, [safeUsersList]);
 
-  // Filtered list
+  // Filtered list with multi-criteria AND logic
   const filteredUsers = useMemo(() => {
     return safeUsersList.filter(u => {
       const statusLower = (u.rawStatus || u.status || '').toLowerCase().trim();
       const roleLower = (u.role || '').toLowerCase().trim();
 
-      // Tab filter
+      // 1. Tab filter
       if (activeTab === 'pending' && statusLower !== 'pending') return false;
       if (activeTab === 'students' && (roleLower !== 'student' || statusLower === 'pending')) return false;
       if (activeTab === 'faculty' && (roleLower !== 'faculty' || statusLower === 'pending')) return false;
       if (activeTab === 'admins' && roleLower !== 'admin') return false;
 
-      // Department filter
+      // 2. Department filter
       if (departmentFilter !== 'all') {
         const deptFilterLower = departmentFilter.toLowerCase().trim();
         const selDept = departments.find(d => d.id === departmentFilter);
@@ -119,7 +137,35 @@ export default function AdminUsers() {
         }
       }
 
-      // Search query
+      // 3. Year filter (All Years, 1st Year, 2nd Year, 3rd Year, 4th Year)
+      if (yearFilter !== 'all') {
+        if (roleLower !== 'student' && (!u.year || u.year === '—')) {
+          return false;
+        }
+
+        const rawDigits = String(u.year || '').replace(/\D/g, '');
+        const normalizedUserYear = rawDigits ? String(Number(rawDigits)) : (u.semester ? String(normalizeYear(u.year, u.semester)) : '');
+
+        if (normalizedUserYear !== String(yearFilter)) {
+          return false;
+        }
+      }
+
+      // 4. Section filter (All Sections, Section A, Section B, Section C, Section D)
+      if (sectionFilter !== 'all') {
+        if (roleLower !== 'student' && (!u.section || u.section === '—')) {
+          return false;
+        }
+
+        const normalizedUserSec = normalizeSection(u.section || '');
+        const targetSec = String(sectionFilter).toUpperCase().trim();
+
+        if (normalizedUserSec !== targetSec) {
+          return false;
+        }
+      }
+
+      // 5. Search query
       if (searchQuery) {
         const q = searchQuery.toLowerCase().trim();
         const nameMatch = (u.name || '').toLowerCase().includes(q);
@@ -158,46 +204,148 @@ export default function AdminUsers() {
 
       return true;
     });
-  }, [safeUsersList, activeTab, departmentFilter, searchQuery, departments]);
+  }, [safeUsersList, activeTab, departmentFilter, yearFilter, sectionFilter, searchQuery, departments]);
+
+  // Current Admin Protection Checker
+  const isCurrentAdminUser = useCallback((u) => {
+    if (!u) return false;
+    const current = authService.getCurrentUser() || authService.getCurrentSession();
+    if (!current) return false;
+    const curId = current.userId || current.id;
+    const curEmail = (current.email || '').toLowerCase().trim();
+    const targetId = u.id || u.userId;
+    const targetEmail = (u.email || '').toLowerCase().trim();
+    return (curId && targetId && curId === targetId) || (curEmail && targetEmail && curEmail === targetEmail);
+  }, []);
 
   // Actions
   const handleApprove = async (u) => {
+    setProcessingUserId(u.id);
     try {
-      await userManagementService.approveUser(u.id);
+      const current = authService.getCurrentUser() || authService.getCurrentSession();
+      await userManagementService.approveUser(u.id, current?.name || 'Admin');
       await loadUsersAndDepartments();
       setActionFeedback({ type: 'success', message: `Registration for ${u.name} (${u.email}) approved and account activated.` });
       setTimeout(() => setActionFeedback(null), 4000);
     } catch (err) {
       alert(err.message || 'Could not approve user.');
+    } finally {
+      setProcessingUserId(null);
     }
   };
 
   const handleReject = async (u) => {
     const reason = window.prompt(`Please enter rejection reason for ${u.name}:`, "Incomplete academic verification");
     if (reason !== null) {
+      setProcessingUserId(u.id);
       try {
-        await userManagementService.rejectUser(u.id, reason);
+        const current = authService.getCurrentUser() || authService.getCurrentSession();
+        await userManagementService.rejectUser(u.id, reason, current?.name || 'Admin');
         await loadUsersAndDepartments();
         setActionFeedback({ type: 'info', message: `Registration for ${u.name} was rejected.` });
         setTimeout(() => setActionFeedback(null), 4000);
       } catch (err) {
         alert(err.message || 'Could not reject user.');
+      } finally {
+        setProcessingUserId(null);
       }
     }
   };
 
   const handleToggleStatus = async (u) => {
-    const current = (u.rawStatus || u.status || 'active').toLowerCase();
-    const nextStatus = current === 'active' ? 'inactive' : 'active';
+    setProcessingUserId(u.id);
+    const currentStatus = (u.rawStatus || u.status || 'active').toLowerCase();
+    const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
     const actionLabel = nextStatus === 'active' ? 'activated' : 'deactivated';
 
     try {
-      await userManagementService.setUserStatus(u.id, nextStatus);
+      const current = authService.getCurrentUser() || authService.getCurrentSession();
+      await userManagementService.setUserStatus(u.id, nextStatus, current?.name || 'Admin');
       await loadUsersAndDepartments();
-      setActionFeedback({ type: 'success', message: `Account for ${u.name} has been ${actionLabel}.` });
+      setActionFeedback({ type: 'success', message: `Account for ${u.name} (${u.email}) has been ${actionLabel}.` });
       setTimeout(() => setActionFeedback(null), 4000);
     } catch (err) {
       alert(err.message || `Could not update account status.`);
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  const handleInitiateDelete = (u) => {
+    if (!u || isDeleting) return;
+    setUserToDelete(u);
+    setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (isDeleting) return;
+    setShowDeleteModal(false);
+    setUserToDelete(null);
+    setDeleteError('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!userToDelete || isDeleting) return;
+    if (isCurrentAdminUser(userToDelete)) {
+      setDeleteError('Cannot delete your own active administrator account.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError('');
+
+    const targetUser = { ...userToDelete };
+    const cleanId = targetUser.id || targetUser.userId;
+    const cleanEmail = targetUser.email;
+    const cleanName = targetUser.name || 'User';
+
+    try {
+      const current = authService.getCurrentUser() || authService.getCurrentSession();
+      const adminName = current?.name || 'Admin';
+
+      // 1. Optimistic removal from currently displayed list & statistics
+      setAuthUsers((prev) => {
+        const arr = Array.isArray(prev) ? prev : (prev?.data ?? prev?.users ?? []);
+        return arr.filter(
+          (u) =>
+            u.id !== cleanId &&
+            u.userId !== cleanId &&
+            (!cleanEmail || u.email?.toLowerCase() !== cleanEmail.toLowerCase())
+        );
+      });
+
+      // 2. Perform deletion with timeout safety
+      const deletePromise = userManagementService.deleteUser(cleanId, adminName);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Deletion operation timed out.')), 8000)
+      );
+
+      await Promise.race([deletePromise, timeoutPromise]);
+
+      // 3. Clean up modal state on success
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+      setDeleteError('');
+
+      // 4. Background refresh to stay synchronized with authoritative source
+      loadUsersAndDepartments().catch((refreshErr) => {
+        console.warn('[AdminUsers] Background refresh error after deletion:', refreshErr);
+      });
+
+      // 5. Toast feedback
+      setActionFeedback({
+        type: 'success',
+        message: `Account for ${cleanName} (${cleanEmail || cleanId}) has been permanently deleted from database and authentication.`
+      });
+      setTimeout(() => setActionFeedback(null), 5000);
+    } catch (err) {
+      console.error('[AdminUsers] Error deleting user:', err);
+      // Re-fetch users to restore state in case deletion failed
+      loadUsersAndDepartments().catch(() => {});
+      setDeleteError(err.message || 'Failed to delete user from database.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -519,22 +667,53 @@ export default function AdminUsers() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {departments.length > 0 && (
             <select
               className="input-field"
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              style={{ width: '180px', paddingBlock: '8px', fontSize: '12.5px' }}
+              style={{ width: '165px', paddingBlock: '8px', fontSize: '12.5px' }}
+              title="Filter by Department or Branch"
             >
               <option value="all">All Departments</option>
               {departments.map(d => (
-                <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
+                <option key={d.id} value={d.id}>{d.displayCode || d.code} - {d.name}</option>
               ))}
             </select>
           )}
 
-          <div style={{ position: 'relative', width: '260px' }}>
+          {/* Year Filter */}
+          <select
+            className="input-field"
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            style={{ width: '120px', paddingBlock: '8px', fontSize: '12.5px' }}
+            title="Filter by Academic Year"
+          >
+            <option value="all">All Years</option>
+            <option value="1">1st Year</option>
+            <option value="2">2nd Year</option>
+            <option value="3">3rd Year</option>
+            <option value="4">4th Year</option>
+          </select>
+
+          {/* Section Filter */}
+          <select
+            className="input-field"
+            value={sectionFilter}
+            onChange={(e) => setSectionFilter(e.target.value)}
+            style={{ width: '125px', paddingBlock: '8px', fontSize: '12.5px' }}
+            title="Filter by Section"
+          >
+            <option value="all">All Sections</option>
+            <option value="A">Section A</option>
+            <option value="B">Section B</option>
+            <option value="C">Section C</option>
+            <option value="D">Section D</option>
+          </select>
+
+          <div style={{ position: 'relative', width: '230px' }}>
             <input
               type="text"
               placeholder="Search name, roll no, email..."
@@ -546,16 +725,72 @@ export default function AdminUsers() {
             <Search size={15} color="var(--color-text)" style={{ position: 'absolute', left: '12px', top: '11px', opacity: 0.6 }} />
           </div>
 
+          {(departmentFilter !== 'all' || yearFilter !== 'all' || sectionFilter !== 'all' || searchQuery) && (
+            <button
+              onClick={() => {
+                setDepartmentFilter('all');
+                setYearFilter('all');
+                setSectionFilter('all');
+                setSearchQuery('');
+              }}
+              className="btn btn-secondary btn-sm"
+              title="Reset all filters"
+              style={{ padding: '8px 10px', fontSize: '12px', color: 'var(--color-text)', opacity: 0.8 }}
+            >
+              <X size={14} />
+              <span>Reset</span>
+            </button>
+          )}
+
           <button 
             onClick={loadUsersAndDepartments} 
             className="btn btn-secondary btn-sm" 
-            title="Refresh list"
+            title="Refresh list from database"
             style={{ padding: '8px 10px' }}
           >
             <RotateCw size={14} className={loading ? 'spin' : ''} />
           </button>
         </div>
       </div>
+
+      {/* Active Filter Results Status Ribbon */}
+      {(departmentFilter !== 'all' || yearFilter !== 'all' || sectionFilter !== 'all' || searchQuery) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 14px',
+          marginBottom: '12px',
+          borderRadius: '8px',
+          backgroundColor: 'var(--color-surface-hover, rgba(0,0,0,0.02))',
+          border: '1px solid var(--color-border)',
+          fontSize: '12.5px',
+          color: 'var(--color-text)'
+        }}>
+          <span style={{ opacity: 0.85 }}>
+            Showing <strong>{filteredUsers.length}</strong> matching {filteredUsers.length === 1 ? 'user' : 'users'} (out of {safeUsersList.length} total)
+          </span>
+          <button
+            onClick={() => {
+              setDepartmentFilter('all');
+              setYearFilter('all');
+              setSectionFilter('all');
+              setSearchQuery('');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-primary)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: 0
+            }}
+          >
+            Clear All Filters
+          </button>
+        </div>
+      )}
 
       {/* Users Table */}
       <div className="table-container">
@@ -585,13 +820,15 @@ export default function AdminUsers() {
               <EmptyState
                 icon={UserX}
                 title={activeTab === 'pending' ? "No Pending Approvals" : "No Accounts Found"}
-                message={activeTab === 'pending' ? "All student and faculty registrations have been processed." : "No accounts match your current tab selection or search criteria."}
+                message={activeTab === 'pending' ? "All student and faculty registrations have been processed." : "No accounts match your current filter criteria or search query."}
                 isTableRow={true}
                 colSpan={7}
-                actionText="Show All Users"
+                actionText="Reset All Filters"
                 onAction={() => {
                   setActiveTab('all');
                   setDepartmentFilter('all');
+                  setYearFilter('all');
+                  setSectionFilter('all');
                   setSearchQuery('');
                 }}
               />
@@ -638,42 +875,71 @@ export default function AdminUsers() {
                       </span>
                     </td>
                     <td>
-                      {isPending ? (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleApprove(u)}
-                            className="btn btn-primary btn-sm"
-                            style={{ padding: '4px 10px', fontSize: '11.5px' }}
-                            title="Approve & Activate Account"
-                          >
-                            <Check size={13} />
-                            <span>Approve</span>
-                          </button>
-                          <button
-                            onClick={() => handleReject(u)}
-                            className="btn btn-secondary btn-sm"
-                            style={{ padding: '4px 10px', fontSize: '11.5px', color: 'var(--error)' }}
-                            title="Reject Registration"
-                          >
-                            <X size={13} />
-                            <span>Reject</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {isPending ? (
+                          <>
+                            <button
+                              onClick={() => handleApprove(u)}
+                              disabled={processingUserId === u.id || isDeleting}
+                              className="btn btn-primary btn-sm"
+                              style={{ padding: '4px 10px', fontSize: '11.5px' }}
+                              title="Approve & Activate Account"
+                            >
+                              {processingUserId === u.id ? <RotateCw size={13} className="spin" /> : <Check size={13} />}
+                              <span>Approve</span>
+                            </button>
+                            <button
+                              onClick={() => handleReject(u)}
+                              disabled={processingUserId === u.id || isDeleting}
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '4px 10px', fontSize: '11.5px', color: '#DC2626' }}
+                              title="Reject Registration"
+                            >
+                              <X size={13} />
+                              <span>Reject</span>
+                            </button>
+                          </>
+                        ) : (
                           <button
                             onClick={() => handleToggleStatus(u)}
+                            disabled={processingUserId === u.id || isDeleting}
                             className="btn btn-secondary btn-sm"
                             style={{ 
                               padding: '4px 10px',
                               fontSize: '11.5px',
-                              color: isActive ? 'var(--error)' : 'var(--color-primary)' 
+                              color: isActive ? '#DC2626' : 'var(--color-primary)' 
                             }}
+                            title={isActive ? 'Deactivate Account' : 'Activate Account'}
                           >
-                            {isActive ? 'Deactivate' : 'Activate'}
+                            {processingUserId === u.id ? (
+                              <RotateCw size={12} className="spin" />
+                            ) : isActive ? (
+                              'Deactivate'
+                            ) : (
+                              'Activate'
+                            )}
                           </button>
-                        </div>
-                      )}
+                        )}
+
+                        {/* Permanent Delete Button */}
+                        <button
+                          onClick={() => handleInitiateDelete(u)}
+                          disabled={processingUserId === u.id || isDeleting || isCurrentAdminUser(u)}
+                          className="btn btn-secondary btn-sm"
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '11.5px',
+                            color: isCurrentAdminUser(u) ? 'var(--color-text-muted, #94a3b8)' : '#DC2626',
+                            borderColor: isCurrentAdminUser(u) ? 'var(--color-border)' : '#FECDD3',
+                            backgroundColor: isCurrentAdminUser(u) ? 'transparent' : 'rgba(239, 68, 68, 0.04)',
+                            cursor: isCurrentAdminUser(u) ? 'not-allowed' : 'pointer'
+                          }}
+                          title={isCurrentAdminUser(u) ? "Cannot delete your own active administrator account" : `Permanently Delete ${u.name}`}
+                        >
+                          <Trash2 size={13} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -684,9 +950,9 @@ export default function AdminUsers() {
       </div>
 
       {/* 1. Provision Single User Modal */}
-      {showCreateModal && (
+      {showCreateModal && typeof document !== 'undefined' && createPortal(
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '580px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '580px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
@@ -955,13 +1221,14 @@ export default function AdminUsers() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 2. Bulk CSV Import Modal */}
-      {showBulkImportModal && (
+      {showBulkImportModal && typeof document !== 'undefined' && createPortal(
         <div className="modal-overlay" onClick={() => setShowBulkImportModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '680px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)' }}>
@@ -1197,13 +1464,14 @@ export default function AdminUsers() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 3. Account Provisioned Success Modal */}
-      {showSuccessModal && lastCreatedAccount && (
+      {showSuccessModal && lastCreatedAccount && typeof document !== 'undefined' && createPortal(
         <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '460px', textAlign: 'center', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '460px', width: '100%', textAlign: 'center', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
             <div style={{
               width: '48px',
               height: '48px',
@@ -1274,7 +1542,217 @@ export default function AdminUsers() {
               Done
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 4. Delete User Confirmation Modal */}
+      {showDeleteModal && userToDelete && typeof document !== 'undefined' && createPortal(
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(43, 33, 24, 0.45)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={handleCloseDeleteModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-title"
+        >
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '500px',
+              width: '100%',
+              backgroundColor: 'var(--color-surface, #FFFDF8)',
+              borderRadius: 'var(--radius-xl, 12px)',
+              boxShadow: 'var(--shadow-modal, 0 16px 36px -8px rgba(43, 33, 24, 0.16))',
+              border: '1px solid var(--color-border)',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--color-border)', padding: '16px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FEE2E2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#DC2626'
+                }}>
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 id="confirm-delete-title" style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
+                    Confirm Permanent User Deletion
+                  </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7, margin: '2px 0 0 0' }}>
+                    Institutional Governance & RBAC
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                disabled={isDeleting}
+                style={{ background: 'none', border: 'none', color: 'var(--color-text)', cursor: isDeleting ? 'not-allowed' : 'pointer', padding: '4px' }}
+                title="Close dialog"
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '20px' }}>
+              {deleteError && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: 'var(--pastel-red-bg, #FFF1F2)',
+                  border: '1px solid var(--pastel-red-border, #FECDD3)',
+                  borderRadius: '8px',
+                  color: '#BE123C',
+                  fontSize: '12.5px',
+                  marginBottom: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertTriangle size={15} />
+                    <span>{deleteError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteError('')}
+                    style={{ background: 'none', border: 'none', color: '#BE123C', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              <p style={{ fontSize: '13.5px', color: 'var(--color-text)', lineHeight: 1.5, marginBottom: '16px' }}>
+                Are you sure you want to permanently delete this account? This action cannot be undone and will purge the authentication account, profile, and associated academic records from the database.
+              </p>
+
+              {/* User Details Box */}
+              <div style={{
+                background: 'var(--color-surface-hover, rgba(0,0,0,0.02))',
+                border: '1px solid var(--color-border)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>Full Name:</span>
+                  <span style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-text)' }}>{userToDelete.name}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>Email Address:</span>
+                  <span style={{ fontSize: '12.5px', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: 'var(--color-text)' }}>{userToDelete.email}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>Role:</span>
+                  <span className={`badge ${
+                    userToDelete.role === 'student' ? 'badge-blue' :
+                    userToDelete.role === 'faculty' ? 'badge-green' : 'badge-purple'
+                  }`}>
+                    {userToDelete.displayRole || userToDelete.role}
+                  </span>
+                </div>
+                {(userToDelete.rollNumber || userToDelete.employeeId) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>
+                      {userToDelete.role === 'student' ? 'Roll Number:' : 'Employee ID:'}
+                    </span>
+                    <span style={{ fontSize: '12.5px', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: 'var(--color-text)' }}>
+                      {userToDelete.rollNumber || userToDelete.employeeId}
+                    </span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.7 }}>Department / Branch:</span>
+                  <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--color-text)' }}>
+                    {userToDelete.branchDisplayName || userToDelete.department || 'CSE'}
+                  </span>
+                </div>
+              </div>
+
+              {isCurrentAdminUser(userToDelete) && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: '#FEF3C7',
+                  border: '1px solid #FDE68A',
+                  borderRadius: '8px',
+                  color: '#92400E',
+                  fontSize: '12.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertTriangle size={15} />
+                  <span>Administrator protection: You cannot delete your own active administrator account.</span>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '14px 20px', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--bg-subtle, #EFE8DC)' }}>
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                disabled={isDeleting}
+                className="btn btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting || isCurrentAdminUser(userToDelete)}
+                className="btn btn-primary"
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '13px',
+                  backgroundColor: '#DC2626',
+                  borderColor: '#DC2626',
+                  color: '#ffffff',
+                  opacity: (isDeleting || isCurrentAdminUser(userToDelete)) ? 0.6 : 1,
+                  cursor: (isDeleting || isCurrentAdminUser(userToDelete)) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <RotateCw size={14} className="spin" />
+                    <span>Deleting Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Permanently Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
