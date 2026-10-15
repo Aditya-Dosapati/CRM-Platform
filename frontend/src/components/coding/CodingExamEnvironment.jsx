@@ -19,7 +19,7 @@ import {
   XCircle,
   HelpCircle
 } from 'lucide-react';
-import { codingProblemsList, supportedLanguagesList } from '../../data/codingData.js';
+import { codingProblemsList, supportedLanguagesList, isDatabaseProblem } from '../../data/codingData.js';
 import codeExecutionService from '../../services/codeExecutionService.js';
 
 export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam }) {
@@ -37,9 +37,12 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const activeProblem = examQuestions[currentQuestionIndex] || codingProblemsList[0];
 
-  // Allowed languages
-  const allowedLanguages = assessment?.allowedLanguages || ['Python', 'C++', 'Java', 'C', 'JavaScript', 'MySQL', 'Oracle'];
-  const defaultInitialLang = allowedLanguages.includes('Python') ? 'python' : allowedLanguages[0]?.toLowerCase() || 'python';
+  // Allowed languages: Database questions only get MySQL; non-database questions get Python, C++, Java, C, JavaScript
+  const isDbExamProblem = isDatabaseProblem(activeProblem);
+  const allowedLanguages = isDbExamProblem
+    ? ['MySQL']
+    : (assessment?.allowedLanguages?.filter(l => l.toLowerCase() !== 'mysql') || ['Python', 'C++', 'Java', 'C', 'JavaScript']);
+  const defaultInitialLang = isDbExamProblem ? 'mysql' : (allowedLanguages.includes('Python') ? 'python' : allowedLanguages[0]?.toLowerCase() || 'python');
 
   // Per-question language selections
   const [questionLanguages, setQuestionLanguages] = useState(() => {

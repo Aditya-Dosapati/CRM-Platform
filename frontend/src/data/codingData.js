@@ -97,108 +97,73 @@ function solve() {
 
 solve();
 `
-  },
-  {
-    id: 'r',
-    name: 'R',
-    version: 'R 4.3.3',
-    runtime: 'Rscript Execution Sandbox',
-    extension: '.R',
-    status: 'enabled',
-    timeLimit: '5.0s',
-    memoryLimit: '256 MB',
-    defaultCode: `# GMRIT Academic R Sandbox
-solve <- function() {
-    # Write statistical computation or solution here
-}
-
-solve()
-`
-  },
-  {
-    id: 'ruby',
-    name: 'Ruby',
-    version: 'Ruby 3.2.3',
-    runtime: 'YARV Isolated Sandbox',
-    extension: '.rb',
-    status: 'enabled',
-    timeLimit: '4.0s',
-    memoryLimit: '128 MB',
-    defaultCode: `# Write your Ruby solution here
-def solve
-    # Solution logic
-end
-
-solve
-`
-  },
-  {
-    id: 'mysql',
-    name: 'MySQL',
-    version: 'MySQL 8.0.36',
-    runtime: 'Relational SQL Query Engine',
-    extension: '.sql',
-    status: 'enabled',
-    timeLimit: '2.0s',
-    memoryLimit: '128 MB',
-    defaultCode: `-- GMR CRM MySQL Query Sandbox
--- Query: Retrieve students with attendance >= 75%
-SELECT student_id, name, department, attendance_pct 
-FROM student_records 
-WHERE attendance_pct >= 75.0 
-ORDER BY attendance_pct DESC;
-`
-  },
-  {
-    id: 'oracle',
-    name: 'Oracle SQL',
-    version: 'Oracle Database 21c (PL/SQL)',
-    runtime: 'Oracle Relational RDBMS Engine',
-    extension: '.sql',
-    status: 'enabled',
-    timeLimit: '2.5s',
-    memoryLimit: '256 MB',
-    defaultCode: `-- GMR CRM Oracle SQL Sandbox
--- Query: Top performing students by CGPA
-SELECT roll_number, full_name, branch, cgpa,
-       RANK() OVER (PARTITION BY branch ORDER BY cgpa DESC) as dept_rank
-FROM gmrit_academic_registry
-WHERE status = 'ACTIVE';
-`
   }
 ];
 
+export const mysqlLanguage = {
+  id: 'mysql',
+  name: 'MySQL',
+  version: 'MySQL 8.0.36',
+  runtime: 'Relational SQL Query Sandbox',
+  extension: '.sql',
+  status: 'enabled',
+  timeLimit: '2.0s',
+  memoryLimit: '128 MB',
+  defaultCode: `# Write your MySQL query statement below\n`
+};
+
+export function isDatabaseProblem(problem) {
+  if (!problem) return false;
+  const topic = (problem.topic || '').toLowerCase();
+  const cat = (problem.category || '').toLowerCase();
+  return (
+    topic.includes('database') ||
+    topic.includes('sql') ||
+    topic === 'db' ||
+    cat.includes('database') ||
+    cat.includes('sql') ||
+    Boolean(problem.starterCode && 'mysql' in problem.starterCode && !('python' in problem.starterCode))
+  );
+}
+
+export function getLanguagesForProblem(problem) {
+  if (isDatabaseProblem(problem)) {
+    return [mysqlLanguage];
+  }
+  return supportedLanguagesList;
+}
+
 export const studentCodingKPIs = {
-  problemsSolved: 128,
-  solvedThisMonth: "+14 this month",
-  problemsAttempted: 176,
-  successRate: "72.7%",
-  currentStreak: 12,
-  longestStreak: 28,
-  totalSubmissions: 342,
-  averageRuntime: "38 ms",
-  rank: 14,
+  problemsSolved: 0,
+  solvedThisMonth: "+0 this month",
+  problemsAttempted: 0,
+  successRate: "0.0%",
+  currentStreak: 0,
+  longestStreak: 0,
+  totalSubmissions: 0,
+  averageRuntime: "0 ms",
+  rank: "--",
   totalStudents: 1450,
-  points: 2340
+  points: 0
 };
 
 export const codingTopicCategories = [
-  { id: 'arrays', name: 'Arrays', problems: 42, solved: 28, percentage: 66, icon: 'Layers', color: '#2563EB' },
-  { id: 'strings', name: 'Strings', problems: 38, solved: 22, percentage: 57, icon: 'FileText', color: '#059669' },
-  { id: 'linked-lists', name: 'Linked Lists', problems: 26, solved: 16, percentage: 61, icon: 'GitCommit', color: '#7C3AED' },
-  { id: 'stacks', name: 'Stacks', problems: 20, solved: 14, percentage: 70, icon: 'Layers', color: '#EA580C' },
-  { id: 'queues', name: 'Queues', problems: 18, solved: 11, percentage: 61, icon: 'AlignLeft', color: '#0891B2' },
-  { id: 'trees', name: 'Trees', problems: 34, solved: 18, percentage: 52, icon: 'GitFork', color: '#059669' },
-  { id: 'graphs', name: 'Graphs', problems: 28, solved: 12, percentage: 42, icon: 'Share2', color: '#DC2626' },
-  { id: 'sorting', name: 'Sorting', problems: 24, solved: 20, percentage: 83, icon: 'ArrowUpDown', color: '#2563EB' },
-  { id: 'searching', name: 'Searching', problems: 22, solved: 18, percentage: 81, icon: 'Search', color: '#059669' },
-  { id: 'recursion', name: 'Recursion', problems: 16, solved: 11, percentage: 68, icon: 'Repeat', color: '#7C3AED' },
-  { id: 'dp', name: 'Dynamic Programming', problems: 30, solved: 9, percentage: 30, icon: 'Grid', color: '#EA580C' },
-  { id: 'greedy', name: 'Greedy Algorithms', problems: 18, solved: 10, percentage: 55, icon: 'Zap', color: '#D97706' },
-  { id: 'hashing', name: 'Hashing', problems: 25, solved: 19, percentage: 76, icon: 'Hash', color: '#0891B2' },
-  { id: 'oop', name: 'Object-Oriented Programming', problems: 15, solved: 12, percentage: 80, icon: 'Box', color: '#2563EB' },
-  { id: 'db', name: 'Database Programming', problems: 14, solved: 9, percentage: 64, icon: 'Database', color: '#059669' },
-  { id: 'math', name: 'Mathematical Problems', problems: 20, solved: 15, percentage: 75, icon: 'Cpu', color: '#7C3AED' }
+  { id: 'arrays', name: 'Arrays', problems: 42, solved: 0, percentage: 0, icon: 'Layers', color: '#2563EB' },
+  { id: 'strings', name: 'Strings', problems: 38, solved: 0, percentage: 0, icon: 'FileText', color: '#059669' },
+  { id: 'linked-lists', name: 'Linked Lists', problems: 26, solved: 0, percentage: 0, icon: 'GitCommit', color: '#7C3AED' },
+  { id: 'stacks', name: 'Stacks', problems: 20, solved: 0, percentage: 0, icon: 'Layers', color: '#EA580C' },
+  { id: 'queues', name: 'Queues', problems: 18, solved: 0, percentage: 0, icon: 'AlignLeft', color: '#0891B2' },
+  { id: 'trees', name: 'Trees', problems: 34, solved: 0, percentage: 0, icon: 'GitFork', color: '#059669' },
+  { id: 'graphs', name: 'Graphs', problems: 28, solved: 0, percentage: 0, icon: 'Share2', color: '#DC2626' },
+  { id: 'sorting', name: 'Sorting', problems: 24, solved: 0, percentage: 0, icon: 'ArrowUpDown', color: '#2563EB' },
+  { id: 'searching', name: 'Searching', problems: 22, solved: 0, percentage: 0, icon: 'Search', color: '#059669' },
+  { id: 'recursion', name: 'Recursion', problems: 16, solved: 0, percentage: 0, icon: 'Repeat', color: '#7C3AED' },
+  { id: 'dp', name: 'Dynamic Programming', problems: 30, solved: 0, percentage: 0, icon: 'Grid', color: '#EA580C' },
+  { id: 'greedy', name: 'Greedy Algorithms', problems: 18, solved: 0, percentage: 0, icon: 'Zap', color: '#D97706' },
+  { id: 'hashing', name: 'Hashing', problems: 25, solved: 0, percentage: 0, icon: 'Hash', color: '#0891B2' },
+  { id: 'oop', name: 'Object-Oriented Programming', problems: 15, solved: 0, percentage: 0, icon: 'Box', color: '#2563EB' },
+  { id: 'db', name: 'Database Programming', problems: 14, solved: 0, percentage: 0, icon: 'Database', color: '#059669' },
+  { id: 'math', name: 'Mathematical Problems', problems: 20, solved: 0, percentage: 0, icon: 'Cpu', color: '#7C3AED' }
 ];
 
 export const codingProblemsList = [
@@ -209,7 +174,7 @@ export const codingProblemsList = [
     topic: 'Arrays',
     acceptance: '78%',
     attempts: '1,842',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers such that they add up to \`target\`.
@@ -318,28 +283,6 @@ var twoSum = function(nums, target) {
     }
     return [];
 };
-`,
-      r: `twoSum <- function(nums, target) {
-    seen <- list()
-    for (i in seq_along(nums)) {
-        diff <- target - nums[i]
-        if (!is.null(seen[[as.character(diff)]])) {
-            return(c(seen[[as.character(diff)]] - 1, i - 1))
-        }
-        seen[[as.character(nums[i])]] <- i
-    }
-    return(c())
-}
-`,
-      ruby: `def two_sum(nums, target)
-  seen = {}
-  nums.each_with_index do |num, i|
-    complement = target - num
-    return [seen[complement], i] if seen.key?(complement)
-    seen[num] = i
-  end
-  []
-end
 `
     },
     sampleTestCases: [
@@ -471,22 +414,6 @@ public:
     }
     return prev;
 };
-`,
-      r: `reverseList <- function(nodeList) {
-    return(rev(nodeList))
-}
-`,
-      ruby: `def reverse_list(head)
-  prev = nil
-  curr = head
-  while curr
-    nxt = curr.next
-    curr.next = prev
-    prev = curr
-    curr = nxt
-  end
-  prev
-end
 `
     },
     sampleTestCases: [
@@ -517,7 +444,7 @@ end
     topic: 'Searching',
     acceptance: '82%',
     attempts: '2,341',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given an array of integers \`nums\` which is sorted in ascending order, and an integer \`target\`, write a function to search \`target\` in \`nums\`.
@@ -608,27 +535,6 @@ public:
     }
     return -1;
 };
-`,
-      r: `searchBinary <- function(nums, target) {
-    idx <- which(nums == target)
-    if (length(idx) > 0) return(idx[1] - 1)
-    return(-1)
-}
-`,
-      ruby: `def search(nums, target)
-  left = 0
-  right = nums.length - 1
-  while left <= right
-    mid = left + (right - left) / 2
-    return mid if nums[mid] == target
-    if nums[mid] < target
-      left = mid + 1
-    else
-      right = mid - 1
-    end
-  end
-  -1
-end
 `
     },
     sampleTestCases: [
@@ -659,7 +565,7 @@ end
     topic: 'Strings',
     acceptance: '58%',
     attempts: '1,204',
-    status: 'Attempted',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given a string \`s\`, find the length of the **longest substring** without repeating characters.`,
@@ -764,23 +670,6 @@ class Solution {
     }
     return maxLen;
 };
-`,
-      r: `lengthOfLongestSubstring <- function(s) {
-    # Sliding window in R
-    return(3)
-}
-`,
-      ruby: `def length_of_longest_substring(s)
-  seen = {}
-  left = 0
-  max_len = 0
-  s.each_char.with_index do |c, right|
-    left = seen[c] + 1 if seen.key?(c) && seen[c] >= left
-    seen[c] = right
-    max_len = [max_len, right - left + 1].max
-  end
-  max_len
-end
 `
     },
     sampleTestCases: [
@@ -811,7 +700,7 @@ end
     topic: 'Stacks',
     acceptance: '85%',
     attempts: '2,100',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given a string \`s\` containing just the characters \`'('\`, \`')'\`, \`'{'\`, \`'}'\`, \`'['\` and \`']'\`, determine if the input string is valid.
@@ -909,20 +798,6 @@ class Solution {
     }
     return stack.length === 0;
 };
-`,
-      r: `isValid <- function(s) { return(TRUE) }`,
-      ruby: `def is_valid(s)
-  stack = []
-  map = { ')' => '(', '}' => '{', ']' => '[' }
-  s.each_char do |c|
-    if map.key?(c)
-      return false if stack.pop != map[c]
-    else
-      stack << c
-    end
-  end
-  stack.empty?
-end
 `
     },
     sampleTestCases: [
@@ -952,7 +827,7 @@ end
     topic: 'Dynamic Programming',
     acceptance: '54%',
     attempts: '1,650',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given an integer array \`nums\`, find the subarray with the largest sum, and return its sum.`,
@@ -1018,17 +893,6 @@ public:
     }
     return maxSum;
 };
-`,
-      r: `maxSubArray <- function(nums) { return(6) }`,
-      ruby: `def max_sub_array(nums)
-  cur_sum = 0
-  max_sum = nums[0]
-  nums.each do |n|
-    cur_sum = [n, cur_sum + n].max
-    max_sum = [max_sum, cur_sum].max
-  end
-  max_sum
-end
 `
     },
     sampleTestCases: [
@@ -1159,13 +1023,6 @@ bool isCyclic(int V, int** adj, int* adjSizes) {
     }
     return false;
 };
-`,
-      r: `isCyclic <- function(V, adj) { return(TRUE) }`,
-      ruby: `def is_cyclic(v, adj)
-  visited = Array.new(v, 0)
-  # logic
-  true
-end
 `
     },
     sampleTestCases: [
@@ -1186,6 +1043,209 @@ end
       bruteForceComplexity: "O(V * E) Path Checking",
       recommendation: "3-state DFS or Kahn's algorithm (indegree topological sorting) achieves optimal linear O(V + E)."
     }
+  },
+  {
+    id: 'prob-8',
+    title: 'Combine Two Tables',
+    difficulty: 'Easy',
+    topic: 'Database Programming',
+    acceptance: '74%',
+    attempts: '940',
+    status: 'Not Attempted',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    description: `Table: \`Person\`
+\`\`\`
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| personId    | int     |
+| lastName    | varchar |
+| firstName   | varchar |
++-------------+---------+
+personId is the primary key.
+\`\`\`
+
+Table: \`Address\`
+\`\`\`
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| addressId   | int     |
+| personId    | int     |
+| city        | varchar |
+| state       | varchar |
++-------------+---------+
+addressId is the primary key.
+\`\`\`
+
+Write a solution to report the first name, last name, city, and state of each person in the \`Person\` table. If the address of a \`personId\` is not present in the \`Address\` table, report \`null\` instead.
+
+Return the result table in **any order**.`,
+    examples: [
+      {
+        input: 'Person = [[1, "Wang", "Allen"], [2, "Alice", "Bob"]], Address = [[1, 2, "New York City", "New York"]]',
+        output: '+-----------+----------+---------------+----------+\n| firstName | lastName | city          | state    |\n+-----------+----------+---------------+----------+\n| Allen     | Wang     | null          | null     |\n| Bob       | Alice    | New York City | New York |\n+-----------+----------+---------------+----------+',
+        explanation: 'There is no address in Address table for personId = 1, so city and state are null.'
+      }
+    ],
+    constraints: [
+      'Person table contains unique personId values.',
+      'Address table contains unique addressId values.'
+    ],
+    starterCode: {
+      mysql: `# Write your MySQL query statement below
+SELECT p.firstName, p.lastName, a.city, a.state
+FROM Person p
+LEFT JOIN Address a ON p.personId = a.personId;
+`
+    },
+    sampleTestCases: [
+      { id: 1, input: 'Person: 2 rows, Address: 1 row', expected: 'Allen Wang null null, Bob Alice NYC NY' }
+    ],
+    hiddenTestCases: [
+      { id: 'h1', input: 'Person: 10 rows, Address: 5 rows', expected: '10 rows matched via LEFT JOIN' }
+    ],
+    hints: [
+      "Hint 1: Use an outer join (LEFT JOIN) since person records must appear even when no corresponding address exists."
+    ],
+    solutionAnalysis: {
+      userComplexity: "O(N + M) Time • O(N) Space",
+      optimalComplexity: "O(N + M) Time • O(N) Space",
+      bruteForceComplexity: "O(N * M) Cartesian Product",
+      recommendation: "Hash Join or Nested Loop with index on Address.personId yields optimal O(N + M) performance."
+    }
+  },
+  {
+    id: 'prob-9',
+    title: 'Second Highest Salary',
+    difficulty: 'Medium',
+    topic: 'Database Programming',
+    acceptance: '43%',
+    attempts: '1,420',
+    status: 'Not Attempted',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    description: `Table: \`Employee\`
+\`\`\`
++-------------+------+
+| Column Name | Type |
++-------------+------+
+| id          | int  |
+| salary      | int  |
++-------------+------+
+id is the primary key.
+\`\`\`
+
+Write a solution to find the second highest distinct salary from the \`Employee\` table. If there is no second highest salary, return \`null\`.`,
+    examples: [
+      {
+        input: 'Employee = [[1, 100], [2, 200], [3, 300]]',
+        output: '+---------------------+\n| SecondHighestSalary |\n+---------------------+\n| 200                 |\n+---------------------+',
+        explanation: '300 is the highest, and 200 is the second highest salary.'
+      }
+    ],
+    constraints: [
+      'Employee table contains 0 or more rows.',
+      'Salaries are positive integers.'
+    ],
+    starterCode: {
+      mysql: `# Write your MySQL query statement below
+SELECT (
+    SELECT DISTINCT salary
+    FROM Employee
+    ORDER BY salary DESC
+    LIMIT 1 OFFSET 1
+) AS SecondHighestSalary;
+`
+    },
+    sampleTestCases: [
+      { id: 1, input: 'Employee: [100, 200, 300]', expected: '200' },
+      { id: 2, input: 'Employee: [100]', expected: 'null' }
+    ],
+    hiddenTestCases: [
+      { id: 'h1', input: 'Employee: [500, 500, 300]', expected: '300' }
+    ],
+    hints: [
+      "Hint 1: Use DISTINCT to handle duplicate salaries.",
+      "Hint 2: Wrapping the query in a subquery returns NULL if OFFSET 1 produces 0 rows."
+    ],
+    solutionAnalysis: {
+      userComplexity: "O(N log N) Time • O(1) Space",
+      optimalComplexity: "O(N) Time with Index • O(1) Space",
+      bruteForceComplexity: "O(N log N) Full Table Sort",
+      recommendation: "Using B-Tree index on salary DESC allows O(1) index scan to locate second distinct salary."
+    }
+  },
+  {
+    id: 'prob-10',
+    title: 'Customers Who Never Order',
+    difficulty: 'Easy',
+    topic: 'Database Programming',
+    acceptance: '68%',
+    attempts: '870',
+    status: 'Not Attempted',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    description: `Table: \`Customers\`
+\`\`\`
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| id          | int     |
+| name        | varchar |
++-------------+---------+
+id is the primary key.
+\`\`\`
+
+Table: \`Orders\`
+\`\`\`
++-------------+------+
+| Column Name | Type |
++-------------+------+
+| id          | int  |
+| customerId  | int  |
++-------------+------+
+id is the primary key. customerId is a foreign key to Customers.id.
+\`\`\`
+
+Write a solution to find all customers who never order anything.
+
+Return the result table with single column \`Customers\` in **any order**.`,
+    examples: [
+      {
+        input: 'Customers = [[1, "Joe"], [2, "Henry"], [3, "Sam"], [4, "Max"]], Orders = [[1, 3], [2, 1]]',
+        output: '+-----------+\n| Customers |\n+-----------+\n| Henry     |\n| Max       |\n+-----------+',
+        explanation: 'Joe and Sam made orders. Henry and Max never ordered anything.'
+      }
+    ],
+    constraints: [
+      'Customers table contains unique IDs.',
+      'Orders table contains unique IDs.'
+    ],
+    starterCode: {
+      mysql: `# Write your MySQL query statement below
+SELECT name AS Customers
+FROM Customers
+LEFT JOIN Orders ON Customers.id = Orders.customerId
+WHERE Orders.customerId IS NULL;
+`
+    },
+    sampleTestCases: [
+      { id: 1, input: 'Customers: 4, Orders: 2', expected: 'Henry, Max' }
+    ],
+    hiddenTestCases: [
+      { id: 'h1', input: 'Customers: 10, Orders: 10', expected: 'Empty set' }
+    ],
+    hints: [
+      "Hint 1: Use LEFT JOIN and filter with WHERE Orders.customerId IS NULL, or use NOT IN / NOT EXISTS."
+    ],
+    solutionAnalysis: {
+      userComplexity: "O(N + M) Time • O(N) Space",
+      optimalComplexity: "O(N + M) Time with Index",
+      bruteForceComplexity: "O(N * M) Nested Loop",
+      recommendation: "NOT EXISTS with correlated subquery or LEFT JOIN with IS NULL is optimal in MySQL query planner."
+    }
   }
 ];
 
@@ -1195,16 +1255,16 @@ export const codingLeaderboardData = [
   { rank: 3, name: "Suresh P.", department: "IT", solved: 165, points: 2990, streak: 15 },
   { rank: 4, name: "Divya N.", department: "CSE", solved: 154, points: 2840, streak: 12 },
   { rank: 5, name: "Ananya B.", department: "ECE", solved: 148, points: 2710, streak: 21 },
-  { rank: 14, name: "Rahul K. (You)", department: "CSE", solved: 128, points: 2340, streak: 12 }
+  { rank: 14, name: "Rahul K. (You)", department: "CSE", solved: 0, points: 0, streak: 0 }
 ];
 
 export const codingAchievements = [
-  { id: 'ach-1', title: '🔥 7 Day Streak', description: 'Solved problems 7 consecutive days', unlocked: true, date: 'Sep 08, 2025' },
-  { id: 'ach-2', title: '💻 First 10 Problems', description: 'Successfully solved your first 10 problems', unlocked: true, date: 'Aug 14, 2025' },
-  { id: 'ach-3', title: '🏆 50 Problems Solved', description: 'Crossed the 50 solved problems milestone', unlocked: true, date: 'Aug 29, 2025' },
-  { id: 'ach-4', title: '⚡ 5 Easy in a Day', description: 'Solved 5 Easy problems within 24 hours', unlocked: true, date: 'Sep 02, 2025' },
-  { id: 'ach-5', title: '🎯 80% Assessment Score', description: 'Scored >= 80% in an official coding assessment', unlocked: true, date: 'Sep 06, 2025' },
-  { id: 'ach-6', title: '🌟 Algorithm Master', description: 'Solve 20 Dynamic Programming challenges', unlocked: false, progress: '9/20' }
+  { id: 'ach-1', title: '🔥 7 Day Streak', description: 'Solve problems on 7 consecutive days', unlocked: false, progress: '0/7 days' },
+  { id: 'ach-2', title: '💻 First 10 Problems', description: 'Successfully solve your first 10 problems', unlocked: false, progress: '0/10' },
+  { id: 'ach-3', title: '🏆 50 Problems Solved', description: 'Cross the 50 solved problems milestone', unlocked: false, progress: '0/50' },
+  { id: 'ach-4', title: '⚡ First Problem Solved', description: 'Solve your first programming challenge', unlocked: false, progress: '0/1' },
+  { id: 'ach-5', title: '🎯 First Submission', description: 'Submit your code for automated evaluation', unlocked: false, progress: '0/1' },
+  { id: 'ach-6', title: '🌟 Algorithm Explorer', description: 'Attempt problems across at least 3 distinct topics', unlocked: false, progress: '0/3' }
 ];
 
 export const codingAssessmentsList = [
