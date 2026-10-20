@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Code2,
   CheckCircle2,
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import {
   supportedLanguagesList,
+  isDatabaseProblem,
   studentCodingKPIs,
   codingTopicCategories,
   codingProblemsList,
@@ -39,8 +40,30 @@ import {
 } from '../../data/codingData.js';
 import CodingWorkspaceModal from './CodingWorkspaceModal.jsx';
 import EmptyState from '../common/EmptyState.jsx';
+import codeExecutionService from '../../services/codeExecutionService.js';
+import authService from '../../services/authService.js';
 
 export default function CodingPracticeView({ onOpenRagQuery }) {
+  // Current logged in user
+  const currentUser = authService.getCurrentUser();
+
+  // Dynamic user coding progress from service / localStorage
+  const [userProgress, setUserProgress] = useState(() =>
+    codeExecutionService.getUserProgress(currentUser?.userId)
+  );
+
+  // Sync state whenever code is run or submitted
+  useEffect(() => {
+    const handleProgressUpdate = () => {
+      setUserProgress(codeExecutionService.getUserProgress(currentUser?.userId));
+    };
+
+    window.addEventListener('gmrit_coding_progress_updated', handleProgressUpdate);
+    return () => {
+      window.removeEventListener('gmrit_coding_progress_updated', handleProgressUpdate);
+    };
+  }, [currentUser?.userId]);
+
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('all');
@@ -54,9 +77,75 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
   // Tabs for sub-views
   const [activeViewTab, setActiveViewTab] = useState('problems'); // 'problems' | 'leaderboard' | 'achievements'
 
-  // Filter logic memoized
+  // Dynamic problems with live user status & attempt counts
+  const dynamicProblems = useMemo(() => {
+    const attempts = userProgress?.attempts || {};
+    return codingProblemsList.map(p => {
+      const attempt = attempts[p.id];
+      const dynamicStatus = attempt?.status || 'Not Attempted';
+      return {
+        ...p,
+        status: dynamicStatus,
+        userAttempts: attempt?.attemptsCount || 0
+      };
+    });
+  }, [userProgress]);
+
+  // Dynamic KPIs computed from actual user activity
+  const dynamicKPIs = useMemo(() => {
+    return codeExecutionService.computeKPIs(currentUser?.userId, codingProblemsList);
+  }, [userProgress, currentUser?.userId]);
+
+  // Dynamic topic categories with live solved counts and percentages
+  const dynamicCategories = useMemo(() => {
+    return codeExecutionService.computeTopicCategories(
+      codingTopicCategories,
+      codingProblemsList,
+      currentUser?.userId
+    );
+  }, [userProgress, currentUser?.userId]);
+
+  // Dynamic achievements computed from live activity
+  const dynamicAchievements = useMemo(() => {
+    return codeExecutionService.computeAchievements(currentUser?.userId, codingProblemsList);
+  }, [userProgress, currentUser?.userId]);
+
+  // Dynamic leaderboard showing student's real rank/progress
+  const dynamicLeaderboard = useMemo(() => {
+    const studentName = currentUser?.name
+      ? `${currentUser.name.split(' ')[0]} ${currentUser.name.split(' ')[1]?.[0] || ''}. (You)`
+      : 'Rahul K. (You)';
+
+    return codingLeaderboardData.map(entry => {
+      if (entry.name.includes('(You)')) {
+        return {
+          ...entry,
+          name: studentName,
+          solved: dynamicKPIs.problemsSolved,
+          points: dynamicKPIs.points,
+          streak: dynamicKPIs.currentStreak
+        };
+      }
+      return entry;
+    });
+  }, [dynamicKPIs, currentUser]);
+
+  // Reset progress handler for clean testing
+  const handleResetProgress = () => {
+    if (window.confirm('Reset all coding practice progress and statistics back to 0?')) {
+      const empty = codeExecutionService.resetUserProgress(currentUser?.userId);
+      setUserProgress(empty);
+    }
+  };
+
+  // Filter logic memoized on dynamic problems
   const filteredProblems = useMemo(() => {
-    return codingProblemsList.filter(p => {
+    return dynamicProblems.filter(p => {
+      const isDb = isDatabaseProblem(p);
+      if (selectedLanguage !== 'all') {
+        if (selectedLanguage === 'mysql' && !isDb) return false;
+        if (selectedLanguage !== 'mysql' && isDb) return false;
+      }
       if (selectedDifficulty !== 'all' && p.difficulty.toLowerCase() !== selectedDifficulty.toLowerCase()) {
         return false;
       }
@@ -72,7 +161,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
       }
       return true;
     });
-  }, [selectedDifficulty, selectedTopic, selectedStatus, searchQuery]);
+  }, [dynamicProblems, selectedDifficulty, selectedTopic, selectedStatus, searchQuery, selectedLanguage]);
 
   const getTopicIcon = (iconName) => {
     switch (iconName) {
@@ -109,7 +198,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
             <span className="badge badge-blue" style={{ fontSize: '11px', padding: '2px 8px' }}>
               ONLINE JUDGE & SANDBOX
             </span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>C, C++, Java, Python, JS, R, Ruby</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>C, C++, Java, Python, JavaScript</span>
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
             Coding Practice
@@ -119,8 +208,19 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
           </p>
         </div>
 
-        {/* View Switchers: Problems, Leaderboard, Achievements */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* View Switchers & Progress Actions */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {dynamicKPIs.problemsAttempted > 0 && (
+            <button
+              onClick={handleResetProgress}
+              className="btn btn-secondary"
+              style={{ fontSize: '12px', color: 'var(--text-muted)' }}
+              title="Reset practice progress to 0"
+            >
+              <RotateCcw size={13} />
+              <span>Reset Progress</span>
+            </button>
+          )}
           <button
             onClick={() => setActiveViewTab('problems')}
             className={`btn ${activeViewTab === 'problems' ? 'btn-primary' : 'btn-secondary'}`}
@@ -148,7 +248,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
         </div>
       </div>
 
-      {/* 4 Colorful KPI Cards */}
+      {/* 4 Dynamic KPI Cards */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -172,10 +272,10 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
           <div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Problems Solved</span>
             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              {studentCodingKPIs.problemsSolved}
+              {dynamicKPIs.problemsSolved}
             </div>
             <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
-              {studentCodingKPIs.solvedThisMonth}
+              {dynamicKPIs.solvedThisMonth}
             </span>
           </div>
         </div>
@@ -197,10 +297,10 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
           <div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Problems Attempted</span>
             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              {studentCodingKPIs.problemsAttempted}
+              {dynamicKPIs.problemsAttempted}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Across 12 topics
+              {dynamicKPIs.topicsAttemptedText}
             </span>
           </div>
         </div>
@@ -222,10 +322,10 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
           <div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Success Rate</span>
             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              {studentCodingKPIs.successRate}
+              {dynamicKPIs.successRate}
             </div>
-            <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
-              Top 10% in CSE Section A
+            <span style={{ fontSize: '11px', color: dynamicKPIs.problemsAttempted > 0 ? '#059669' : 'var(--text-muted)', fontWeight: 600 }}>
+              {dynamicKPIs.successRateSubtitle}
             </span>
           </div>
         </div>
@@ -247,10 +347,10 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
           <div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Current Streak</span>
             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              {studentCodingKPIs.currentStreak} days 🔥
+              {dynamicKPIs.currentStreak} {dynamicKPIs.currentStreak === 1 ? 'day' : 'days'} {dynamicKPIs.currentStreak > 0 ? '🔥' : '🌱'}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Longest: {studentCodingKPIs.longestStreak} days
+              Longest: {dynamicKPIs.longestStreak} {dynamicKPIs.longestStreak === 1 ? 'day' : 'days'}
             </span>
           </div>
         </div>
@@ -259,11 +359,11 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
       {/* VIEW 1: PROBLEMS & TOPICS */}
       {activeViewTab === 'problems' && (
         <>
-          {/* Topic Categories Cards Slider/Grid */}
+          {/* Dynamic Topic Categories Cards Grid */}
           <div style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Problem Categories ({codingTopicCategories.length})
+                Problem Categories ({dynamicCategories.length})
               </h3>
               {selectedTopic !== 'all' && (
                 <button
@@ -280,7 +380,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
               gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
               gap: '12px'
             }}>
-              {codingTopicCategories.map(cat => {
+              {dynamicCategories.map(cat => {
                 const isSelected = selectedTopic.toLowerCase() === cat.name.toLowerCase();
                 return (
                   <div
@@ -373,12 +473,13 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
                   className="input-field"
                   value={selectedLanguage}
                   onChange={(e) => setSelectedLanguage(e.target.value)}
-                  style={{ width: '115px', height: '38px', fontSize: '12px', padding: '4px 6px' }}
+                  style={{ width: '135px', height: '38px', fontSize: '12px', padding: '4px 6px' }}
                 >
                   <option value="all">Language: All</option>
                   {supportedLanguagesList.map(l => (
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
+                  <option value="mysql">MySQL (Database)</option>
                 </select>
 
                 {/* Difficulty Filter */}
@@ -509,7 +610,13 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
                           </td>
 
                           <td style={{ padding: '13px 18px', color: 'var(--text-muted)' }}>
-                            {p.attempts}
+                            {p.userAttempts > 0 ? (
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {p.userAttempts} {p.userAttempts === 1 ? 'attempt' : 'attempts'}
+                              </span>
+                            ) : (
+                              '0 attempts'
+                            )}
                           </td>
 
                           <td style={{ padding: '13px 18px', textAlign: 'right' }}>
@@ -522,7 +629,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
                               style={{ fontSize: '11.5px', padding: '4px 10px' }}
                             >
                               <Play size={12} fill="#FFFFFF" />
-                              <span>{isSolved ? 'Solve Again' : 'Solve Challenge'}</span>
+                              <span>{isSolved ? 'Solve Again' : isAttempted ? 'Resume Challenge' : 'Solve Challenge'}</span>
                             </button>
                           </td>
                         </tr>
@@ -536,7 +643,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
         </>
       )}
 
-      {/* VIEW 2: LEADERBOARD (WITH INSTITUTIONAL PRIVACY PROTECTION) */}
+      {/* VIEW 2: DYNAMIC LEADERBOARD */}
       {activeViewTab === 'leaderboard' && (
         <div className="card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
@@ -549,7 +656,9 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
               </p>
             </div>
             <span className="badge badge-purple" style={{ fontSize: '11px', padding: '3px 8px' }}>
-              Your Rank: #14 (Top 1%)
+              {dynamicKPIs.problemsSolved > 0
+                ? `Your Rank: #14 (${dynamicKPIs.problemsSolved} solved)`
+                : 'Your Rank: Unranked (0 solved)'}
             </span>
           </div>
 
@@ -566,7 +675,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
                 </tr>
               </thead>
               <tbody>
-                {codingLeaderboardData.map(entry => (
+                {dynamicLeaderboard.map(entry => (
                   <tr
                     key={entry.rank}
                     style={{
@@ -593,7 +702,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
         </div>
       )}
 
-      {/* VIEW 3: ACHIEVEMENTS & GAMIFICATION */}
+      {/* VIEW 3: DYNAMIC ACHIEVEMENTS & GAMIFICATION */}
       {activeViewTab === 'achievements' && (
         <div>
           <div style={{ marginBottom: '16px' }}>
@@ -610,7 +719,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '16px'
           }}>
-            {codingAchievements.map(ach => (
+            {dynamicAchievements.map(ach => (
               <div
                 key={ach.id}
                 className="card"
@@ -665,11 +774,14 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
       {activeProblem && (
         <CodingWorkspaceModal
           isOpen={Boolean(activeProblem)}
-          onClose={() => setActiveProblem(null)}
+          onClose={() => {
+            setActiveProblem(null);
+            setUserProgress(codeExecutionService.getUserProgress(currentUser?.userId));
+          }}
           problem={activeProblem}
           onProblemSolved={(probId) => {
-            // mark solved in active session
-            console.log(`Problem ${probId} marked solved.`);
+            const updated = codeExecutionService.getUserProgress(currentUser?.userId);
+            setUserProgress(updated);
           }}
           activeRole="student"
         />
