@@ -24,18 +24,20 @@ export default function RagChatbot({
 I can assist you with your **R20/R23 syllabus PDFs, faculty lecture notes, PYQs (2020-2025), and personal gradebook**.
 
 What would you like to explore today?`,
-      sources: [
-        { title: "GMRIT R20 Academic Regulations", doc: "GMRIT_Curriculum_R20.pdf", page: 1 },
-        { title: "CSE Course Catalog 2025-26", doc: "CSE_Catalog.pdf", page: 3 }
-      ],
+      sources: [],
       retrievalSteps: ["Connected to GMRIT Vector Store", "Loaded active semester syllabus"]
     }
   ]);
 
   const [inputVal, setInputVal] = useState('');
+  const inputValRef = useRef(inputVal);
+  inputValRef.current = inputVal;
+
   const [isThinking, setIsThinking] = useState(false);
   const [activeStep, setActiveStep] = useState('');
   const messagesEndRef = useRef(null);
+  const isThinkingRef = useRef(false);
+  const processedInitialQueryRef = useRef(null);
   const setSafeTimeout = useSafeTimeout();
 
   useEscapeKey(() => {
@@ -59,9 +61,14 @@ What would you like to explore today?`,
     scrollToBottom();
   }, [messages, isThinking]);
 
-  const handleSend = useCallback(async (textToSend = inputVal) => {
-    const query = typeof textToSend === 'string' ? textToSend.trim() : inputVal.trim();
-    if (!query || isThinking) return;
+  const handleSend = useCallback(async (textToSend) => {
+    const query = (typeof textToSend === 'string' ? textToSend : inputValRef.current).trim();
+    if (!query || isThinkingRef.current) return;
+
+    isThinkingRef.current = true;
+    setIsThinking(true);
+    setInputVal('');
+    setActiveStep('Scanning GMRIT Academic Knowledge Base...');
 
     const userMsg = {
       id: `usr_${Date.now()}`,
@@ -70,9 +77,6 @@ What would you like to explore today?`,
     };
 
     setMessages(prev => [...prev, userMsg]);
-    setInputVal('');
-    setIsThinking(true);
-    setActiveStep('Scanning GMRIT Academic Knowledge Base...');
 
     try {
       if (isSupabaseConfigured()) {
@@ -83,6 +87,9 @@ What would you like to explore today?`,
           const formattedSources = (ragRes.sources || []).map(s => ({
             title: s.title || 'Academic Document',
             doc: s.fileName || 'document.pdf',
+            fileName: s.fileName || 'document.pdf',
+            storagePath: s.storagePath || s.storage_path || '',
+            storage_path: s.storage_path || s.storagePath || '',
             page: s.page || 1,
             documentId: s.documentId,
             similarity: s.similarity
@@ -100,36 +107,51 @@ What would you like to explore today?`,
             ]
           };
           setMessages(prev => [...prev, botMsg]);
-          setIsThinking(false);
-          setActiveStep('');
+          return;
+        } else if (ragRes.error && !ragRes.error.toLowerCase().includes('no documents')) {
+          const botMsg = {
+            id: `bot_${Date.now()}`,
+            sender: 'bot',
+            text: `⚠️ **Retrieval Notice**: ${ragRes.error}`,
+            sources: [],
+            retrievalSteps: ["Query attempted against GMRIT Vector Store", `Status: ${ragRes.error}`]
+          };
+          setMessages(prev => [...prev, botMsg]);
           return;
         }
       }
-    } catch (e) {
-      console.warn('[RagChatbot] Live RAG query notice, using fallback:', e);
-    }
 
-    setSafeTimeout(() => {
+      // Fallback local query engine (properly awaited)
       setActiveStep('Matching query vectors with course syllabi & notes...');
-    }, 400);
-
-    setSafeTimeout(() => {
-      const ragResult = queryRagEngine(query, activeRole, currentUser);
+      const ragResult = await queryRagEngine(query, activeRole, currentUser);
       const botMsg = {
         id: `bot_${Date.now()}`,
         sender: 'bot',
-        text: ragResult.text,
-        sources: ragResult.sources,
-        retrievalSteps: ragResult.retrievalSteps
+        text: ragResult.text || "I couldn't find enough information in the available documents to answer that question.",
+        sources: ragResult.sources || [],
+        retrievalSteps: ragResult.retrievalSteps || ["GMRIT Academic Knowledge Base scanned"]
       };
       setMessages(prev => [...prev, botMsg]);
+    } catch (err) {
+      console.error('[RagChatbot] Unexpected error in handleSend:', err);
+      const botMsg = {
+        id: `bot_${Date.now()}`,
+        sender: 'bot',
+        text: `An error occurred while processing your query: ${err?.message || 'Unknown error'}. Please try again.`,
+        sources: [],
+        retrievalSteps: ["Search terminated with error"]
+      };
+      setMessages(prev => [...prev, botMsg]);
+    } finally {
       setIsThinking(false);
       setActiveStep('');
-    }, 800);
-  }, [inputVal, isThinking, activeRole, currentUser, setSafeTimeout]);
+      isThinkingRef.current = false;
+    }
+  }, [activeRole, currentUser]);
 
   useEffect(() => {
-    if (initialQuery && isOpen) {
+    if (initialQuery && isOpen && processedInitialQueryRef.current !== initialQuery) {
+      processedInitialQueryRef.current = initialQuery;
       handleSend(initialQuery);
     }
   }, [initialQuery, isOpen, handleSend]);

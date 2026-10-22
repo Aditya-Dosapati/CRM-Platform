@@ -766,18 +766,30 @@ class RagDocumentService {
           // 9. Document Permissions for Selected Students
           if (resolvedAudienceType === 'selected_students' && cleanStudentIds.length > 0 && docRecord?.id) {
             try {
-              const permissionRows = cleanStudentIds
-                .filter(sid => isDbUuid(sid))
-                .map(uid => ({
-                  document_id: docRecord.id,
-                  user_id: uid,
-                  can_view: true
-                }));
+              let targetUserUuids = cleanStudentIds.filter(sid => isDbUuid(sid));
+              const nonUuidTargets = cleanStudentIds.filter(sid => !isDbUuid(sid));
+              if (nonUuidTargets.length > 0) {
+                // Fetch user_ids for roll numbers or emails
+                const { data: matchedUsers } = await supabase
+                  .from('users')
+                  .select('id, email')
+                  .or(nonUuidTargets.map(t => `email.ilike.%${t}%`).join(','));
+                if (matchedUsers && matchedUsers.length > 0) {
+                  targetUserUuids.push(...matchedUsers.map(u => u.id));
+                }
+              }
+              const permissionRows = Array.from(new Set(targetUserUuids)).map(uid => ({
+                document_id: docRecord.id,
+                user_id: uid,
+                can_view: true
+              }));
 
               if (permissionRows.length > 0) {
                 await supabase.from('document_permissions').upsert(permissionRows, { onConflict: 'document_id,user_id' });
               }
-            } catch (permErr) {}
+            } catch (permErr) {
+              console.warn('[Faculty Resource Upload] Permission upsert notice:', permErr);
+            }
           }
         }
       } catch (uploadErr) {
@@ -1313,18 +1325,35 @@ class RagDocumentService {
     }
 
     // 3. Try direct Supabase Storage download
-    if (isSupabaseConfigured() && storagePath) {
+    let effectiveStoragePath = storagePath || docDetails?.storagePath || docDetails?.storage_path;
+    if (isSupabaseConfigured() && effectiveStoragePath) {
+      if (!effectiveStoragePath.includes('/')) {
+        try {
+          const { data: doc } = await supabase
+            .from('rag_documents')
+            .select('storage_path')
+            .or(`file_name.eq."${effectiveStoragePath}",title.eq."${effectiveStoragePath}"`)
+            .limit(1)
+            .maybeSingle();
+          if (doc?.storage_path) {
+            effectiveStoragePath = doc.storage_path;
+          }
+        } catch (_) {}
+      }
+
+      effectiveStoragePath = effectiveStoragePath.replace(/^\/+/, '');
+
       try {
         const { data: blob, error: dlErr } = await supabase.storage
           .from(BUCKET_NAME)
-          .download(storagePath);
+          .download(effectiveStoragePath);
 
         if (!dlErr && blob && blob.size > 0) {
           if (this._blobCache) {
-            this._blobCache.set(storagePath, blob);
+            this._blobCache.set(effectiveStoragePath, blob);
             if (resourceId) this._blobCache.set(resourceId, blob);
           }
-          saveBlobToIdb(storagePath, blob);
+          saveBlobToIdb(effectiveStoragePath, blob);
           if (resourceId) saveBlobToIdb(resourceId, blob);
           return blob;
         }
@@ -1460,12 +1489,31 @@ class RagDocumentService {
     if (!isSupabaseConfigured()) return null;
 
     try {
+      let resolvedPath = String(storagePath).trim();
+
+      // If storagePath does not contain a folder slash, resolve it from rag_documents
+      if (!resolvedPath.includes('/')) {
+        const { data: doc } = await supabase
+          .from('rag_documents')
+          .select('storage_path')
+          .or(`file_name.eq."${resolvedPath}",title.eq."${resolvedPath}"`)
+          .limit(1)
+          .maybeSingle();
+
+        if (doc?.storage_path) {
+          resolvedPath = doc.storage_path;
+        }
+      }
+
+      // Ensure no leading slashes
+      resolvedPath = resolvedPath.replace(/^\/+/, '');
+
       const { data, error } = await supabase.storage
         .from(BUCKET_NAME)
-        .createSignedUrl(storagePath, 3600);
+        .createSignedUrl(resolvedPath, 3600);
 
       if (error || !data?.signedUrl) {
-        console.warn('[RagDocumentService] Failed to create signed URL:', error?.message);
+        console.warn('[RagDocumentService] Failed to create signed URL for path:', resolvedPath, error?.message);
         return null;
       }
 

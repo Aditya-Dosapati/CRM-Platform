@@ -19,7 +19,7 @@ import {
   XCircle,
   HelpCircle
 } from 'lucide-react';
-import { codingProblemsList, supportedLanguagesList } from '../../data/codingData.js';
+import { codingProblemsList, supportedLanguagesList, isDatabaseProblem } from '../../data/codingData.js';
 import codeExecutionService from '../../services/codeExecutionService.js';
 
 export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam }) {
@@ -37,9 +37,12 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const activeProblem = examQuestions[currentQuestionIndex] || codingProblemsList[0];
 
-  // Allowed languages
-  const allowedLanguages = assessment?.allowedLanguages || ['Python', 'C++', 'Java', 'C', 'JavaScript', 'MySQL', 'Oracle'];
-  const defaultInitialLang = allowedLanguages.includes('Python') ? 'python' : allowedLanguages[0]?.toLowerCase() || 'python';
+  // Allowed languages: Database questions only get MySQL; non-database questions get Python, C++, Java, C, JavaScript
+  const isDbExamProblem = isDatabaseProblem(activeProblem);
+  const allowedLanguages = isDbExamProblem
+    ? ['MySQL']
+    : (assessment?.allowedLanguages?.filter(l => l.toLowerCase() !== 'mysql') || ['Python', 'C++', 'Java', 'C', 'JavaScript']);
+  const defaultInitialLang = isDbExamProblem ? 'mysql' : (allowedLanguages.includes('Python') ? 'python' : allowedLanguages[0]?.toLowerCase() || 'python');
 
   // Per-question language selections
   const [questionLanguages, setQuestionLanguages] = useState(() => {
@@ -77,6 +80,8 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   });
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
+  const [submissionProgress, setSubmissionProgress] = useState('');
 
   // Timer countdown
   useEffect(() => {
@@ -157,6 +162,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
   };
 
   const handleRunSampleTests = async () => {
+    if (isRunning) return;
     setIsRunning(true);
     setActiveBottomTab('tests');
     try {
@@ -183,33 +189,138 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
     }
   };
 
-  const handleAutoSubmit = () => {
-    if (onSubmitExam) {
-      onSubmitExam({
-        assessmentId: assessment?.id,
-        answeredCount: Object.keys(answeredQuestions).length,
-        totalQuestions: examQuestions.length,
-        score: 86,
-        totalMarks: assessment?.totalMarks || 100
+  const computeExamResults = () => {
+    const totalMarks = assessment?.totalMarks || 100;
+    const marksPerQuestion = totalMarks / Math.max(1, examQuestions.length);
+    let totalScore = 0;
+    let totalPassedCases = 0;
+    let totalCasesCount = 0;
+    let fullySolvedCount = 0;
+    const breakdown = [];
+
+    examQuestions.forEach((q, idx) => {
+      const qRes = executionResultsByQuestion[q.id];
+      const testCases = q.sampleTestCases || [{ id: 1, input: 'Sample', expected: 'Sample' }];
+      const qTotalCases = testCases.length;
+      totalCasesCount += qTotalCases;
+
+      let qPassedCases = 0;
+      if (qRes && Array.isArray(qRes.testResults)) {
+        qPassedCases = qRes.testResults.filter(t => t.passed).length;
+      }
+
+      totalPassedCases += qPassedCases;
+      if (qPassedCases === qTotalCases && qTotalCases > 0) {
+        fullySolvedCount++;
+      }
+
+      const qScore = qTotalCases > 0 ? Math.round((qPassedCases / qTotalCases) * marksPerQuestion) : 0;
+      totalScore += qScore;
+
+      breakdown.push({
+        id: `Q${idx + 1}`,
+        title: q.title || `Question ${idx + 1}`,
+        marks: `${qScore} / ${Math.round(marksPerQuestion)}`,
+        status: qPassedCases === qTotalCases ? 'Passed' : qPassedCases > 0 ? 'Partial' : 'Failed',
+        testCases: `${qPassedCases}/${qTotalCases}`
       });
+    });
+
+    return {
+      assessmentId: assessment?.id,
+      title: assessment?.title,
+      score: Math.min(totalMarks, totalScore),
+      totalMarks,
+      solvedCount: fullySolvedCount,
+      questionsCount: examQuestions.length,
+      testCasesPassed: `${totalPassedCases} / ${totalCasesCount}`,
+      runtimeScore: totalPassedCases > 0 ? 'Evaluated' : '0 test cases passed',
+      problemBreakdown: breakdown
+    };
+  };
+
+  const executeFinalExamEvaluation = async () => {
+    if (isSubmittingExam) return;
+    setIsSubmittingExam(true);
+    setShowSubmitModal(false);
+    setSubmissionProgress('Initializing official assessment evaluation...');
+
+    try {
+      const totalMarks = assessment?.totalMarks || 100;
+      const marksPerQuestion = totalMarks / Math.max(1, examQuestions.length);
+      let totalScore = 0;
+      let totalPassedCases = 0;
+      let totalCasesCount = 0;
+      let fullySolvedCount = 0;
+      const breakdown = [];
+
+      for (let i = 0; i < examQuestions.length; i++) {
+        const q = examQuestions[i];
+        const lang = questionLanguages[q.id] || defaultInitialLang;
+        const code = questionCodes[q.id] || '';
+        setSubmissionProgress(`Evaluating Problem ${i + 1}/${examQuestions.length}: ${q.title}...`);
+
+        let subRes;
+        try {
+          subRes = await codeExecutionService.submitCode(q.id, lang, code);
+        } catch (err) {
+          subRes = {
+            status: 'Runtime Error',
+            passedCount: 0,
+            totalCount: (q.sampleTestCases?.length || 0) + (q.hiddenTestCases?.length || 0)
+          };
+        }
+
+        const qTotalCases = subRes.totalCount || ((q.sampleTestCases?.length || 0) + (q.hiddenTestCases?.length || 0)) || 1;
+        const qPassedCases = subRes.passedCount || 0;
+        totalCasesCount += qTotalCases;
+        totalPassedCases += qPassedCases;
+
+        if (qPassedCases === qTotalCases && qTotalCases > 0) {
+          fullySolvedCount++;
+        }
+
+        const qScore = qTotalCases > 0 ? Math.round((qPassedCases / qTotalCases) * marksPerQuestion) : 0;
+        totalScore += qScore;
+
+        breakdown.push({
+          id: `Q${i + 1}`,
+          title: q.title || `Question ${i + 1}`,
+          marks: `${qScore} / ${Math.round(marksPerQuestion)}`,
+          status: qPassedCases === qTotalCases ? 'Passed' : qPassedCases > 0 ? 'Partial' : 'Failed',
+          testCases: `${qPassedCases}/${qTotalCases}`
+        });
+      }
+
+      const examResult = {
+        assessmentId: assessment?.id,
+        title: assessment?.title,
+        score: Math.min(totalMarks, totalScore),
+        totalMarks,
+        solvedCount: fullySolvedCount,
+        questionsCount: examQuestions.length,
+        testCasesPassed: `${totalPassedCases} / ${totalCasesCount}`,
+        runtimeScore: totalPassedCases > 0 ? 'Evaluated' : '0 test cases passed',
+        problemBreakdown: breakdown
+      };
+
+      if (onSubmitExam) {
+        onSubmitExam(examResult);
+      }
+    } catch (err) {
+      console.error('[CodingExam] Submission evaluation error:', err);
+      alert('Error during assessment evaluation: ' + (err.message || 'Unknown error'));
+      setIsSubmittingExam(false);
+      setSubmissionProgress('');
     }
   };
 
+  const handleAutoSubmit = () => {
+    executeFinalExamEvaluation();
+  };
+
   const handleConfirmSubmit = () => {
-    setShowSubmitModal(false);
-    if (onSubmitExam) {
-      const answeredCount = Object.keys(answeredQuestions).length;
-      onSubmitExam({
-        assessmentId: assessment?.id,
-        title: assessment?.title,
-        score: Math.min(assessment?.totalMarks || 100, Math.round((answeredCount / examQuestions.length) * (assessment?.totalMarks || 100))),
-        totalMarks: assessment?.totalMarks || 100,
-        solvedCount: answeredCount,
-        questionsCount: examQuestions.length,
-        testCasesPassed: `${answeredCount * 8} / ${examQuestions.length * 8}`,
-        runtimeScore: 'Good (36 ms avg)'
-      });
-    }
+    executeFinalExamEvaluation();
   };
 
   const isLowTime = timeLeftSeconds < 300; // Under 5 minutes
@@ -964,6 +1075,56 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
                 Confirm &amp; Submit Now
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Evaluation in Progress Overlay */}
+      {isSubmittingExam && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                border: '4px solid #E2E8F0',
+                borderTopColor: '#2563EB',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 1.25rem'
+              }}
+            />
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: '800', color: '#0F172A' }}>
+              Grading Assessment
+            </h3>
+            <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#2563EB', fontWeight: '600' }}>
+              {submissionProgress || 'Executing code against server-side sandboxes...'}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748B' }}>
+              Please do not close or navigate away. Each problem is being securely verified against hidden test suites.
+            </p>
           </div>
         </div>
       )}

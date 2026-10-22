@@ -97,108 +97,73 @@ function solve() {
 
 solve();
 `
-  },
-  {
-    id: 'r',
-    name: 'R',
-    version: 'R 4.3.3',
-    runtime: 'Rscript Execution Sandbox',
-    extension: '.R',
-    status: 'enabled',
-    timeLimit: '5.0s',
-    memoryLimit: '256 MB',
-    defaultCode: `# GMRIT Academic R Sandbox
-solve <- function() {
-    # Write statistical computation or solution here
-}
-
-solve()
-`
-  },
-  {
-    id: 'ruby',
-    name: 'Ruby',
-    version: 'Ruby 3.2.3',
-    runtime: 'YARV Isolated Sandbox',
-    extension: '.rb',
-    status: 'enabled',
-    timeLimit: '4.0s',
-    memoryLimit: '128 MB',
-    defaultCode: `# Write your Ruby solution here
-def solve
-    # Solution logic
-end
-
-solve
-`
-  },
-  {
-    id: 'mysql',
-    name: 'MySQL',
-    version: 'MySQL 8.0.36',
-    runtime: 'Relational SQL Query Engine',
-    extension: '.sql',
-    status: 'enabled',
-    timeLimit: '2.0s',
-    memoryLimit: '128 MB',
-    defaultCode: `-- GMR CRM MySQL Query Sandbox
--- Query: Retrieve students with attendance >= 75%
-SELECT student_id, name, department, attendance_pct 
-FROM student_records 
-WHERE attendance_pct >= 75.0 
-ORDER BY attendance_pct DESC;
-`
-  },
-  {
-    id: 'oracle',
-    name: 'Oracle SQL',
-    version: 'Oracle Database 21c (PL/SQL)',
-    runtime: 'Oracle Relational RDBMS Engine',
-    extension: '.sql',
-    status: 'enabled',
-    timeLimit: '2.5s',
-    memoryLimit: '256 MB',
-    defaultCode: `-- GMR CRM Oracle SQL Sandbox
--- Query: Top performing students by CGPA
-SELECT roll_number, full_name, branch, cgpa,
-       RANK() OVER (PARTITION BY branch ORDER BY cgpa DESC) as dept_rank
-FROM gmrit_academic_registry
-WHERE status = 'ACTIVE';
-`
   }
 ];
 
+export const mysqlLanguage = {
+  id: 'mysql',
+  name: 'MySQL',
+  version: 'MySQL 8.0.36',
+  runtime: 'Relational SQL Query Sandbox',
+  extension: '.sql',
+  status: 'enabled',
+  timeLimit: '2.0s',
+  memoryLimit: '128 MB',
+  defaultCode: `# Write your MySQL query statement below\n`
+};
+
+export function isDatabaseProblem(problem) {
+  if (!problem) return false;
+  const topic = (problem.topic || '').toLowerCase();
+  const cat = (problem.category || '').toLowerCase();
+  return (
+    topic.includes('database') ||
+    topic.includes('sql') ||
+    topic === 'db' ||
+    cat.includes('database') ||
+    cat.includes('sql') ||
+    Boolean(problem.starterCode && 'mysql' in problem.starterCode && !('python' in problem.starterCode))
+  );
+}
+
+export function getLanguagesForProblem(problem) {
+  if (isDatabaseProblem(problem)) {
+    return [mysqlLanguage];
+  }
+  return supportedLanguagesList;
+}
+
 export const studentCodingKPIs = {
-  problemsSolved: 128,
-  solvedThisMonth: "+14 this month",
-  problemsAttempted: 176,
-  successRate: "72.7%",
-  currentStreak: 12,
-  longestStreak: 28,
-  totalSubmissions: 342,
-  averageRuntime: "38 ms",
-  rank: 14,
+  problemsSolved: 0,
+  solvedThisMonth: "+0 this month",
+  problemsAttempted: 0,
+  successRate: "0.0%",
+  currentStreak: 0,
+  longestStreak: 0,
+  totalSubmissions: 0,
+  averageRuntime: "0 ms",
+  rank: "--",
   totalStudents: 1450,
-  points: 2340
+  points: 0
 };
 
 export const codingTopicCategories = [
-  { id: 'arrays', name: 'Arrays', problems: 42, solved: 28, percentage: 66, icon: 'Layers', color: '#2563EB' },
-  { id: 'strings', name: 'Strings', problems: 38, solved: 22, percentage: 57, icon: 'FileText', color: '#059669' },
-  { id: 'linked-lists', name: 'Linked Lists', problems: 26, solved: 16, percentage: 61, icon: 'GitCommit', color: '#7C3AED' },
-  { id: 'stacks', name: 'Stacks', problems: 20, solved: 14, percentage: 70, icon: 'Layers', color: '#EA580C' },
-  { id: 'queues', name: 'Queues', problems: 18, solved: 11, percentage: 61, icon: 'AlignLeft', color: '#0891B2' },
-  { id: 'trees', name: 'Trees', problems: 34, solved: 18, percentage: 52, icon: 'GitFork', color: '#059669' },
-  { id: 'graphs', name: 'Graphs', problems: 28, solved: 12, percentage: 42, icon: 'Share2', color: '#DC2626' },
-  { id: 'sorting', name: 'Sorting', problems: 24, solved: 20, percentage: 83, icon: 'ArrowUpDown', color: '#2563EB' },
-  { id: 'searching', name: 'Searching', problems: 22, solved: 18, percentage: 81, icon: 'Search', color: '#059669' },
-  { id: 'recursion', name: 'Recursion', problems: 16, solved: 11, percentage: 68, icon: 'Repeat', color: '#7C3AED' },
-  { id: 'dp', name: 'Dynamic Programming', problems: 30, solved: 9, percentage: 30, icon: 'Grid', color: '#EA580C' },
-  { id: 'greedy', name: 'Greedy Algorithms', problems: 18, solved: 10, percentage: 55, icon: 'Zap', color: '#D97706' },
-  { id: 'hashing', name: 'Hashing', problems: 25, solved: 19, percentage: 76, icon: 'Hash', color: '#0891B2' },
-  { id: 'oop', name: 'Object-Oriented Programming', problems: 15, solved: 12, percentage: 80, icon: 'Box', color: '#2563EB' },
-  { id: 'db', name: 'Database Programming', problems: 14, solved: 9, percentage: 64, icon: 'Database', color: '#059669' },
-  { id: 'math', name: 'Mathematical Problems', problems: 20, solved: 15, percentage: 75, icon: 'Cpu', color: '#7C3AED' }
+  { id: 'arrays', name: 'Arrays', problems: 42, solved: 0, percentage: 0, icon: 'Layers', color: '#2563EB' },
+  { id: 'strings', name: 'Strings', problems: 38, solved: 0, percentage: 0, icon: 'FileText', color: '#059669' },
+  { id: 'linked-lists', name: 'Linked Lists', problems: 26, solved: 0, percentage: 0, icon: 'GitCommit', color: '#7C3AED' },
+  { id: 'stacks', name: 'Stacks', problems: 20, solved: 0, percentage: 0, icon: 'Layers', color: '#EA580C' },
+  { id: 'queues', name: 'Queues', problems: 18, solved: 0, percentage: 0, icon: 'AlignLeft', color: '#0891B2' },
+  { id: 'trees', name: 'Trees', problems: 34, solved: 0, percentage: 0, icon: 'GitFork', color: '#059669' },
+  { id: 'graphs', name: 'Graphs', problems: 28, solved: 0, percentage: 0, icon: 'Share2', color: '#DC2626' },
+  { id: 'sorting', name: 'Sorting', problems: 24, solved: 0, percentage: 0, icon: 'ArrowUpDown', color: '#2563EB' },
+  { id: 'searching', name: 'Searching', problems: 22, solved: 0, percentage: 0, icon: 'Search', color: '#059669' },
+  { id: 'recursion', name: 'Recursion', problems: 16, solved: 0, percentage: 0, icon: 'Repeat', color: '#7C3AED' },
+  { id: 'dp', name: 'Dynamic Programming', problems: 30, solved: 0, percentage: 0, icon: 'Grid', color: '#EA580C' },
+  { id: 'greedy', name: 'Greedy Algorithms', problems: 18, solved: 0, percentage: 0, icon: 'Zap', color: '#D97706' },
+  { id: 'hashing', name: 'Hashing', problems: 25, solved: 0, percentage: 0, icon: 'Hash', color: '#0891B2' },
+  { id: 'oop', name: 'Object-Oriented Programming', problems: 15, solved: 0, percentage: 0, icon: 'Box', color: '#2563EB' },
+  { id: 'db', name: 'Database Programming', problems: 14, solved: 0, percentage: 0, icon: 'Database', color: '#059669' },
+  { id: 'math', name: 'Mathematical Problems', problems: 20, solved: 0, percentage: 0, icon: 'Cpu', color: '#7C3AED' }
 ];
 
 export const codingProblemsList = [
@@ -209,7 +174,7 @@ export const codingProblemsList = [
     topic: 'Arrays',
     acceptance: '78%',
     attempts: '1,842',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers such that they add up to \`target\`.
@@ -243,30 +208,16 @@ You can return the answer in any order.`,
     starterCode: {
       python: `class Solution:
     def twoSum(self, nums: list[int], target: int) -> list[int]:
-        # Complete your solution
-        prev_map = {}
-        for i, n in enumerate(nums):
-            diff = target - n
-            if diff in prev_map:
-                return [prev_map[diff], i]
-            prev_map[n] = i
-        return []
+        # Write your code here
+        pass
 `,
       cpp: `#include <vector>
-#include <unordered_map>
 using namespace std;
 
 class Solution {
 public:
     vector<int> twoSum(vector<int>& nums, int target) {
-        unordered_map<int, int> seen;
-        for (int i = 0; i < nums.size(); i++) {
-            int complement = target - nums[i];
-            if (seen.find(complement) != seen.end()) {
-                return {seen[complement], i};
-            }
-            seen[nums[i]] = i;
-        }
+        // Write your code here
         return {};
     }
 };
@@ -275,30 +226,20 @@ public:
 
 class Solution {
     public int[] twoSum(int[] nums, int target) {
-        Map<Integer, Integer> map = new HashMap<>();
-        for (int i = 0; i < nums.length; i++) {
-            int complement = target - nums[i];
-            if (map.containsKey(complement)) {
-                return new int[] { map.get(complement), i };
-            }
-            map.put(nums[i], i);
-        }
+        // Write your code here
         return new int[]{};
     }
 }
 `,
-      c: `int* twoSum(int* nums, int numsSize, int target, int* returnSize) {
+      c: `#include <stdlib.h>
+
+/**
+ * Note: The returned array must be malloced, assume caller calls free().
+ */
+int* twoSum(int* nums, int numsSize, int target, int* returnSize) {
     *returnSize = 2;
     int* result = (int*)malloc(2 * sizeof(int));
-    for (int i = 0; i < numsSize; i++) {
-        for (int j = i + 1; j < numsSize; j++) {
-            if (nums[i] + nums[j] == target) {
-                result[0] = i;
-                result[1] = j;
-                return result;
-            }
-        }
-    }
+    // Write your code here
     return result;
 }
 `,
@@ -308,38 +249,9 @@ class Solution {
  * @return {number[]}
  */
 var twoSum = function(nums, target) {
-    const map = new Map();
-    for (let i = 0; i < nums.length; i++) {
-        const diff = target - nums[i];
-        if (map.has(diff)) {
-            return [map.get(diff), i];
-        }
-        map.set(nums[i], i);
-    }
+    // Write your code here
     return [];
 };
-`,
-      r: `twoSum <- function(nums, target) {
-    seen <- list()
-    for (i in seq_along(nums)) {
-        diff <- target - nums[i]
-        if (!is.null(seen[[as.character(diff)]])) {
-            return(c(seen[[as.character(diff)]] - 1, i - 1))
-        }
-        seen[[as.character(nums[i])]] <- i
-    }
-    return(c())
-}
-`,
-      ruby: `def two_sum(nums, target)
-  seen = {}
-  nums.each_with_index do |num, i|
-    complement = target - num
-    return [seen[complement], i] if seen.key?(complement)
-    seen[num] = i
-  end
-  []
-end
 `
     },
     sampleTestCases: [
@@ -401,14 +313,8 @@ Can you reverse it iteratively and recursively?`,
 #         self.next = next
 class Solution:
     def reverseList(self, head):
-        prev = None
-        curr = head
-        while curr:
-            next_temp = curr.next
-            curr.next = prev
-            prev = curr
-            curr = next_temp
-        return prev
+        # Write your code here
+        pass
 `,
       cpp: `/**
  * Definition for singly-linked list.
@@ -422,71 +328,45 @@ class Solution:
 class Solution {
 public:
     ListNode* reverseList(ListNode* head) {
-        ListNode* prev = nullptr;
-        ListNode* curr = head;
-        while (curr != nullptr) {
-            ListNode* nextTemp = curr->next;
-            curr->next = prev;
-            prev = curr;
-            curr = nextTemp;
-        }
-        return prev;
+        // Write your code here
+        return nullptr;
     }
 };
 `,
       java: `class Solution {
     public ListNode reverseList(ListNode head) {
-        ListNode prev = null;
-        ListNode curr = head;
-        while (curr != null) {
-            ListNode nextTemp = curr.next;
-            curr.next = prev;
-            prev = curr;
-            curr = nextTemp;
-        }
-        return prev;
+        // Write your code here
+        return null;
     }
 }
 `,
-      c: `struct ListNode* reverseList(struct ListNode* head) {
-    struct ListNode* prev = NULL;
-    struct ListNode* curr = head;
-    while (curr != NULL) {
-        struct ListNode* next = curr->next;
-        curr->next = prev;
-        prev = curr;
-        curr = next;
-    }
-    return prev;
+      c: `/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     struct ListNode *next;
+ * };
+ */
+struct ListNode* reverseList(struct ListNode* head) {
+    // Write your code here
+    return NULL;
 }
 `,
-      javascript: `var reverseList = function(head) {
-    let prev = null;
-    let curr = head;
-    while (curr) {
-        let nextTemp = curr.next;
-        curr.next = prev;
-        prev = curr;
-        curr = nextTemp;
-    }
-    return prev;
+      javascript: `/**
+ * Definition for singly-linked list.
+ * function ListNode(val, next) {
+ *     this.val = (val===undefined ? 0 : val)
+ *     this.next = (next===undefined ? null : next)
+ * }
+ */
+/**
+ * @param {ListNode} head
+ * @return {ListNode}
+ */
+var reverseList = function(head) {
+    // Write your code here
+    return null;
 };
-`,
-      r: `reverseList <- function(nodeList) {
-    return(rev(nodeList))
-}
-`,
-      ruby: `def reverse_list(head)
-  prev = nil
-  curr = head
-  while curr
-    nxt = curr.next
-    curr.next = prev
-    prev = curr
-    curr = nxt
-  end
-  prev
-end
 `
     },
     sampleTestCases: [
@@ -517,7 +397,7 @@ end
     topic: 'Searching',
     acceptance: '82%',
     attempts: '2,341',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given an array of integers \`nums\` which is sorted in ascending order, and an integer \`target\`, write a function to search \`target\` in \`nums\`.
@@ -546,15 +426,7 @@ You must write an algorithm with **O(log n)** runtime complexity.`,
     starterCode: {
       python: `class Solution:
     def search(self, nums: list[int], target: int) -> int:
-        left, right = 0, len(nums) - 1
-        while left <= right:
-            mid = (left + right) // 2
-            if nums[mid] == target:
-                return mid
-            elif nums[mid] < target:
-                left = mid + 1
-            else:
-                right = mid - 1
+        # Write your code here
         return -1
 `,
       cpp: `#include <vector>
@@ -563,72 +435,32 @@ using namespace std;
 class Solution {
 public:
     int search(vector<int>& nums, int target) {
-        int left = 0, right = nums.size() - 1;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            if (nums[mid] == target) return mid;
-            if (nums[mid] < target) left = mid + 1;
-            else right = mid - 1;
-        }
+        // Write your code here
         return -1;
     }
 };
 `,
       java: `class Solution {
     public int search(int[] nums, int target) {
-        int left = 0, right = nums.length - 1;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            if (nums[mid] == target) return mid;
-            if (nums[mid] < target) left = mid + 1;
-            else right = mid - 1;
-        }
+        // Write your code here
         return -1;
     }
 }
 `,
       c: `int search(int* nums, int numsSize, int target) {
-    int left = 0, right = numsSize - 1;
-    while (left <= right) {
-        int mid = left + (right - left) / 2;
-        if (nums[mid] == target) return mid;
-        if (nums[mid] < target) left = mid + 1;
-        else right = mid - 1;
-    }
+    // Write your code here
     return -1;
 }
 `,
-      javascript: `var search = function(nums, target) {
-    let left = 0, right = nums.length - 1;
-    while (left <= right) {
-        let mid = Math.floor((left + right) / 2);
-        if (nums[mid] === target) return mid;
-        if (nums[mid] < target) left = mid + 1;
-        else right = mid - 1;
-    }
+      javascript: `/**
+ * @param {number[]} nums
+ * @param {number} target
+ * @return {number}
+ */
+var search = function(nums, target) {
+    // Write your code here
     return -1;
 };
-`,
-      r: `searchBinary <- function(nums, target) {
-    idx <- which(nums == target)
-    if (length(idx) > 0) return(idx[1] - 1)
-    return(-1)
-}
-`,
-      ruby: `def search(nums, target)
-  left = 0
-  right = nums.length - 1
-  while left <= right
-    mid = left + (right - left) / 2
-    return mid if nums[mid] == target
-    if nums[mid] < target
-      left = mid + 1
-    else
-      right = mid - 1
-    end
-  end
-  -1
-end
 `
     },
     sampleTestCases: [
@@ -659,7 +491,7 @@ end
     topic: 'Strings',
     acceptance: '58%',
     attempts: '1,204',
-    status: 'Attempted',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given a string \`s\`, find the length of the **longest substring** without repeating characters.`,
@@ -687,100 +519,40 @@ end
     starterCode: {
       python: `class Solution:
     def lengthOfLongestSubstring(self, s: str) -> int:
-        char_map = {}
-        left = 0
-        max_len = 0
-        for right, char in enumerate(s):
-            if char in char_map and char_map[char] >= left:
-                left = char_map[char] + 1
-            char_map[char] = right
-            max_len = max(max_len, right - left + 1)
-        return max_len
+        # Write your code here
+        return 0
 `,
       cpp: `#include <string>
-#include <unordered_map>
-#include <algorithm>
 using namespace std;
 
 class Solution {
 public:
     int lengthOfLongestSubstring(string s) {
-        unordered_map<char, int> seen;
-        int left = 0, maxLen = 0;
-        for (int right = 0; right < s.length(); right++) {
-            if (seen.find(s[right]) != seen.end() && seen[s[right]] >= left) {
-                left = seen[s[right]] + 1;
-            }
-            seen[s[right]] = right;
-            maxLen = max(maxLen, right - left + 1);
-        }
-        return maxLen;
+        // Write your code here
+        return 0;
     }
 };
 `,
-      java: `import java.util.*;
-
-class Solution {
+      java: `class Solution {
     public int lengthOfLongestSubstring(String s) {
-        Map<Character, Integer> map = new HashMap<>();
-        int left = 0, maxLen = 0;
-        for (int right = 0; right < s.length(); right++) {
-            char c = s.charAt(right);
-            if (map.containsKey(c) && map.get(c) >= left) {
-                left = map.get(c) + 1;
-            }
-            map.put(c, right);
-            maxLen = Math.max(maxLen, right - left + 1);
-        }
-        return maxLen;
+        // Write your code here
+        return 0;
     }
 }
 `,
       c: `int lengthOfLongestSubstring(char* s) {
-    int lastPos[256];
-    for (int i = 0; i < 256; i++) lastPos[i] = -1;
-    int maxLen = 0, start = 0;
-    for (int i = 0; s[i] != '\\0'; i++) {
-        unsigned char c = (unsigned char)s[i];
-        if (lastPos[c] >= start) {
-            start = lastPos[c] + 1;
-        }
-        lastPos[c] = i;
-        int len = i - start + 1;
-        if (len > maxLen) maxLen = len;
-    }
-    return maxLen;
+    // Write your code here
+    return 0;
 }
 `,
-      javascript: `var lengthOfLongestSubstring = function(s) {
-    const map = new Map();
-    let left = 0, maxLen = 0;
-    for (let right = 0; right < s.length; right++) {
-        if (map.has(s[right]) && map.get(s[right]) >= left) {
-            left = map.get(s[right]) + 1;
-        }
-        map.set(s[right], right);
-        maxLen = Math.max(maxLen, right - left + 1);
-    }
-    return maxLen;
+      javascript: `/**
+ * @param {string} s
+ * @return {number}
+ */
+var lengthOfLongestSubstring = function(s) {
+    // Write your code here
+    return 0;
 };
-`,
-      r: `lengthOfLongestSubstring <- function(s) {
-    # Sliding window in R
-    return(3)
-}
-`,
-      ruby: `def length_of_longest_substring(s)
-  seen = {}
-  left = 0
-  max_len = 0
-  s.each_char.with_index do |c, right|
-    left = seen[c] + 1 if seen.key?(c) && seen[c] >= left
-    seen[c] = right
-    max_len = [max_len, right - left + 1].max
-  end
-  max_len
-end
 `
     },
     sampleTestCases: [
@@ -811,7 +583,7 @@ end
     topic: 'Stacks',
     acceptance: '85%',
     attempts: '2,100',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given a string \`s\` containing just the characters \`'('\`, \`')'\`, \`'{'\`, \`'}'\`, \`'['\` and \`']'\`, determine if the input string is valid.
@@ -832,16 +604,8 @@ An input string is valid if:
     starterCode: {
       python: `class Solution:
     def isValid(self, s: str) -> bool:
-        stack = []
-        mapping = {')': '(', '}': '{', ']': '['}
-        for char in s:
-            if char in mapping:
-                top = stack.pop() if stack else '#'
-                if mapping[char] != top:
-                    return False
-            else:
-                stack.append(char)
-        return not stack
+        # Write your code here
+        pass
 `,
       cpp: `#include <string>
 #include <stack>
@@ -851,17 +615,8 @@ using namespace std;
 class Solution {
 public:
     bool isValid(string s) {
-        stack<char> st;
-        unordered_map<char, char> map = {{')', '('}, {'}', '{'}, {']', '['}};
-        for (char c : s) {
-            if (map.count(c)) {
-                if (st.empty() || st.top() != map[c]) return false;
-                st.pop();
-            } else {
-                st.push(c);
-            }
-        }
-        return st.empty();
+        // Write your code here
+        return false;
     }
 };
 `,
@@ -869,60 +624,26 @@ public:
 
 class Solution {
     public boolean isValid(String s) {
-        Stack<Character> stack = new Stack<>();
-        for (char c : s.toCharArray()) {
-            if (c == '(') stack.push(')');
-            else if (c == '{') stack.push('}');
-            else if (c == '[') stack.push(']');
-            else if (stack.isEmpty() || stack.pop() != c) return false;
-        }
-        return stack.isEmpty();
+        // Write your code here
+        return false;
     }
 }
 `,
-      c: `bool isValid(char* s) {
-    char stack[10005];
-    int top = -1;
-    for (int i = 0; s[i] != '\\0'; i++) {
-        if (s[i] == '(' || s[i] == '{' || s[i] == '[') {
-            stack[++top] = s[i];
-        } else {
-            if (top == -1) return false;
-            char open = stack[top--];
-            if (s[i] == ')' && open != '(') return false;
-            if (s[i] == '}' && open != '{') return false;
-            if (s[i] == ']' && open != '[') return false;
-        }
-    }
-    return top == -1;
+      c: `#include <stdbool.h>
+
+bool isValid(char* s) {
+    // Write your code here
+    return false;
 }
 `,
-      javascript: `var isValid = function(s) {
-    const stack = [];
-    const map = { ')': '(', '}': '{', ']': '[' };
-    for (let c of s) {
-        if (map[c]) {
-            if (stack.pop() !== map[c]) return false;
-        } else {
-            stack.push(c);
-        }
-    }
-    return stack.length === 0;
+      javascript: `/**
+ * @param {string} s
+ * @return {boolean}
+ */
+var isValid = function(s) {
+    // Write your code here
+    return false;
 };
-`,
-      r: `isValid <- function(s) { return(TRUE) }`,
-      ruby: `def is_valid(s)
-  stack = []
-  map = { ')' => '(', '}' => '{', ']' => '[' }
-  s.each_char do |c|
-    if map.key?(c)
-      return false if stack.pop != map[c]
-    else
-      stack << c
-    end
-  end
-  stack.empty?
-end
 `
     },
     sampleTestCases: [
@@ -952,7 +673,7 @@ end
     topic: 'Dynamic Programming',
     acceptance: '54%',
     attempts: '1,650',
-    status: 'Solved',
+    status: 'Not Attempted',
     timeLimit: '2.0s',
     memoryLimit: '128 MB',
     description: `Given an integer array \`nums\`, find the subarray with the largest sum, and return its sum.`,
@@ -967,68 +688,40 @@ end
     starterCode: {
       python: `class Solution:
     def maxSubArray(self, nums: list[int]) -> int:
-        cur_sum = 0
-        max_sum = nums[0]
-        for n in nums:
-            cur_sum = max(n, cur_sum + n)
-            max_sum = max(max_sum, cur_sum)
-        return max_sum
+        # Write your code here
+        pass
 `,
       cpp: `#include <vector>
-#include <algorithm>
 using namespace std;
 
 class Solution {
 public:
     int maxSubArray(vector<int>& nums) {
-        int curSum = 0, maxSum = nums[0];
-        for (int n : nums) {
-            curSum = max(n, curSum + n);
-            maxSum = max(maxSum, curSum);
-        }
-        return maxSum;
+        // Write your code here
+        return 0;
     }
 };
 `,
       java: `class Solution {
     public int maxSubArray(int[] nums) {
-        int curSum = 0, maxSum = nums[0];
-        for (int n : nums) {
-            curSum = Math.max(n, curSum + n);
-            maxSum = Math.max(maxSum, curSum);
-        }
-        return maxSum;
+        // Write your code here
+        return 0;
     }
 }
 `,
       c: `int maxSubArray(int* nums, int numsSize) {
-    int curSum = 0, maxSum = nums[0];
-    for (int i = 0; i < numsSize; i++) {
-        curSum = (nums[i] > curSum + nums[i]) ? nums[i] : (curSum + nums[i]);
-        if (curSum > maxSum) maxSum = curSum;
-    }
-    return maxSum;
+    // Write your code here
+    return 0;
 }
 `,
-      javascript: `var maxSubArray = function(nums) {
-    let curSum = 0, maxSum = nums[0];
-    for (let n of nums) {
-        curSum = Math.max(n, curSum + n);
-        maxSum = Math.max(maxSum, curSum);
-    }
-    return maxSum;
+      javascript: `/**
+ * @param {number[]} nums
+ * @return {number}
+ */
+var maxSubArray = function(nums) {
+    // Write your code here
+    return 0;
 };
-`,
-      r: `maxSubArray <- function(nums) { return(6) }`,
-      ruby: `def max_sub_array(nums)
-  cur_sum = 0
-  max_sum = nums[0]
-  nums.each do |n|
-    cur_sum = [n, cur_sum + n].max
-    max_sum = [max_sum, cur_sum].max
-  end
-  max_sum
-end
 `
     },
     sampleTestCases: [
@@ -1074,44 +767,16 @@ Return \`true\` if a cycle exists, otherwise \`false\`.`,
     starterCode: {
       python: `class Solution:
     def isCyclic(self, V: int, adj: list[list[int]]) -> bool:
-        visited = [0] * V # 0 = unvisited, 1 = visiting, 2 = visited
-        
-        def dfs(u):
-            visited[u] = 1
-            for v in adj[u]:
-                if visited[v] == 1:
-                    return True
-                if visited[v] == 0 and dfs(v):
-                    return True
-            visited[u] = 2
-            return False
-
-        for i in range(V):
-            if visited[i] == 0:
-                if dfs(i):
-                    return True
-        return False
+        # Write your code here
+        pass
 `,
       cpp: `#include <vector>
 using namespace std;
 
 class Solution {
 public:
-    bool dfs(int u, vector<int>& visited, vector<vector<int>>& adj) {
-        visited[u] = 1;
-        for (int v : adj[u]) {
-            if (visited[v] == 1) return true;
-            if (visited[v] == 0 && dfs(v, visited, adj)) return true;
-        }
-        visited[u] = 2;
-        return false;
-    }
-
     bool isCyclic(int V, vector<vector<int>>& adj) {
-        vector<int> visited(V, 0);
-        for (int i = 0; i < V; i++) {
-            if (visited[i] == 0 && dfs(i, visited, adj)) return true;
-        }
+        // Write your code here
         return false;
     }
 };
@@ -1120,52 +785,27 @@ public:
 
 class Solution {
     public boolean isCyclic(int V, List<List<Integer>> adj) {
-        int[] visited = new int[V];
-        for (int i = 0; i < V; i++) {
-            if (visited[i] == 0 && dfs(i, visited, adj)) return true;
-        }
+        // Write your code here
         return false;
     }
+}
+`,
+      c: `#include <stdbool.h>
 
-    private boolean dfs(int u, int[] visited, List<List<Integer>> adj) {
-        visited[u] = 1;
-        for (int v : adj.get(u)) {
-            if (visited[v] == 1) return true;
-            if (visited[v] == 0 && dfs(v, visited, adj)) return true;
-        }
-        visited[u] = 2;
-        return false;
-    }
-}
-`,
-      c: `// Directed Graph Cycle Detection
 bool isCyclic(int V, int** adj, int* adjSizes) {
-    return true;
+    // Write your code here
+    return false;
 }
 `,
-      javascript: `var isCyclic = function(V, adj) {
-    const visited = new Array(V).fill(0);
-    const dfs = (u) => {
-        visited[u] = 1;
-        for (let v of adj[u]) {
-            if (visited[v] === 1) return true;
-            if (visited[v] === 0 && dfs(v)) return true;
-        }
-        visited[u] = 2;
-        return false;
-    };
-    for (let i = 0; i < V; i++) {
-        if (visited[i] === 0 && dfs(i)) return true;
-    }
+      javascript: `/**
+ * @param {number} V
+ * @param {number[][]} adj
+ * @return {boolean}
+ */
+var isCyclic = function(V, adj) {
+    // Write your code here
     return false;
 };
-`,
-      r: `isCyclic <- function(V, adj) { return(TRUE) }`,
-      ruby: `def is_cyclic(v, adj)
-  visited = Array.new(v, 0)
-  # logic
-  true
-end
 `
     },
     sampleTestCases: [
@@ -1186,6 +826,205 @@ end
       bruteForceComplexity: "O(V * E) Path Checking",
       recommendation: "3-state DFS or Kahn's algorithm (indegree topological sorting) achieves optimal linear O(V + E)."
     }
+  },
+  {
+    id: 'prob-8',
+    title: 'Combine Two Tables',
+    difficulty: 'Easy',
+    topic: 'Database Programming',
+    acceptance: '74%',
+    attempts: '940',
+    status: 'Not Attempted',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    description: `Table: \`Person\`
+\`\`\`
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| personId    | int     |
+| lastName    | varchar |
+| firstName   | varchar |
++-------------+---------+
+personId is the primary key.
+\`\`\`
+
+Table: \`Address\`
+\`\`\`
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| addressId   | int     |
+| personId    | int     |
+| city        | varchar |
+| state       | varchar |
++-------------+---------+
+addressId is the primary key.
+\`\`\`
+
+Write a solution to report the first name, last name, city, and state of each person in the \`Person\` table. If the address of a \`personId\` is not present in the \`Address\` table, report \`null\` instead.
+
+Return the result table in **any order**.`,
+    examples: [
+      {
+        input: 'Person = [[1, "Wang", "Allen"], [2, "Alice", "Bob"]], Address = [[1, 2, "New York City", "New York"]]',
+        output: '+-----------+----------+---------------+----------+\n| firstName | lastName | city          | state    |\n+-----------+----------+---------------+----------+\n| Allen     | Wang     | null          | null     |\n| Bob       | Alice    | New York City | New York |\n+-----------+----------+---------------+----------+',
+        explanation: 'There is no address in Address table for personId = 1, so city and state are null.'
+      }
+    ],
+    constraints: [
+      'Person table contains unique personId values.',
+      'Address table contains unique addressId values.'
+    ],
+    starterCode: {
+      mysql: `# Write your MySQL query statement below
+SELECT 
+FROM Person
+;
+`
+    },
+    sampleTestCases: [
+      { id: 1, input: 'Person: 2 rows, Address: 1 row', expected: 'Allen Wang null null, Bob Alice NYC NY' }
+    ],
+    hiddenTestCases: [
+      { id: 'h1', input: 'Person: 10 rows, Address: 5 rows', expected: '10 rows matched via LEFT JOIN' }
+    ],
+    hints: [
+      "Hint 1: Use an outer join (LEFT JOIN) since person records must appear even when no corresponding address exists."
+    ],
+    solutionAnalysis: {
+      userComplexity: "O(N + M) Time • O(N) Space",
+      optimalComplexity: "O(N + M) Time • O(N) Space",
+      bruteForceComplexity: "O(N * M) Cartesian Product",
+      recommendation: "Hash Join or Nested Loop with index on Address.personId yields optimal O(N + M) performance."
+    }
+  },
+  {
+    id: 'prob-9',
+    title: 'Second Highest Salary',
+    difficulty: 'Medium',
+    topic: 'Database Programming',
+    acceptance: '43%',
+    attempts: '1,420',
+    status: 'Not Attempted',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    description: `Table: \`Employee\`
+\`\`\`
++-------------+------+
+| Column Name | Type |
++-------------+------+
+| id          | int  |
+| salary      | int  |
++-------------+------+
+id is the primary key.
+\`\`\`
+
+Write a solution to find the second highest distinct salary from the \`Employee\` table. If there is no second highest salary, return \`null\`.`,
+    examples: [
+      {
+        input: 'Employee = [[1, 100], [2, 200], [3, 300]]',
+        output: '+---------------------+\n| SecondHighestSalary |\n+---------------------+\n| 200                 |\n+---------------------+',
+        explanation: '300 is the highest, and 200 is the second highest salary.'
+      }
+    ],
+    constraints: [
+      'Employee table contains 0 or more rows.',
+      'Salaries are positive integers.'
+    ],
+    starterCode: {
+      mysql: `# Write your MySQL query statement below
+SELECT 
+FROM Employee
+;
+`
+    },
+    sampleTestCases: [
+      { id: 1, input: 'Employee: [100, 200, 300]', expected: '200' },
+      { id: 2, input: 'Employee: [100]', expected: 'null' }
+    ],
+    hiddenTestCases: [
+      { id: 'h1', input: 'Employee: [500, 500, 300]', expected: '300' }
+    ],
+    hints: [
+      "Hint 1: Use DISTINCT to handle duplicate salaries.",
+      "Hint 2: Wrapping the query in a subquery returns NULL if OFFSET 1 produces 0 rows."
+    ],
+    solutionAnalysis: {
+      userComplexity: "O(N log N) Time • O(1) Space",
+      optimalComplexity: "O(N) Time with Index • O(1) Space",
+      bruteForceComplexity: "O(N log N) Full Table Sort",
+      recommendation: "Using B-Tree index on salary DESC allows O(1) index scan to locate second distinct salary."
+    }
+  },
+  {
+    id: 'prob-10',
+    title: 'Customers Who Never Order',
+    difficulty: 'Easy',
+    topic: 'Database Programming',
+    acceptance: '68%',
+    attempts: '870',
+    status: 'Not Attempted',
+    timeLimit: '2.0s',
+    memoryLimit: '128 MB',
+    description: `Table: \`Customers\`
+\`\`\`
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| id          | int     |
+| name        | varchar |
++-------------+---------+
+id is the primary key.
+\`\`\`
+
+Table: \`Orders\`
+\`\`\`
++-------------+------+
+| Column Name | Type |
++-------------+------+
+| id          | int  |
+| customerId  | int  |
++-------------+------+
+id is the primary key. customerId is a foreign key to Customers.id.
+\`\`\`
+
+Write a solution to find all customers who never order anything.
+
+Return the result table with single column \`Customers\` in **any order**.`,
+    examples: [
+      {
+        input: 'Customers = [[1, "Joe"], [2, "Henry"], [3, "Sam"], [4, "Max"]], Orders = [[1, 3], [2, 1]]',
+        output: '+-----------+\n| Customers |\n+-----------+\n| Henry     |\n| Max       |\n+-----------+',
+        explanation: 'Joe and Sam made orders. Henry and Max never ordered anything.'
+      }
+    ],
+    constraints: [
+      'Customers table contains unique IDs.',
+      'Orders table contains unique IDs.'
+    ],
+    starterCode: {
+      mysql: `# Write your MySQL query statement below
+SELECT 
+FROM Customers
+;
+`
+    },
+    sampleTestCases: [
+      { id: 1, input: 'Customers: 4, Orders: 2', expected: 'Henry, Max' }
+    ],
+    hiddenTestCases: [
+      { id: 'h1', input: 'Customers: 10, Orders: 10', expected: 'Empty set' }
+    ],
+    hints: [
+      "Hint 1: Use LEFT JOIN and filter with WHERE Orders.customerId IS NULL, or use NOT IN / NOT EXISTS."
+    ],
+    solutionAnalysis: {
+      userComplexity: "O(N + M) Time • O(N) Space",
+      optimalComplexity: "O(N + M) Time with Index",
+      bruteForceComplexity: "O(N * M) Nested Loop",
+      recommendation: "NOT EXISTS with correlated subquery or LEFT JOIN with IS NULL is optimal in MySQL query planner."
+    }
   }
 ];
 
@@ -1195,16 +1034,16 @@ export const codingLeaderboardData = [
   { rank: 3, name: "Suresh P.", department: "IT", solved: 165, points: 2990, streak: 15 },
   { rank: 4, name: "Divya N.", department: "CSE", solved: 154, points: 2840, streak: 12 },
   { rank: 5, name: "Ananya B.", department: "ECE", solved: 148, points: 2710, streak: 21 },
-  { rank: 14, name: "Rahul K. (You)", department: "CSE", solved: 128, points: 2340, streak: 12 }
+  { rank: 14, name: "Rahul K. (You)", department: "CSE", solved: 0, points: 0, streak: 0 }
 ];
 
 export const codingAchievements = [
-  { id: 'ach-1', title: '🔥 7 Day Streak', description: 'Solved problems 7 consecutive days', unlocked: true, date: 'Sep 08, 2025' },
-  { id: 'ach-2', title: '💻 First 10 Problems', description: 'Successfully solved your first 10 problems', unlocked: true, date: 'Aug 14, 2025' },
-  { id: 'ach-3', title: '🏆 50 Problems Solved', description: 'Crossed the 50 solved problems milestone', unlocked: true, date: 'Aug 29, 2025' },
-  { id: 'ach-4', title: '⚡ 5 Easy in a Day', description: 'Solved 5 Easy problems within 24 hours', unlocked: true, date: 'Sep 02, 2025' },
-  { id: 'ach-5', title: '🎯 80% Assessment Score', description: 'Scored >= 80% in an official coding assessment', unlocked: true, date: 'Sep 06, 2025' },
-  { id: 'ach-6', title: '🌟 Algorithm Master', description: 'Solve 20 Dynamic Programming challenges', unlocked: false, progress: '9/20' }
+  { id: 'ach-1', title: '🔥 7 Day Streak', description: 'Solve problems on 7 consecutive days', unlocked: false, progress: '0/7 days' },
+  { id: 'ach-2', title: '💻 First 10 Problems', description: 'Successfully solve your first 10 problems', unlocked: false, progress: '0/10' },
+  { id: 'ach-3', title: '🏆 50 Problems Solved', description: 'Cross the 50 solved problems milestone', unlocked: false, progress: '0/50' },
+  { id: 'ach-4', title: '⚡ First Problem Solved', description: 'Solve your first programming challenge', unlocked: false, progress: '0/1' },
+  { id: 'ach-5', title: '🎯 First Submission', description: 'Submit your code for automated evaluation', unlocked: false, progress: '0/1' },
+  { id: 'ach-6', title: '🌟 Algorithm Explorer', description: 'Attempt problems across at least 3 distinct topics', unlocked: false, progress: '0/3' }
 ];
 
 export const codingAssessmentsList = [
