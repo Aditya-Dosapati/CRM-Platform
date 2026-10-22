@@ -91,7 +91,12 @@ CREATE POLICY "rag_docs_authenticated_select" ON public.rag_documents
             status IN ('published', 'indexed', 'uploaded')
             AND (
                 -- Explicit permission in document_permissions
-                public.check_document_permission(id, auth.uid())
+                EXISTS (
+                    SELECT 1 FROM public.document_permissions dp
+                    WHERE dp.document_id = rag_documents.id
+                    AND dp.user_id = auth.uid()
+                    AND dp.can_view = TRUE
+                )
                 -- Match via faculty_assignments and student enrollment
                 OR EXISTS (
                     SELECT 1 FROM public.students s

@@ -169,35 +169,66 @@ export default function CodingWorkspaceModal({
 
   // Run Code against visible sample cases
   const handleRunCode = async () => {
+    if (isRunning) return;
     setIsRunning(true);
-    const result = await codeExecutionService.runCode(problem.id, selectedLanguage, code);
-    setSampleResults(result);
-    setIsRunning(false);
-    if (result.isCompileError || (result.errors && result.errors.length > 0)) {
-      setActiveBottomTab('debugger');
-    } else {
+    try {
+      const result = await codeExecutionService.runCode(problem.id, selectedLanguage, code);
+      setSampleResults(result);
+      if (result.isCompileError || (result.errors && result.errors.length > 0)) {
+        setActiveBottomTab('debugger');
+      } else {
+        setActiveBottomTab('testresult');
+      }
+    } catch (err) {
+      setSampleResults({
+        status: 'Runtime Error',
+        isCompileError: false,
+        allPassed: false,
+        compilerOutput: err?.message || 'Execution error encountered.',
+        testResults: (problem.sampleTestCases || []).map(tc => ({
+          id: tc.id,
+          passed: false,
+          input: tc.input,
+          expected: tc.expected,
+          actual: `Execution failed: ${err?.message || 'Unknown error'}`
+        }))
+      });
       setActiveBottomTab('testresult');
+    } finally {
+      setIsRunning(false);
     }
   };
 
   // Submit Code against hidden test cases
   const handleSubmitCode = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    const result = await codeExecutionService.submitCode(problem.id, selectedLanguage, code);
-    setSubmissionResult(result);
-    setIsSubmitting(false);
+    try {
+      const result = await codeExecutionService.submitCode(problem.id, selectedLanguage, code);
+      setSubmissionResult(result);
 
-    if (result.isCompileError || (result.errors && result.errors.length > 0)) {
-      setActiveBottomTab('debugger');
-    } else {
-      setActiveBottomTab('testresult');
-    }
-
-    if (result.status === 'Accepted') {
-      setShowSolutionDiscussion(true);
-      if (onProblemSolved) {
-        onProblemSolved(problem.id);
+      if (result.isCompileError || (result.errors && result.errors.length > 0)) {
+        setActiveBottomTab('debugger');
+      } else {
+        setActiveBottomTab('testresult');
       }
+
+      if (result.status === 'Accepted') {
+        setShowSolutionDiscussion(true);
+        if (onProblemSolved) {
+          onProblemSolved(problem.id);
+        }
+      }
+    } catch (err) {
+      setSubmissionResult({
+        status: 'Runtime Error',
+        passedCount: 0,
+        totalCount: (problem.sampleTestCases?.length || 0) + (problem.hiddenTestCases?.length || 0),
+        compilerOutput: err?.message || 'Submission execution failed.'
+      });
+      setActiveBottomTab('testresult');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -205,7 +236,7 @@ export default function CodingWorkspaceModal({
   const handleResetCode = () => {
     const template = codeExecutionService.getStarterTemplate(problem, selectedLanguage);
     setCode(template);
-    codeExecutionService.saveDraft(problem.id, selectedLanguage, template);
+    codeExecutionService.clearDraft(problem.id, selectedLanguage);
     setSampleResults(null);
     setSubmissionResult(null);
   };
@@ -222,9 +253,9 @@ export default function CodingWorkspaceModal({
     return Array.from({ length: lineCount }, (_, i) => i + 1);
   }, [code]);
 
-  // Generate runtime distribution bar
-  const runtimePercentile = submissionResult?.runtimePercentile || `${Math.floor(60 + Math.random() * 35)}%`;
-  const memoryPercentile = submissionResult?.memoryPercentile || `${Math.floor(50 + Math.random() * 45)}%`;
+  // Runtime and memory percentiles from genuine provider evaluation (if available)
+  const runtimePercentile = submissionResult?.runtimePercentile || null;
+  const memoryPercentile = submissionResult?.memoryPercentile || null;
 
   // LeetCode-style colors
   const lcBg = '#1A1A2E';
@@ -1104,79 +1135,45 @@ export default function CodingWorkspaceModal({
                             <div style={{ fontSize: '20px', fontWeight: 700, color: lcGreen, marginBottom: '16px' }}>
                               Accepted
                             </div>
-                            <div style={{ display: 'flex', gap: '24px', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', gap: '32px', marginBottom: '16px' }}>
                               {/* Runtime */}
-                              <div>
+                              <div style={{
+                                backgroundColor: '#2D2D2D',
+                                padding: '12px 18px',
+                                borderRadius: '8px',
+                                border: `1px solid ${lcBorder}`
+                              }}>
                                 <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px' }}>Runtime</div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                  <span style={{ fontSize: '20px', fontWeight: 700, color: lcTextPrimary }}>
-                                    {submissionResult.runtimeMs?.replace(' ms', '') || '42'}
+                                  <span style={{ fontSize: '22px', fontWeight: 700, color: lcTextPrimary }}>
+                                    {submissionResult.runtimeMs || '0 ms'}
                                   </span>
-                                  <span style={{ fontSize: '13px', color: lcTextSecondary }}>ms</span>
                                 </div>
-                                <div style={{ fontSize: '12px', color: lcTextSecondary }}>
-                                  Beats <span style={{ color: lcTextPrimary, fontWeight: 600 }}>{runtimePercentile}</span> of users
-                                </div>
-                                {/* Mini bar chart */}
-                                <div style={{
-                                  marginTop: '6px', height: '24px', width: '140px',
-                                  backgroundColor: '#373737', borderRadius: '4px',
-                                  position: 'relative', overflow: 'hidden'
-                                }}>
-                                  <div style={{
-                                    position: 'absolute', left: `${parseInt(runtimePercentile)}%`,
-                                    top: 0, bottom: 0, width: '2px',
-                                    backgroundColor: lcGreen
-                                  }} />
-                                  {/* Distribution bars */}
-                                  {Array.from({length: 20}, (_, i) => (
-                                    <div key={i} style={{
-                                      position: 'absolute',
-                                      left: `${i * 5}%`,
-                                      bottom: 0,
-                                      width: '4%',
-                                      height: `${Math.random() * 80 + 10}%`,
-                                      backgroundColor: i * 5 <= parseInt(runtimePercentile) ? '#4A4A4A' : '#555',
-                                      borderRadius: '1px'
-                                    }} />
-                                  ))}
-                                </div>
+                                {runtimePercentile && (
+                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginTop: '4px' }}>
+                                    Beats <span style={{ color: lcTextPrimary, fontWeight: 600 }}>{runtimePercentile}</span> of users
+                                  </div>
+                                )}
                               </div>
 
                               {/* Memory */}
-                              <div>
+                              <div style={{
+                                backgroundColor: '#2D2D2D',
+                                padding: '12px 18px',
+                                borderRadius: '8px',
+                                border: `1px solid ${lcBorder}`
+                              }}>
                                 <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px' }}>Memory</div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                  <span style={{ fontSize: '20px', fontWeight: 700, color: lcTextPrimary }}>
-                                    {submissionResult.memoryMB?.replace(' MB', '') || '17.2'}
+                                  <span style={{ fontSize: '22px', fontWeight: 700, color: lcTextPrimary }}>
+                                    {submissionResult.memoryMB || '0 MB'}
                                   </span>
-                                  <span style={{ fontSize: '13px', color: lcTextSecondary }}>MB</span>
                                 </div>
-                                <div style={{ fontSize: '12px', color: lcTextSecondary }}>
-                                  Beats <span style={{ color: lcTextPrimary, fontWeight: 600 }}>{memoryPercentile}</span> of users
-                                </div>
-                                <div style={{
-                                  marginTop: '6px', height: '24px', width: '140px',
-                                  backgroundColor: '#373737', borderRadius: '4px',
-                                  position: 'relative', overflow: 'hidden'
-                                }}>
-                                  <div style={{
-                                    position: 'absolute', left: `${parseInt(memoryPercentile)}%`,
-                                    top: 0, bottom: 0, width: '2px',
-                                    backgroundColor: lcGreen
-                                  }} />
-                                  {Array.from({length: 20}, (_, i) => (
-                                    <div key={i} style={{
-                                      position: 'absolute',
-                                      left: `${i * 5}%`,
-                                      bottom: 0,
-                                      width: '4%',
-                                      height: `${Math.random() * 80 + 10}%`,
-                                      backgroundColor: i * 5 <= parseInt(memoryPercentile) ? '#4A4A4A' : '#555',
-                                      borderRadius: '1px'
-                                    }} />
-                                  ))}
-                                </div>
+                                {memoryPercentile && (
+                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginTop: '4px' }}>
+                                    Beats <span style={{ color: lcTextPrimary, fontWeight: 600 }}>{memoryPercentile}</span> of users
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>

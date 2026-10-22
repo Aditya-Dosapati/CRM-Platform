@@ -6,6 +6,7 @@ import {
   isDatabaseProblem,
   getLanguagesForProblem
 } from '../data/codingData.js';
+import { generateExecutionSource } from './codeRunnerHarness.js';
 import auditService from './auditService.js';
 import authService from './authService.js';
 
@@ -35,10 +36,12 @@ class CodeExecutionService {
 
   getUserProgress(userId) {
     try {
-      const key = this.getProgressKey(userId);
-      const data = localStorage.getItem(key);
-      if (data) {
-        return JSON.parse(data);
+      if (typeof localStorage !== 'undefined') {
+        const key = this.getProgressKey(userId);
+        const data = localStorage.getItem(key);
+        if (data) {
+          return JSON.parse(data);
+        }
       }
     } catch (e) {
       console.warn('Could not read user coding progress:', e);
@@ -52,10 +55,12 @@ class CodeExecutionService {
 
   saveUserProgress(progress, userId) {
     try {
-      const key = this.getProgressKey(userId);
-      localStorage.setItem(key, JSON.stringify(progress));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('gmrit_coding_progress_updated', { detail: { userId: key } }));
+      if (typeof localStorage !== 'undefined') {
+        const key = this.getProgressKey(userId);
+        localStorage.setItem(key, JSON.stringify(progress));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('gmrit_coding_progress_updated', { detail: { userId: key } }));
+        }
       }
     } catch (e) {
       console.warn('Could not save user coding progress:', e);
@@ -965,10 +970,124 @@ class CodeExecutionService {
     return langConfig?.defaultCode || '// Write your solution here\n';
   }
 
+  async executeRemoteCode(sourceCode, language, stdin = '') {
+    const langIdMap = {
+      python: 100,
+      cpp: 105,
+      c: 103,
+      java: 91,
+      javascript: 102,
+      mysql: 82,
+      sql: 82
+    };
+    const langId = langIdMap[language?.toLowerCase()] || 100;
+
+    const executionUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CODE_EXECUTION_URL) || 
+      (typeof process !== 'undefined' && process?.env?.VITE_CODE_EXECUTION_URL) || 
+      'http://127.0.0.1:8000/api/code/execute';
+
+    // 1. Primary execution via local/configured FastAPI sandbox backend
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
+      const res = await fetch(executionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_code: sourceCode,
+          language: language,
+          language_id: langId,
+          stdin: stdin || ''
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json && typeof json === 'object') return json;
+      } else {
+        const errText = await res.text().catch(() => res.statusText);
+        return {
+          success: false,
+          error: `Execution server returned HTTP ${res.status}: ${errText}`,
+          status: 'Execution Error'
+        };
+      }
+    } catch (err) {
+      const isTimeout = err?.name === 'AbortError';
+      if (isTimeout) {
+        return {
+          success: false,
+          error: 'Time Limit Exceeded: Execution took longer than 6.5 seconds.',
+          status: 'Time Limit Exceeded'
+        };
+      }
+
+      // Check if Judge0 is explicitly configured
+      const judge0Url = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_JUDGE0_URL) || '';
+      if (judge0Url) {
+        try {
+          const jController = new AbortController();
+          const jTimeoutId = setTimeout(() => jController.abort(), 8000);
+          const jRes = await fetch(judge0Url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              source_code: sourceCode,
+              language_id: langId,
+              stdin: stdin || ''
+            }),
+            signal: jController.signal
+          });
+          clearTimeout(jTimeoutId);
+          if (jRes.ok) {
+            const data = await jRes.json();
+            return {
+              success: true,
+              stdout: data.stdout || '',
+              stderr: data.stderr || '',
+              compile_output: data.compile_output || '',
+              time: data.time || '0.05',
+              memory: data.memory || '32000',
+              status: data.status?.description || 'Completed'
+            };
+          }
+        } catch (_) {}
+      }
+
+      // Direct, clear network / connection error
+      return {
+        success: false,
+        error: 'Execution API unreachable. Please ensure the backend execution service is running (python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000).',
+        status: 'Service Unavailable'
+      };
+    }
+  }
+
+  compareOutput(actual, expected) {
+    if (actual === null || actual === undefined) return false;
+    const a = String(actual).trim();
+    const e = String(expected).trim();
+    if (a === e) return true;
+
+    if (a.toLowerCase() === e.toLowerCase()) return true;
+
+    try {
+      const jsonA = JSON.parse(a);
+      const jsonE = JSON.parse(e);
+      if (JSON.stringify(jsonA) === JSON.stringify(jsonE)) return true;
+    } catch (_) {}
+
+    if (!isNaN(Number(a)) && !isNaN(Number(e)) && Number(a) === Number(e)) {
+      return true;
+    }
+
+    return false;
+  }
+
   // Evaluate code against visible sample test cases
   async runCode(arg1, arg2, arg3) {
-    await new Promise(r => setTimeout(r, 380));
-
     let problemId, language, code;
     if (typeof arg1 === 'object' && arg1 !== null) {
       code = arg1.code || '';
@@ -1021,76 +1140,89 @@ class CodeExecutionService {
       };
     }
 
-    // 2. Infinite Loop / TLE Protection
-    if (cleanCode.includes('while True:') || cleanCode.includes('while(true)') || cleanCode.includes('while (1)')) {
-      if (!cleanCode.includes('break') && !cleanCode.includes('return')) {
-        const tleOutput = `Execution timed out after 4.0 seconds. Process killed by GMRIT Sandbox daemon (SIGXCPU).`;
-        this.recordAttempt(problemId, language);
-        return {
-          status: 'Time Limit Exceeded',
-          errorLine: null,
-          errors: debug.errors,
-          warnings: debug.warnings,
-          errorLines: debug.errorLines,
-          warningLines: debug.warningLines,
-          lineDiagnostics: debug.lineDiagnostics,
-          debugSummary: debug.summary,
-          compilerOutput: tleOutput,
-          compileOutput: tleOutput,
-          testResults: (problem.sampleTestCases || []).map(tc => ({
-            id: tc.id,
-            passed: false,
-            input: tc.input,
-            expected: tc.expected,
-            actual: 'Time Limit Exceeded (CPU execution timeout)',
-            runtimeMs: '4000 ms',
-            memoryMB: '128 MB'
-          })),
-          allPassed: false,
-          totalTime: '4000 ms',
-          executionTime: '4000 ms',
-          totalMemory: '128 MB'
-        };
-      }
-    }
-
-    // 3. Evaluate sample test cases
+    // 2. Real execution against sample test cases
     const sampleCases = problem.sampleTestCases || [
       { id: 1, input: 'Sample Input', expected: 'Sample Output' }
     ];
 
-    const testResults = sampleCases.map((tc) => {
-      const runtime = Math.floor(28 + Math.random() * 24);
-      const memory = (14.2 + Math.random() * 5).toFixed(1);
+    const testResults = [];
+    let totalTimeSec = 0;
+    let maxMemoryKB = 0;
+    let compilerErrorOutput = '';
 
-      return {
+    for (const tc of sampleCases) {
+      const wrappedSource = generateExecutionSource(problemId, language, cleanCode, tc);
+      const execResult = await this.executeRemoteCode(wrappedSource, language, tc.input);
+
+      const stdout = (execResult.stdout || '').trim();
+      const stderr = (execResult.stderr || execResult.compile_output || '').trim();
+      const timeVal = parseFloat(execResult.time || '0.04');
+      totalTimeSec += timeVal;
+      const memKB = parseInt(execResult.memory || '32000', 10);
+      if (memKB > maxMemoryKB) maxMemoryKB = memKB;
+
+      let actual = stdout;
+      let passed = false;
+
+      if (!execResult.success) {
+        actual = execResult.error || 'Execution service error';
+        passed = false;
+        if (!compilerErrorOutput) compilerErrorOutput = execResult.error;
+      } else if (stderr) {
+        actual = stderr;
+        passed = false;
+        if (!compilerErrorOutput) compilerErrorOutput = stderr;
+      } else {
+        passed = this.compareOutput(stdout, tc.expected);
+        if (!actual) actual = 'No output returned (stdout was empty)';
+      }
+
+      testResults.push({
         id: tc.id,
-        passed: true,
+        passed,
         input: tc.input,
         expected: tc.expected,
-        actual: tc.expected,
-        runtimeMs: `${runtime} ms`,
-        memoryMB: `${memory} MB`
-      };
-    });
+        actual,
+        runtimeMs: `${Math.round(timeVal * 1000)} ms`,
+        memoryMB: `${(memKB / 1024).toFixed(1)} MB`
+      });
+    }
 
-    const allPassed = testResults.every(t => t.passed);
-    const totalRuntime = Math.floor(32 + Math.random() * 15);
-    const totalMem = (16.4 + Math.random() * 3).toFixed(1);
+    const allPassed = testResults.length > 0 && testResults.every(t => t.passed);
+    const avgTimeMs = `${Math.round((totalTimeSec / Math.max(1, testResults.length)) * 1000)} ms`;
+    const peakMemMB = `${(maxMemoryKB / 1024).toFixed(1)} MB`;
 
-    this.recordAttempt(problemId, language);
+    const isServiceUnavailable = testResults.some(t => t.actual && (t.actual.includes('Execution API unreachable') || t.actual.includes('Service Unavailable')));
+    const isTimeLimit = testResults.some(t => t.actual && t.actual.includes('Time Limit Exceeded'));
+    const isCompileErr = Boolean(compilerErrorOutput) || !debug.isValid;
+    const overallStatus = isServiceUnavailable
+      ? 'Service Unavailable'
+      : isTimeLimit
+        ? 'Time Limit Exceeded'
+        : isCompileErr 
+          ? 'Compilation Error' 
+          : allPassed 
+            ? 'Accepted' 
+            : 'Wrong Answer';
+
+    let errorLine = debug.line;
+    if (compilerErrorOutput && (!errorLine || debug.isValid)) {
+      const match = compilerErrorOutput.match(/(?:line\s*|:\s*)(\d+)/i);
+      errorLine = match ? parseInt(match[1], 10) : 1;
+    }
 
     return {
-      status: allPassed ? 'Accepted' : 'Wrong Answer',
-      compilerOutput: language === 'mysql' ? `MySQL 8.0 query executed successfully. 4 rows affected (${totalRuntime} ms).` : '',
-      compileOutput: language === 'mysql' ? `MySQL 8.0 query executed successfully. 4 rows affected (${totalRuntime} ms).` : '',
+      status: overallStatus,
+      isCompileError: overallStatus === 'Compilation Error',
+      errorLine: overallStatus === 'Compilation Error' ? (errorLine || 1) : undefined,
+      compilerOutput: compilerErrorOutput || (language === 'mysql' ? 'Query executed successfully.' : ''),
+      compileOutput: compilerErrorOutput || (language === 'mysql' ? 'Query executed successfully.' : ''),
       testResults,
       testCasesResults: testResults,
       allPassed,
-      totalTime: `${totalRuntime} ms`,
-      executionTime: `${totalRuntime} ms`,
-      totalMemory: `${totalMem} MB`,
-      // Attach full line-by-line debugging diagnostics
+      totalTime: avgTimeMs,
+      executionTime: avgTimeMs,
+      totalMemory: peakMemMB,
       errors: debug.errors,
       warnings: debug.warnings,
       errorLines: debug.errorLines,
@@ -1102,14 +1234,13 @@ class CodeExecutionService {
 
   // Submit code for official evaluation against hidden test cases
   async submitCode(problemId, language, code, user = null) {
-    await new Promise(r => setTimeout(r, 650));
-
     const problem = this.getProblem(problemId);
     const cleanCode = (code || '').trim();
 
     // 1. Strict Line-by-Line Debugging & Diagnostics Check
     const debug = this.debugCode(language, cleanCode, problem);
-    const totalCases = (problem.hiddenTestCases?.length || 0) + (problem.sampleTestCases?.length || 0);
+    const allTestCases = [...(problem.sampleTestCases || []), ...(problem.hiddenTestCases || [])];
+    const totalCases = allTestCases.length;
 
     if (!debug.isValid) {
       const errRes = {
@@ -1135,60 +1266,111 @@ class CodeExecutionService {
       return errRes;
     }
 
-    const passedCount = totalCases;
-    const runtime = Math.floor(36 + Math.random() * 18);
-    const memory = (17.5 + Math.random() * 4).toFixed(1);
+    // 2. Real Execution across all test cases
+    let passedCount = 0;
+    let totalTimeSec = 0;
+    let maxMemoryKB = 0;
+    let failureOutput = '';
+
+    for (const tc of allTestCases) {
+      const wrappedSource = generateExecutionSource(problemId, language, cleanCode, tc);
+      const execResult = await this.executeRemoteCode(wrappedSource, language, tc.input);
+
+      const stdout = (execResult.stdout || '').trim();
+      const stderr = (execResult.stderr || execResult.compile_output || '').trim();
+      const timeVal = parseFloat(execResult.time || '0.04');
+      totalTimeSec += timeVal;
+      const memKB = parseInt(execResult.memory || '32000', 10);
+      if (memKB > maxMemoryKB) maxMemoryKB = memKB;
+
+      if (!execResult.success) {
+        failureOutput = execResult.error || 'Execution service error';
+        const isUnavailable = failureOutput.includes('Execution API unreachable');
+        const isTimeout = failureOutput.includes('Time Limit Exceeded');
+        const statusStr = isUnavailable ? 'Service Unavailable' : isTimeout ? 'Time Limit Exceeded' : 'Execution Error';
+        return {
+          status: statusStr,
+          passedCount: 0,
+          totalCount: totalCases,
+          compilerOutput: failureOutput,
+          runtimeMs: '0 ms',
+          memoryMB: '0 MB',
+          error: failureOutput
+        };
+      } else if (execResult.success && !stderr && this.compareOutput(stdout, tc.expected)) {
+        passedCount++;
+      } else if (!failureOutput) {
+        if (stderr) {
+          failureOutput = stderr;
+        } else {
+          failureOutput = `Expected [${tc.expected}], got [${stdout || 'empty'}] on input: ${tc.input}`;
+        }
+      }
+    }
+
+    const allPassed = passedCount === totalCases && totalCases > 0;
+    const avgTimeMs = `${Math.round((totalTimeSec / Math.max(1, totalCases)) * 1000)} ms`;
+    const peakMemMB = `${(maxMemoryKB / 1024).toFixed(1)} MB`;
 
     const activeUser = user || authService.getCurrentUser();
 
     auditService.logAction({
-      user: activeUser?.name || 'Rahul Kumar',
+      user: activeUser?.name || 'Student',
       role: activeUser?.role || 'student',
       userId: activeUser?.userId || 'STU001',
       action: 'Code Submission',
       resource: `/coding/problems/${problem.id}`,
-      result: 'Success',
-      details: `Submitted solution for [${problem.title}] in ${language.toUpperCase()}. All ${totalCases}/${totalCases} test cases passed.`
+      result: allPassed ? 'Success' : 'Partial',
+      details: `Submitted solution for [${problem.title}] in ${language.toUpperCase()}. ${passedCount}/${totalCases} test cases passed.`
     });
 
     const result = {
-      status: 'Accepted',
+      status: allPassed ? 'Accepted' : 'Wrong Answer',
       passedCount,
       totalCount: totalCases,
-      compilerOutput: '',
-      runtimeMs: `${runtime} ms`,
-      memoryMB: `${memory} MB`,
-      runtimePercentile: '89.4%',
-      memoryPercentile: '76.8%'
+      compilerOutput: failureOutput,
+      runtimeMs: avgTimeMs,
+      memoryMB: peakMemMB
     };
 
     this.recordSubmission(problemId, language, result, activeUser);
-
     return result;
   }
 
   // Run Custom Input
   async runCustomInput(arg1, arg2, arg3, arg4) {
-    await new Promise(r => setTimeout(r, 400));
     let customInput = typeof arg4 === 'string' ? arg4 : (typeof arg3 === 'string' ? arg3 : '');
+    let code = typeof arg1 === 'string' ? arg1 : (arg1?.code || '');
+    let language = typeof arg2 === 'string' ? arg2 : (arg1?.language || 'python');
     const inputClean = (customInput || '').trim();
-    const runtime = Math.floor(22 + Math.random() * 20);
-    const memory = (15.1 + Math.random() * 3).toFixed(1);
-    const out = inputClean ? `Execution Output:\nProcessed [${inputClean}]\nResult: True` : 'Empty input provided. Standard input (stdin) was blank.';
+
+    const execResult = await this.executeRemoteCode(code, language, inputClean);
+
+    const stdout = execResult.stdout || '';
+    const stderr = execResult.stderr || execResult.compile_output || '';
+    const timeVal = parseFloat(execResult.time || '0.04');
+    const memKB = parseInt(execResult.memory || '32000', 10);
+
+    const out = stderr ? `Error:\n${stderr}` : (stdout || 'Program completed with no output.');
 
     return {
-      status: 'Success',
+      status: stderr ? 'Error' : 'Success',
       stdout: out,
       output: out,
-      runtimeMs: `${runtime} ms`,
-      memoryMB: `${memory} MB`
+      runtimeMs: `${Math.round(timeVal * 1000)} ms`,
+      memoryMB: `${(memKB / 1024).toFixed(1)} MB`
     };
   }
 
-  // Drafts Persistence
-  saveDraft(problemId, language, code) {
+  // Drafts Persistence scoped by active user
+  _resolveDraftKey(problemId, language, customUserId = null) {
+    const uid = customUserId || authService.getCurrentUser()?.id || authService.getCurrentUser()?.userId || 'guest';
+    return `${this.draftsKeyPrefix}${uid}_${problemId}_${language}`;
+  }
+
+  saveDraft(problemId, language, code, userId = null) {
     try {
-      const key = `${this.draftsKeyPrefix}${problemId}_${language}`;
+      const key = this._resolveDraftKey(problemId, language, userId);
       const payload = {
         code,
         timestamp: Date.now()
@@ -1199,9 +1381,9 @@ class CodeExecutionService {
     }
   }
 
-  getDraft(problemId, language) {
+  getDraft(problemId, language, userId = null) {
     try {
-      const key = `${this.draftsKeyPrefix}${problemId}_${language}`;
+      const key = this._resolveDraftKey(problemId, language, userId);
       const stored = sessionStorage.getItem(key);
       if (stored) {
         return JSON.parse(stored);
@@ -1210,6 +1392,15 @@ class CodeExecutionService {
       console.warn("Could not retrieve draft", e);
     }
     return null;
+  }
+
+  clearDraft(problemId, language, userId = null) {
+    try {
+      const key = this._resolveDraftKey(problemId, language, userId);
+      sessionStorage.removeItem(key);
+    } catch (e) {
+      console.warn("Could not clear draft", e);
+    }
   }
 }
 

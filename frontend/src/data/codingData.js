@@ -208,30 +208,16 @@ You can return the answer in any order.`,
     starterCode: {
       python: `class Solution:
     def twoSum(self, nums: list[int], target: int) -> list[int]:
-        # Complete your solution
-        prev_map = {}
-        for i, n in enumerate(nums):
-            diff = target - n
-            if diff in prev_map:
-                return [prev_map[diff], i]
-            prev_map[n] = i
-        return []
+        # Write your code here
+        pass
 `,
       cpp: `#include <vector>
-#include <unordered_map>
 using namespace std;
 
 class Solution {
 public:
     vector<int> twoSum(vector<int>& nums, int target) {
-        unordered_map<int, int> seen;
-        for (int i = 0; i < nums.size(); i++) {
-            int complement = target - nums[i];
-            if (seen.find(complement) != seen.end()) {
-                return {seen[complement], i};
-            }
-            seen[nums[i]] = i;
-        }
+        // Write your code here
         return {};
     }
 };
@@ -240,30 +226,20 @@ public:
 
 class Solution {
     public int[] twoSum(int[] nums, int target) {
-        Map<Integer, Integer> map = new HashMap<>();
-        for (int i = 0; i < nums.length; i++) {
-            int complement = target - nums[i];
-            if (map.containsKey(complement)) {
-                return new int[] { map.get(complement), i };
-            }
-            map.put(nums[i], i);
-        }
+        // Write your code here
         return new int[]{};
     }
 }
 `,
-      c: `int* twoSum(int* nums, int numsSize, int target, int* returnSize) {
+      c: `#include <stdlib.h>
+
+/**
+ * Note: The returned array must be malloced, assume caller calls free().
+ */
+int* twoSum(int* nums, int numsSize, int target, int* returnSize) {
     *returnSize = 2;
     int* result = (int*)malloc(2 * sizeof(int));
-    for (int i = 0; i < numsSize; i++) {
-        for (int j = i + 1; j < numsSize; j++) {
-            if (nums[i] + nums[j] == target) {
-                result[0] = i;
-                result[1] = j;
-                return result;
-            }
-        }
-    }
+    // Write your code here
     return result;
 }
 `,
@@ -273,14 +249,7 @@ class Solution {
  * @return {number[]}
  */
 var twoSum = function(nums, target) {
-    const map = new Map();
-    for (let i = 0; i < nums.length; i++) {
-        const diff = target - nums[i];
-        if (map.has(diff)) {
-            return [map.get(diff), i];
-        }
-        map.set(nums[i], i);
-    }
+    // Write your code here
     return [];
 };
 `
@@ -344,14 +313,8 @@ Can you reverse it iteratively and recursively?`,
 #         self.next = next
 class Solution:
     def reverseList(self, head):
-        prev = None
-        curr = head
-        while curr:
-            next_temp = curr.next
-            curr.next = prev
-            prev = curr
-            curr = next_temp
-        return prev
+        # Write your code here
+        pass
 `,
       cpp: `/**
  * Definition for singly-linked list.
@@ -365,54 +328,44 @@ class Solution:
 class Solution {
 public:
     ListNode* reverseList(ListNode* head) {
-        ListNode* prev = nullptr;
-        ListNode* curr = head;
-        while (curr != nullptr) {
-            ListNode* nextTemp = curr->next;
-            curr->next = prev;
-            prev = curr;
-            curr = nextTemp;
-        }
-        return prev;
+        // Write your code here
+        return nullptr;
     }
 };
 `,
       java: `class Solution {
     public ListNode reverseList(ListNode head) {
-        ListNode prev = null;
-        ListNode curr = head;
-        while (curr != null) {
-            ListNode nextTemp = curr.next;
-            curr.next = prev;
-            prev = curr;
-            curr = nextTemp;
-        }
-        return prev;
+        // Write your code here
+        return null;
     }
 }
 `,
-      c: `struct ListNode* reverseList(struct ListNode* head) {
-    struct ListNode* prev = NULL;
-    struct ListNode* curr = head;
-    while (curr != NULL) {
-        struct ListNode* next = curr->next;
-        curr->next = prev;
-        prev = curr;
-        curr = next;
-    }
-    return prev;
+      c: `/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     struct ListNode *next;
+ * };
+ */
+struct ListNode* reverseList(struct ListNode* head) {
+    // Write your code here
+    return NULL;
 }
 `,
-      javascript: `var reverseList = function(head) {
-    let prev = null;
-    let curr = head;
-    while (curr) {
-        let nextTemp = curr.next;
-        curr.next = prev;
-        prev = curr;
-        curr = nextTemp;
-    }
-    return prev;
+      javascript: `/**
+ * Definition for singly-linked list.
+ * function ListNode(val, next) {
+ *     this.val = (val===undefined ? 0 : val)
+ *     this.next = (next===undefined ? null : next)
+ * }
+ */
+/**
+ * @param {ListNode} head
+ * @return {ListNode}
+ */
+var reverseList = function(head) {
+    // Write your code here
+    return null;
 };
 `
     },
@@ -473,15 +426,7 @@ You must write an algorithm with **O(log n)** runtime complexity.`,
     starterCode: {
       python: `class Solution:
     def search(self, nums: list[int], target: int) -> int:
-        left, right = 0, len(nums) - 1
-        while left <= right:
-            mid = (left + right) // 2
-            if nums[mid] == target:
-                return mid
-            elif nums[mid] < target:
-                left = mid + 1
-            else:
-                right = mid - 1
+        # Write your code here
         return -1
 `,
       cpp: `#include <vector>
@@ -490,49 +435,30 @@ using namespace std;
 class Solution {
 public:
     int search(vector<int>& nums, int target) {
-        int left = 0, right = nums.size() - 1;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            if (nums[mid] == target) return mid;
-            if (nums[mid] < target) left = mid + 1;
-            else right = mid - 1;
-        }
+        // Write your code here
         return -1;
     }
 };
 `,
       java: `class Solution {
     public int search(int[] nums, int target) {
-        int left = 0, right = nums.length - 1;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            if (nums[mid] == target) return mid;
-            if (nums[mid] < target) left = mid + 1;
-            else right = mid - 1;
-        }
+        // Write your code here
         return -1;
     }
 }
 `,
       c: `int search(int* nums, int numsSize, int target) {
-    int left = 0, right = numsSize - 1;
-    while (left <= right) {
-        int mid = left + (right - left) / 2;
-        if (nums[mid] == target) return mid;
-        if (nums[mid] < target) left = mid + 1;
-        else right = mid - 1;
-    }
+    // Write your code here
     return -1;
 }
 `,
-      javascript: `var search = function(nums, target) {
-    let left = 0, right = nums.length - 1;
-    while (left <= right) {
-        let mid = Math.floor((left + right) / 2);
-        if (nums[mid] === target) return mid;
-        if (nums[mid] < target) left = mid + 1;
-        else right = mid - 1;
-    }
+      javascript: `/**
+ * @param {number[]} nums
+ * @param {number} target
+ * @return {number}
+ */
+var search = function(nums, target) {
+    // Write your code here
     return -1;
 };
 `
@@ -593,82 +519,39 @@ public:
     starterCode: {
       python: `class Solution:
     def lengthOfLongestSubstring(self, s: str) -> int:
-        char_map = {}
-        left = 0
-        max_len = 0
-        for right, char in enumerate(s):
-            if char in char_map and char_map[char] >= left:
-                left = char_map[char] + 1
-            char_map[char] = right
-            max_len = max(max_len, right - left + 1)
-        return max_len
+        # Write your code here
+        return 0
 `,
       cpp: `#include <string>
-#include <unordered_map>
-#include <algorithm>
 using namespace std;
 
 class Solution {
 public:
     int lengthOfLongestSubstring(string s) {
-        unordered_map<char, int> seen;
-        int left = 0, maxLen = 0;
-        for (int right = 0; right < s.length(); right++) {
-            if (seen.find(s[right]) != seen.end() && seen[s[right]] >= left) {
-                left = seen[s[right]] + 1;
-            }
-            seen[s[right]] = right;
-            maxLen = max(maxLen, right - left + 1);
-        }
-        return maxLen;
+        // Write your code here
+        return 0;
     }
 };
 `,
-      java: `import java.util.*;
-
-class Solution {
+      java: `class Solution {
     public int lengthOfLongestSubstring(String s) {
-        Map<Character, Integer> map = new HashMap<>();
-        int left = 0, maxLen = 0;
-        for (int right = 0; right < s.length(); right++) {
-            char c = s.charAt(right);
-            if (map.containsKey(c) && map.get(c) >= left) {
-                left = map.get(c) + 1;
-            }
-            map.put(c, right);
-            maxLen = Math.max(maxLen, right - left + 1);
-        }
-        return maxLen;
+        // Write your code here
+        return 0;
     }
 }
 `,
       c: `int lengthOfLongestSubstring(char* s) {
-    int lastPos[256];
-    for (int i = 0; i < 256; i++) lastPos[i] = -1;
-    int maxLen = 0, start = 0;
-    for (int i = 0; s[i] != '\\0'; i++) {
-        unsigned char c = (unsigned char)s[i];
-        if (lastPos[c] >= start) {
-            start = lastPos[c] + 1;
-        }
-        lastPos[c] = i;
-        int len = i - start + 1;
-        if (len > maxLen) maxLen = len;
-    }
-    return maxLen;
+    // Write your code here
+    return 0;
 }
 `,
-      javascript: `var lengthOfLongestSubstring = function(s) {
-    const map = new Map();
-    let left = 0, maxLen = 0;
-    for (let right = 0; right < s.length; right++) {
-        if (map.has(s[right]) && map.get(s[right]) >= left) {
-            left = map.get(s[right]) + 1;
-        }
-        map.set(s[right], right);
-        maxLen = Math.max(maxLen, right - left + 1);
-    }
-    return maxLen;
+      javascript: `/**
+ * @param {string} s
+ * @return {number}
+ */
+var lengthOfLongestSubstring = function(s) {
+    // Write your code here
+    return 0;
 };
 `
     },
@@ -721,16 +604,8 @@ An input string is valid if:
     starterCode: {
       python: `class Solution:
     def isValid(self, s: str) -> bool:
-        stack = []
-        mapping = {')': '(', '}': '{', ']': '['}
-        for char in s:
-            if char in mapping:
-                top = stack.pop() if stack else '#'
-                if mapping[char] != top:
-                    return False
-            else:
-                stack.append(char)
-        return not stack
+        # Write your code here
+        pass
 `,
       cpp: `#include <string>
 #include <stack>
@@ -740,17 +615,8 @@ using namespace std;
 class Solution {
 public:
     bool isValid(string s) {
-        stack<char> st;
-        unordered_map<char, char> map = {{')', '('}, {'}', '{'}, {']', '['}};
-        for (char c : s) {
-            if (map.count(c)) {
-                if (st.empty() || st.top() != map[c]) return false;
-                st.pop();
-            } else {
-                st.push(c);
-            }
-        }
-        return st.empty();
+        // Write your code here
+        return false;
     }
 };
 `,
@@ -758,45 +624,25 @@ public:
 
 class Solution {
     public boolean isValid(String s) {
-        Stack<Character> stack = new Stack<>();
-        for (char c : s.toCharArray()) {
-            if (c == '(') stack.push(')');
-            else if (c == '{') stack.push('}');
-            else if (c == '[') stack.push(']');
-            else if (stack.isEmpty() || stack.pop() != c) return false;
-        }
-        return stack.isEmpty();
+        // Write your code here
+        return false;
     }
 }
 `,
-      c: `bool isValid(char* s) {
-    char stack[10005];
-    int top = -1;
-    for (int i = 0; s[i] != '\\0'; i++) {
-        if (s[i] == '(' || s[i] == '{' || s[i] == '[') {
-            stack[++top] = s[i];
-        } else {
-            if (top == -1) return false;
-            char open = stack[top--];
-            if (s[i] == ')' && open != '(') return false;
-            if (s[i] == '}' && open != '{') return false;
-            if (s[i] == ']' && open != '[') return false;
-        }
-    }
-    return top == -1;
+      c: `#include <stdbool.h>
+
+bool isValid(char* s) {
+    // Write your code here
+    return false;
 }
 `,
-      javascript: `var isValid = function(s) {
-    const stack = [];
-    const map = { ')': '(', '}': '{', ']': '[' };
-    for (let c of s) {
-        if (map[c]) {
-            if (stack.pop() !== map[c]) return false;
-        } else {
-            stack.push(c);
-        }
-    }
-    return stack.length === 0;
+      javascript: `/**
+ * @param {string} s
+ * @return {boolean}
+ */
+var isValid = function(s) {
+    // Write your code here
+    return false;
 };
 `
     },
@@ -842,56 +688,39 @@ class Solution {
     starterCode: {
       python: `class Solution:
     def maxSubArray(self, nums: list[int]) -> int:
-        cur_sum = 0
-        max_sum = nums[0]
-        for n in nums:
-            cur_sum = max(n, cur_sum + n)
-            max_sum = max(max_sum, cur_sum)
-        return max_sum
+        # Write your code here
+        pass
 `,
       cpp: `#include <vector>
-#include <algorithm>
 using namespace std;
 
 class Solution {
 public:
     int maxSubArray(vector<int>& nums) {
-        int curSum = 0, maxSum = nums[0];
-        for (int n : nums) {
-            curSum = max(n, curSum + n);
-            maxSum = max(maxSum, curSum);
-        }
-        return maxSum;
+        // Write your code here
+        return 0;
     }
 };
 `,
       java: `class Solution {
     public int maxSubArray(int[] nums) {
-        int curSum = 0, maxSum = nums[0];
-        for (int n : nums) {
-            curSum = Math.max(n, curSum + n);
-            maxSum = Math.max(maxSum, curSum);
-        }
-        return maxSum;
+        // Write your code here
+        return 0;
     }
 }
 `,
       c: `int maxSubArray(int* nums, int numsSize) {
-    int curSum = 0, maxSum = nums[0];
-    for (int i = 0; i < numsSize; i++) {
-        curSum = (nums[i] > curSum + nums[i]) ? nums[i] : (curSum + nums[i]);
-        if (curSum > maxSum) maxSum = curSum;
-    }
-    return maxSum;
+    // Write your code here
+    return 0;
 }
 `,
-      javascript: `var maxSubArray = function(nums) {
-    let curSum = 0, maxSum = nums[0];
-    for (let n of nums) {
-        curSum = Math.max(n, curSum + n);
-        maxSum = Math.max(maxSum, curSum);
-    }
-    return maxSum;
+      javascript: `/**
+ * @param {number[]} nums
+ * @return {number}
+ */
+var maxSubArray = function(nums) {
+    // Write your code here
+    return 0;
 };
 `
     },
@@ -938,44 +767,16 @@ Return \`true\` if a cycle exists, otherwise \`false\`.`,
     starterCode: {
       python: `class Solution:
     def isCyclic(self, V: int, adj: list[list[int]]) -> bool:
-        visited = [0] * V # 0 = unvisited, 1 = visiting, 2 = visited
-        
-        def dfs(u):
-            visited[u] = 1
-            for v in adj[u]:
-                if visited[v] == 1:
-                    return True
-                if visited[v] == 0 and dfs(v):
-                    return True
-            visited[u] = 2
-            return False
-
-        for i in range(V):
-            if visited[i] == 0:
-                if dfs(i):
-                    return True
-        return False
+        # Write your code here
+        pass
 `,
       cpp: `#include <vector>
 using namespace std;
 
 class Solution {
 public:
-    bool dfs(int u, vector<int>& visited, vector<vector<int>>& adj) {
-        visited[u] = 1;
-        for (int v : adj[u]) {
-            if (visited[v] == 1) return true;
-            if (visited[v] == 0 && dfs(v, visited, adj)) return true;
-        }
-        visited[u] = 2;
-        return false;
-    }
-
     bool isCyclic(int V, vector<vector<int>>& adj) {
-        vector<int> visited(V, 0);
-        for (int i = 0; i < V; i++) {
-            if (visited[i] == 0 && dfs(i, visited, adj)) return true;
-        }
+        // Write your code here
         return false;
     }
 };
@@ -984,43 +785,25 @@ public:
 
 class Solution {
     public boolean isCyclic(int V, List<List<Integer>> adj) {
-        int[] visited = new int[V];
-        for (int i = 0; i < V; i++) {
-            if (visited[i] == 0 && dfs(i, visited, adj)) return true;
-        }
+        // Write your code here
         return false;
     }
+}
+`,
+      c: `#include <stdbool.h>
 
-    private boolean dfs(int u, int[] visited, List<List<Integer>> adj) {
-        visited[u] = 1;
-        for (int v : adj.get(u)) {
-            if (visited[v] == 1) return true;
-            if (visited[v] == 0 && dfs(v, visited, adj)) return true;
-        }
-        visited[u] = 2;
-        return false;
-    }
-}
-`,
-      c: `// Directed Graph Cycle Detection
 bool isCyclic(int V, int** adj, int* adjSizes) {
-    return true;
+    // Write your code here
+    return false;
 }
 `,
-      javascript: `var isCyclic = function(V, adj) {
-    const visited = new Array(V).fill(0);
-    const dfs = (u) => {
-        visited[u] = 1;
-        for (let v of adj[u]) {
-            if (visited[v] === 1) return true;
-            if (visited[v] === 0 && dfs(v)) return true;
-        }
-        visited[u] = 2;
-        return false;
-    };
-    for (let i = 0; i < V; i++) {
-        if (visited[i] === 0 && dfs(i)) return true;
-    }
+      javascript: `/**
+ * @param {number} V
+ * @param {number[][]} adj
+ * @return {boolean}
+ */
+var isCyclic = function(V, adj) {
+    // Write your code here
     return false;
 };
 `
@@ -1095,9 +878,9 @@ Return the result table in **any order**.`,
     ],
     starterCode: {
       mysql: `# Write your MySQL query statement below
-SELECT p.firstName, p.lastName, a.city, a.state
-FROM Person p
-LEFT JOIN Address a ON p.personId = a.personId;
+SELECT 
+FROM Person
+;
 `
     },
     sampleTestCases: [
@@ -1151,12 +934,9 @@ Write a solution to find the second highest distinct salary from the \`Employee\
     ],
     starterCode: {
       mysql: `# Write your MySQL query statement below
-SELECT (
-    SELECT DISTINCT salary
-    FROM Employee
-    ORDER BY salary DESC
-    LIMIT 1 OFFSET 1
-) AS SecondHighestSalary;
+SELECT 
+FROM Employee
+;
 `
     },
     sampleTestCases: [
@@ -1225,10 +1005,9 @@ Return the result table with single column \`Customers\` in **any order**.`,
     ],
     starterCode: {
       mysql: `# Write your MySQL query statement below
-SELECT name AS Customers
+SELECT 
 FROM Customers
-LEFT JOIN Orders ON Customers.id = Orders.customerId
-WHERE Orders.customerId IS NULL;
+;
 `
     },
     sampleTestCases: [

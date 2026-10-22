@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Terminal,
   Calendar,
@@ -69,7 +69,31 @@ export default function CodingAssessmentsView() {
     return assessments.filter(a => a.status === 'completed').length;
   }, [assessments]);
 
+  // Load saved completed assessments from persistence
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem('gmrit_coding_exam_attempts');
+      if (stored) {
+        const attemptsMap = JSON.parse(stored);
+        setAssessments(prev => prev.map(a => {
+          if (attemptsMap[a.id]) {
+            return {
+              ...a,
+              status: 'completed',
+              ...attemptsMap[a.id]
+            };
+          }
+          return a;
+        }));
+      }
+    } catch (_) {}
+  }, []);
+
   const handleStartExamClick = (assessment) => {
+    if (assessment.status === 'completed') {
+      setSelectedCompletedAssessment(assessment);
+      return;
+    }
     setSelectedAssessmentForExam(assessment);
     setIsExamModalOpen(true);
   };
@@ -81,6 +105,20 @@ export default function CodingAssessmentsView() {
 
   const handleExamSubmitted = (result) => {
     setActiveExamSession(null);
+
+    try {
+      const stored = localStorage.getItem('gmrit_coding_exam_attempts');
+      const attemptsMap = stored ? JSON.parse(stored) : {};
+      attemptsMap[result.assessmentId] = {
+        score: result.score,
+        solvedCount: result.solvedCount,
+        testCasesPassed: result.testCasesPassed,
+        runtimeScore: result.runtimeScore || 'Good (36 ms avg)',
+        problemBreakdown: result.problemBreakdown
+      };
+      localStorage.setItem('gmrit_coding_exam_attempts', JSON.stringify(attemptsMap));
+    } catch (_) {}
+
     // Mark as completed in state
     setAssessments(prev => prev.map(a => {
       if (a.id === result.assessmentId) {
@@ -90,7 +128,8 @@ export default function CodingAssessmentsView() {
           score: result.score,
           solvedCount: result.solvedCount,
           testCasesPassed: result.testCasesPassed,
-          runtimeScore: result.runtimeScore || 'Good (36 ms avg)'
+          runtimeScore: result.runtimeScore || 'Good (36 ms avg)',
+          problemBreakdown: result.problemBreakdown
         };
       }
       return a;
@@ -102,7 +141,8 @@ export default function CodingAssessmentsView() {
       ...target,
       score: result.score,
       solvedCount: result.solvedCount,
-      testCasesPassed: result.testCasesPassed
+      testCasesPassed: result.testCasesPassed,
+      problemBreakdown: result.problemBreakdown
     });
   };
 

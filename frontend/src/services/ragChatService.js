@@ -6,7 +6,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import { ragIngestionService } from './ragIngestionService.js';
 
 const EMBEDDING_DIMENSION = 384;
-const DEFAULT_MATCH_THRESHOLD = 0.70;
+const DEFAULT_MATCH_THRESHOLD = 0.65;
 const DEFAULT_MATCH_COUNT = 5;
 
 export class RagChatService {
@@ -118,7 +118,7 @@ export class RagChatService {
           subjects ( id, name, code ),
           departments ( id, name, code )
         `)
-        .eq('status', 'indexed');
+        .in('status', ['indexed', 'published']);
 
       if (filterDocumentId) docQuery = docQuery.eq('id', filterDocumentId);
       if (filterSubjectId) docQuery = docQuery.eq('subject_id', filterSubjectId);
@@ -246,14 +246,26 @@ export class RagChatService {
         };
       });
 
-      const sources = structuredChunks.map(c => ({
-        documentId: c.documentId,
-        title: c.metadata.title,
-        fileName: c.metadata.fileName,
-        page: c.metadata.page,
-        chunkIndex: c.metadata.chunkIndex,
-        similarity: c.similarity
-      }));
+      // Deduplicate source cards by document ID and display actual source title once per document
+      const seenDocIds = new Set();
+      const sources = [];
+
+      for (const c of structuredChunks) {
+        if (!seenDocIds.has(c.documentId)) {
+          seenDocIds.add(c.documentId);
+          const doc = docMap.get(c.documentId);
+          sources.push({
+            documentId: c.documentId,
+            title: c.metadata.title,
+            fileName: c.metadata.fileName,
+            storagePath: doc?.storage_path || '',
+            storage_path: doc?.storage_path || '',
+            page: c.metadata.page,
+            chunkIndex: c.metadata.chunkIndex,
+            similarity: c.similarity
+          });
+        }
+      }
 
       return {
         success: true,
