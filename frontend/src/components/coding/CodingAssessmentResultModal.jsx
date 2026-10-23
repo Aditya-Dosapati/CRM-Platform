@@ -83,12 +83,12 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
                 width: '42px',
                 height: '42px',
                 borderRadius: '10px',
-                backgroundColor: 'var(--pastel-blue-bg, #EFF6FF)',
-                color: 'var(--primary-blue, #2563EB)',
+                backgroundColor: 'var(--pastel-blue-bg, #FFF7ED)',
+                color: 'var(--color-primary, #EA580C)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid var(--pastel-blue-border, #BFDBFE)'
+                border: '1px solid var(--pastel-blue-border, #FED7AA)'
               }}
             >
               <Award size={22} />
@@ -148,8 +148,8 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
             {/* Score Card */}
             <div
               style={{
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
+                backgroundColor: '#FFF7ED',
+                border: '1px solid #FED7AA',
                 borderRadius: '12px',
                 padding: '1rem',
                 display: 'flex',
@@ -157,18 +157,18 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
                 gap: '0.35rem'
               }}
             >
-              <span style={{ fontSize: '0.78rem', fontWeight: '600', color: '#1D4ED8', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: '600', color: '#C2410C', textTransform: 'uppercase' }}>
                 Total Score
               </span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
-                <span style={{ fontSize: '1.65rem', fontWeight: '800', color: '#1E40AF' }}>
+                <span style={{ fontSize: '1.65rem', fontWeight: '800', color: '#9A3412' }}>
                   {score}
                 </span>
-                <span style={{ fontSize: '0.9rem', color: '#3B82F6', fontWeight: '600' }}>
+                <span style={{ fontSize: '0.9rem', color: '#EA580C', fontWeight: '600' }}>
                   / {totalMarks}
                 </span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#2563EB', fontWeight: '600' }}>
+              <div style={{ fontSize: '0.75rem', color: '#C2410C', fontWeight: '600' }}>
                 {percentage}% overall mark
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
                           borderBottom: idx === problemBreakdown.length - 1 ? 'none' : '1px solid #F1F5F9'
                         }}
                       >
-                        <td style={{ padding: '0.875rem 1.25rem', fontWeight: '700', color: '#2563EB' }}>
+                        <td style={{ padding: '0.875rem 1.25rem', fontWeight: '700', color: '#EA580C' }}>
                           {item.id}
                         </td>
                         <td style={{ padding: '0.875rem 1rem', fontWeight: '600', color: '#1E293B' }}>
@@ -378,8 +378,8 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
                 width: '32px',
                 height: '32px',
                 borderRadius: '8px',
-                backgroundColor: '#EFF6FF',
-                color: '#2563EB',
+                backgroundColor: '#FFF7ED',
+                color: '#EA580C',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -419,7 +419,7 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
               padding: '0.55rem 1.25rem',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: 'var(--primary-blue, #2563EB)',
+              backgroundColor: 'var(--color-primary, #EA580C)',
               color: '#FFFFFF',
               fontSize: '0.85rem',
               fontWeight: '600',

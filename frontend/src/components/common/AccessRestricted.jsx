@@ -134,14 +134,14 @@ export default function AccessRestricted({ currentUser, attemptedView, onReturn 
           alignItems: 'flex-start',
           gap: '10px',
           textAlign: 'left',
-          backgroundColor: '#EFF6FF',
-          border: '1px solid #BFDBFE',
+          backgroundColor: '#FFF7ED',
+          border: '1px solid #FED7AA',
           borderRadius: 'var(--radius-md)',
           padding: '12px 14px',
           marginBottom: '26px'
         }}>
-          <FileWarning size={16} color="var(--primary-blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <p style={{ fontSize: '11.5px', color: '#1E40AF', lineHeight: 1.4, margin: 0 }}>
+          <FileWarning size={16} color="var(--color-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ fontSize: '11.5px', color: '#9A3412', lineHeight: 1.4, margin: 0 }}>
             Under GMRIT institutional data governance, system access is strictly scoped to your authorized role. This event has been recorded in the central security audit log.
           </p>
         </div>

@@ -27,14 +27,15 @@ export default function NotificationCenter({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ justifyContent: 'flex-end', padding: 0, backdropFilter: 'blur(3px)', background: 'rgba(43, 33, 24, 0.4)' }}>
+    <div className="modal-overlay" onClick={onClose} style={{ justifyContent: 'flex-end', padding: 0, backdropFilter: 'blur(8px)', background: 'rgba(15, 23, 42, 0.5)' }}>
       <div
         style={{
-          width: '380px',
+          width: '390px',
+          maxWidth: '100vw',
           height: '100vh',
           background: 'var(--color-surface)',
-          borderLeft: '1px solid var(--color-border)',
-          boxShadow: '-8px 0 25px rgba(0, 0, 0, 0.08)',
+          borderLeft: '1px solid rgba(226, 232, 240, 0.9)',
+          boxShadow: '-12px 0 40px rgba(15, 23, 42, 0.15)',
           display: 'flex',
           flexDirection: 'column',
           animation: 'drawerSlideInRight 0.24s var(--ease-spring)'

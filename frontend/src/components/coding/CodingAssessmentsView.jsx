@@ -242,7 +242,7 @@ export default function CodingAssessmentsView() {
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: activeTab === 'active' ? 'var(--primary-blue, #2563EB)' : '#F1F5F9',
+              backgroundColor: activeTab === 'active' ? 'var(--color-primary, #EA580C)' : '#F1F5F9',
               color: activeTab === 'active' ? '#FFFFFF' : '#475569',
               fontSize: '0.85rem',
               fontWeight: '700',
@@ -273,7 +273,7 @@ export default function CodingAssessmentsView() {
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: activeTab === 'completed' ? 'var(--primary-blue, #2563EB)' : '#F1F5F9',
+              backgroundColor: activeTab === 'completed' ? 'var(--color-primary, #EA580C)' : '#F1F5F9',
               color: activeTab === 'completed' ? '#FFFFFF' : '#475569',
               fontSize: '0.85rem',
               fontWeight: '700',
@@ -426,9 +426,9 @@ export default function CodingAssessmentsView() {
                           fontWeight: '700',
                           padding: '0.15rem 0.55rem',
                           borderRadius: '9999px',
-                          backgroundColor: isCompleted ? '#ECFDF5' : '#EFF6FF',
-                          color: isCompleted ? '#059669' : '#2563EB',
-                          border: `1px solid ${isCompleted ? '#A7F3D0' : '#BFDBFE'}`,
+                          backgroundColor: isCompleted ? '#ECFDF5' : '#FFF7ED',
+                          color: isCompleted ? '#059669' : '#EA580C',
+                          border: `1px solid ${isCompleted ? '#A7F3D0' : '#FED7AA'}`,
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em'
                         }}
@@ -533,8 +533,8 @@ export default function CodingAssessmentsView() {
                           alignItems: 'center',
                           gap: '0.4rem',
                           backgroundColor: '#FFFFFF',
-                          color: '#2563EB',
-                          border: '1px solid #BFDBFE',
+                          color: '#EA580C',
+                          border: '1px solid #FED7AA',
                           borderRadius: '8px',
                           padding: '0.5rem 1rem',
                           fontSize: '0.85rem',
@@ -553,7 +553,7 @@ export default function CodingAssessmentsView() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.45rem',
-                          backgroundColor: 'var(--primary-blue, #2563EB)',
+                          backgroundColor: 'var(--color-primary, #EA580C)',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
@@ -561,7 +561,7 @@ export default function CodingAssessmentsView() {
                           fontSize: '0.85rem',
                           fontWeight: '700',
                           cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                          boxShadow: '0 2px 4px rgba(234, 88, 12, 0.2)',
                           transition: 'background-color 0.15s'
                         }}
                       >
@@ -611,12 +611,12 @@ export default function CodingAssessmentsView() {
                   width: '42px',
                   height: '42px',
                   borderRadius: '10px',
-                  backgroundColor: '#EFF6FF',
-                  color: '#2563EB',
+                  backgroundColor: '#FFF7ED',
+                  color: '#EA580C',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '1px solid #BFDBFE'
+                  border: '1px solid #FED7AA'
                 }}
               >
                 <Lock size={20} />
@@ -699,7 +699,7 @@ export default function CodingAssessmentsView() {
                   padding: '0.55rem 1.5rem',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#EA580C',
                   color: '#FFFFFF',
                   fontSize: '0.85rem',
                   fontWeight: '700',

@@ -1,32 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sliders, Cpu, Shield, Save, CheckCircle2, RotateCcw } from 'lucide-react';
 import useSafeTimeout from '../../hooks/useSafeTimeout';
 
+const SETTINGS_STORAGE_KEY = 'gmrit_rag_settings';
+
+const DEFAULT_SETTINGS = {
+  topK: 4,
+  similarityThreshold: 0.78,
+  chunkSize: 512,
+  aiModel: 'llama-3.1-70b-versatile (Groq)',
+  temperature: 0.2,
+  maxTokens: 1024,
+  studentAccess: true,
+  facultyAccess: true,
+  adminAccess: true,
+  enableSyllabus: true,
+  enablePYQs: true,
+  enableFacultyResources: true,
+  enableLectureNotes: true,
+};
+
+function loadSettings() {
+  try {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    }
+  } catch (e) {
+    console.warn('[AdminRagSettings] Could not load settings from localStorage:', e);
+  }
+  return DEFAULT_SETTINGS;
+}
+
 export default function AdminRagSettings() {
-  const [topK, setTopK] = useState(4);
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.78);
-  const [chunkSize, setChunkSize] = useState(512);
-  const [aiModel, setAiModel] = useState('GPT-4o Academic Fine-tune');
-  const [temperature, setTemperature] = useState(0.2);
-  const [maxTokens, setMaxTokens] = useState(1024);
-
-  // Access control toggles
-  const [studentAccess, setStudentAccess] = useState(true);
-  const [facultyAccess, setFacultyAccess] = useState(true);
-  const [adminAccess, setAdminAccess] = useState(true);
-
-  // Knowledge sources toggles
-  const [enableSyllabus, setEnableSyllabus] = useState(true);
-  const [enablePYQs, setEnablePYQs] = useState(true);
-  const [enableFacultyResources, setEnableFacultyResources] = useState(true);
-  const [enableLectureNotes, setEnableLectureNotes] = useState(true);
-
+  const [settings, setSettings] = useState(loadSettings);
   const [saved, setSaved] = useState(false);
   const setSafeTimeout = useSafeTimeout();
 
+  const topK = settings.topK;
+  const similarityThreshold = settings.similarityThreshold;
+  const chunkSize = settings.chunkSize;
+  const aiModel = settings.aiModel;
+  const temperature = settings.temperature;
+  const maxTokens = settings.maxTokens;
+  const studentAccess = settings.studentAccess;
+  const facultyAccess = settings.facultyAccess;
+  const adminAccess = settings.adminAccess;
+  const enableSyllabus = settings.enableSyllabus;
+  const enablePYQs = settings.enablePYQs;
+  const enableFacultyResources = settings.enableFacultyResources;
+  const enableLectureNotes = settings.enableLectureNotes;
+
+  const setTopK = (v) => setSettings(s => ({ ...s, topK: v }));
+  const setSimilarityThreshold = (v) => setSettings(s => ({ ...s, similarityThreshold: v }));
+  const setChunkSize = (v) => setSettings(s => ({ ...s, chunkSize: v }));
+  const setAiModel = (v) => setSettings(s => ({ ...s, aiModel: v }));
+  const setTemperature = (v) => setSettings(s => ({ ...s, temperature: v }));
+  const setMaxTokens = (v) => setSettings(s => ({ ...s, maxTokens: v }));
+  const setStudentAccess = (v) => setSettings(s => ({ ...s, studentAccess: v }));
+  const setFacultyAccess = (v) => setSettings(s => ({ ...s, facultyAccess: v }));
+  const setAdminAccess = (v) => setSettings(s => ({ ...s, adminAccess: v }));
+  const setEnableSyllabus = (v) => setSettings(s => ({ ...s, enableSyllabus: v }));
+  const setEnablePYQs = (v) => setSettings(s => ({ ...s, enablePYQs: v }));
+  const setEnableFacultyResources = (v) => setSettings(s => ({ ...s, enableFacultyResources: v }));
+  const setEnableLectureNotes = (v) => setSettings(s => ({ ...s, enableLectureNotes: v }));
+
   const handleSave = () => {
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch (e) {
+      console.warn('[AdminRagSettings] Could not persist settings:', e);
+    }
     setSaved(true);
-    setSafeTimeout(() => setSaved(false), 2000);
+    setSafeTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleReset = () => {
+    setSettings(DEFAULT_SETTINGS);
+    try {
+      localStorage.removeItem(SETTINGS_STORAGE_KEY);
+    } catch (e) {}
   };
 
   return (
@@ -50,9 +103,13 @@ export default function AdminRagSettings() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleReset} className="btn btn-secondary">
+            <RotateCcw size={15} />
+            <span>Reset to Defaults</span>
+          </button>
           <button onClick={handleSave} className="btn btn-primary">
             {saved ? <CheckCircle2 size={15} /> : <Save size={15} />}
-            <span>{saved ? 'Settings Synced' : 'Save Configurations'}</span>
+            <span>{saved ? 'Saved to Config' : 'Save Configurations'}</span>
           </button>
         </div>
       </div>

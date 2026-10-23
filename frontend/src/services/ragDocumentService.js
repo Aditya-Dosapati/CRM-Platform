@@ -941,6 +941,7 @@ class RagDocumentService {
 
   /**
    * Fetch all RAG documents from Supabase rag_documents
+   * Accepts optional filters: { subjectId, departmentId, documentType }
    */
   async getDocuments(filters = {}) {
     if (!isSupabaseConfigured()) {
@@ -973,6 +974,10 @@ class RagDocumentService {
       }
       if (filters?.departmentId && isValidUuid(filters.departmentId)) {
         query = query.eq('department_id', filters.departmentId);
+      }
+
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
       }
 
       query = query.order('created_at', { ascending: false });

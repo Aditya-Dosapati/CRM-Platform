@@ -197,7 +197,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
         right: 0,
         bottom: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(4px)',
+        backdropFilter: 'blur(6px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -224,7 +224,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
         {/* Banner with clean gradient and distinct close button */}
         <div style={{
           height: '100px',
-          background: 'linear-gradient(135deg, #1E40AF 0%, #2563EB 50%, #3B82F6 100%)',
+          background: 'linear-gradient(135deg, #9A3412 0%, #C2410C 50%, #EA580C 100%)',
           position: 'relative',
           display: 'flex',
           alignItems: 'flex-start',
@@ -271,7 +271,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
             width: '84px',
             height: '84px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #2563EB, #60A5FA)',
+            background: 'linear-gradient(135deg, #C2410C, #EA580C)',
             border: '4px solid var(--color-surface, #FFFDF8)',
             display: 'flex',
             alignItems: 'center',
@@ -279,7 +279,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
             fontSize: '28px',
             fontWeight: 800,
             color: '#FFFFFF',
-            boxShadow: '0 8px 18px -4px rgba(37, 99, 235, 0.35)',
+            boxShadow: '0 8px 18px -4px rgba(234, 88, 12, 0.35)',
             flexShrink: 0
           }}>
             {avatarText}
@@ -288,7 +288,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
           <div style={{ flex: 1, minWidth: '200px', paddingBottom: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
               <span className={`badge ${
-                currentRole === 'student' ? 'badge-blue' :
+                currentRole === 'student' ? 'badge-orange' :
                 currentRole === 'faculty' ? 'badge-green' : 'badge-purple'
               }`} style={{ textTransform: 'capitalize', fontSize: '11.5px', fontWeight: 700, padding: '3px 10px' }}>
                 {currentRole} Profile
@@ -376,8 +376,8 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                     width: '34px',
                     height: '34px',
                     borderRadius: '8px',
-                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    color: '#2563EB',
+                    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                    color: '#EA580C',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -451,8 +451,8 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                     width: '34px',
                     height: '34px',
                     borderRadius: '8px',
-                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    color: '#2563EB',
+                    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                    color: '#EA580C',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -547,8 +547,8 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                   {/* Academic Metrics (CGPA & Attendance) */}
                   <div style={{
                     padding: '14px 16px',
-                    backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                    border: '1px solid rgba(37, 99, 235, 0.18)',
+                    backgroundColor: 'rgba(234, 88, 12, 0.05)',
+                    border: '1px solid rgba(234, 88, 12, 0.18)',
                     borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
@@ -557,7 +557,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                     gap: '12px'
                   }}>
                     <div>
-                      <p style={{ fontSize: '11px', color: '#2563EB', fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>
+                      <p style={{ fontSize: '11px', color: '#EA580C', fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>
                         Cumulative CGPA
                       </p>
                       <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', margin: '2px 0 0 0' }}>
@@ -566,7 +566,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                     </div>
 
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '11px', color: '#2563EB', fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>
+                      <p style={{ fontSize: '11px', color: '#EA580C', fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>
                         Attendance Standing
                       </p>
                       <p style={{ fontSize: '13.5px', fontWeight: 700, color: '#059669', margin: '2px 0 0 0' }}>
@@ -604,11 +604,11 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
 
                     <div style={{
                       padding: '12px 14px',
-                      backgroundColor: 'rgba(37, 99, 235, 0.06)',
-                      border: '1px solid rgba(37, 99, 235, 0.2)',
+                      backgroundColor: 'rgba(217, 119, 6, 0.06)',
+                      border: '1px solid rgba(217, 119, 6, 0.2)',
                       borderRadius: '10px'
                     }}>
-                      <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: 700, textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '11px', color: '#D97706', fontWeight: 700, textTransform: 'uppercase' }}>
                         Assigned Students
                       </span>
                       <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', margin: '3px 0 0 0' }}>
@@ -631,7 +631,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                           Assigned Teaching Courses ({regulationDisplay})
                         </span>
                       </div>
-                      <span className="badge badge-blue" style={{ fontSize: '10.5px' }}>
+                      <span className="badge badge-orange" style={{ fontSize: '10.5px' }}>
                         {totalCourses} Active
                       </span>
                     </div>
@@ -669,7 +669,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                                     {courseName}
                                   </strong>
                                   {courseCode && (
-                                    <span className="badge badge-blue" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                    <span className="badge badge-orange" style={{ fontSize: '10px', padding: '2px 6px' }}>
                                       {courseCode}
                                     </span>
                                   )}

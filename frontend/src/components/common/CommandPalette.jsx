@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, BookOpen, FileText, HelpCircle, User, Cpu, X, ArrowRight, Sparkles, Code2, Terminal, UserCheck } from 'lucide-react';
+import { 
+  Search, BookOpen, FileText, HelpCircle, User, Cpu, X, ArrowRight, 
+  Sparkles, Code2, Terminal, UserCheck, CheckCircle2, Award, ChevronRight, Hash 
+} from 'lucide-react';
 import academicDataService from '../../services/academicDataService';
 import ragDocumentService from '../../services/ragDocumentService';
 import authService from '../../services/authService';
+import { codingProblemsList } from '../../data/codingData';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQuery, activeRole = 'student' }) {
@@ -41,21 +45,26 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
 
   const query = searchQuery.toLowerCase().trim();
 
-  // Aggregate searchable items with useMemo to avoid re-indexing on every render
-  const results = useMemo(() => {
-    const items = [];
+  // Aggregate searchable items categorized
+  const categorizedResults = useMemo(() => {
+    const subjectsCategory = [];
+    const codingCategory = [];
+    const pyqCategory = [];
+    const resourcesCategory = [];
+    const directoryCategory = [];
 
-    // 1. Subjects (Visible to all)
+    // 1. Subjects
     subjects.forEach(s => {
       const name = s.name || '';
       const code = s.code || '';
       if (!query || name.toLowerCase().includes(query) || code.toLowerCase().includes(query)) {
-        items.push({
+        subjectsCategory.push({
           id: `sub_${s.id}`,
-          type: 'Subject',
+          category: 'Subjects',
           title: name,
           subtitle: `${code} • Credits: ${s.credits || 3}`,
           icon: BookOpen,
+          badge: code,
           action: () => {
             onNavigate('subjects');
             onClose();
@@ -64,40 +73,66 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
       }
     });
 
-    // 2. RAG Documents & PYQs (Visible to all)
-    documents.forEach(d => {
-      const title = d.title || d.document || d.fileName || '';
-      const subj = d.subject || '';
-      const type = d.documentType || 'Document';
-      if (!query || title.toLowerCase().includes(query) || subj.toLowerCase().includes(query) || type.toLowerCase().includes(query)) {
-        items.push({
-          id: `doc_${d.id}`,
-          type: type === 'pyq' ? 'PYQ Exam Paper' : type === 'syllabus' ? 'Syllabus Document' : 'Academic Resource',
+    // 2. Coding Practice Problems
+    codingProblemsList.forEach(p => {
+      const title = p.title || '';
+      const topic = p.topic || '';
+      const diff = p.difficulty || '';
+      if (!query || title.toLowerCase().includes(query) || topic.toLowerCase().includes(query) || diff.toLowerCase().includes(query)) {
+        codingCategory.push({
+          id: `prob_${p.id}`,
+          category: 'Practice',
           title: title,
-          subtitle: `${subj} • ${d.status || 'Indexed'}`,
-          icon: type === 'pyq' ? HelpCircle : FileText,
+          subtitle: `${topic} • Acceptance: ${p.acceptance || '75%'}`,
+          icon: Code2,
+          badge: diff,
           action: () => {
-            if (type === 'pyq') onNavigate('pyqs');
-            else if (type === 'syllabus') onNavigate('syllabus');
-            else onNavigate('resources');
+            onNavigate('coding-practice');
             onClose();
           }
         });
       }
     });
 
-    // 3. Students & Faculty Roster - RESTRICTED: Faculty and Admin only
+    // 3. Documents & PYQs
+    documents.forEach(d => {
+      const title = d.title || d.document || d.fileName || '';
+      const subj = d.subject || '';
+      const type = (d.documentType || '').toLowerCase();
+      if (!query || title.toLowerCase().includes(query) || subj.toLowerCase().includes(query) || type.includes(query)) {
+        const item = {
+          id: `doc_${d.id}`,
+          category: type === 'pyq' ? 'PYQs' : 'Resources',
+          title: title,
+          subtitle: `${subj} • ${d.status || 'Indexed in RAG'}`,
+          icon: type === 'pyq' ? HelpCircle : FileText,
+          badge: type === 'pyq' ? 'Exam Paper' : 'Syllabus',
+          action: () => {
+            if (type === 'pyq') onNavigate('pyqs');
+            else if (type === 'syllabus') onNavigate('syllabus');
+            else onNavigate('resources');
+            onClose();
+          }
+        };
+
+        if (type === 'pyq') pyqCategory.push(item);
+        else resourcesCategory.push(item);
+      }
+    });
+
+    // 4. Directory Roster (Faculty/Admin only)
     if (activeRole === 'faculty' || activeRole === 'admin') {
       users.forEach(u => {
         const name = u.name || u.full_name || '';
         const id = u.userId || u.email || '';
         if (!query || name.toLowerCase().includes(query) || id.toLowerCase().includes(query)) {
-          items.push({
+          directoryCategory.push({
             id: `usr_${u.id || u.userId}`,
-            type: `${u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : 'User'} Record`,
-            title: `${name} (${id})`,
-            subtitle: `${u.department || 'CSE'} • ${u.role || 'User'}`,
+            category: 'Directory',
+            title: `${name}`,
+            subtitle: `${u.department || 'CSE'} • ${u.role || 'Member'} • ${id}`,
             icon: User,
+            badge: u.role || 'User',
             action: () => {
               if (activeRole === 'admin') onNavigate('users');
               else onNavigate('students');
@@ -108,11 +143,12 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
       });
     }
 
-    // 4. Coding Practice & Assessments Navigation Items
+    // 5. Coding Practice & Assessments Navigation Items
+    const navCategory = [];
     if (!query || 'coding practice problems leetcode dsa'.includes(query) || query.includes('cod')) {
-      items.push({
+      navCategory.push({
         id: 'nav_coding_practice',
-        type: 'Academic Module',
+        category: 'Quick Navigation',
         title: 'Coding Practice & Problem Solving',
         subtitle: 'Problem sets • Compiler Sandbox',
         icon: Code2,
@@ -124,9 +160,9 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
     }
 
     if (activeRole !== 'faculty' && (!query || 'coding assessments exams test quiz practical'.includes(query) || query.includes('assess'))) {
-      items.push({
+      navCategory.push({
         id: 'nav_coding_assessments',
-        type: 'Academic Module',
+        category: 'Quick Navigation',
         title: 'Coding Assessments & Examinations',
         subtitle: 'Autonomous Semester Exam Environment',
         icon: Terminal,
@@ -138,9 +174,9 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
     }
 
     if (activeRole === 'admin' && (!query || 'faculty assignments classes sections scheduler teaching'.includes(query) || query.includes('fac') || query.includes('assign'))) {
-      items.push({
+      navCategory.push({
         id: 'nav_faculty_assignments',
-        type: 'Admin Management',
+        category: 'Quick Navigation',
         title: 'Faculty Assignments',
         subtitle: 'Assign faculty members to subjects, classes, and sections',
         icon: UserCheck,
@@ -151,27 +187,37 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
       });
     }
 
-    return items;
+    return [
+      ...(navCategory.length > 0 ? [{ name: 'Quick Navigation', items: navCategory }] : []),
+      { name: 'Subjects', items: subjectsCategory.slice(0, 4) },
+      { name: 'Coding Practice Problems', items: codingCategory.slice(0, 5) },
+      { name: 'Previous Questions (PYQs)', items: pyqCategory.slice(0, 3) },
+      { name: 'Syllabus & Resources', items: resourcesCategory.slice(0, 3) },
+      ...(directoryCategory.length > 0 ? [{ name: 'Institutional Directory', items: directoryCategory.slice(0, 4) }] : [])
+    ].filter(g => g.items.length > 0);
   }, [query, subjects, documents, users, activeRole, onNavigate, onClose]);
+
+  // Flattened list for keyboard selection
+  const flatResults = useMemo(() => {
+    return categorizedResults.flatMap(g => g.items);
+  }, [categorizedResults]);
 
   if (!isOpen) return null;
 
   const handleInputKeyDown = (e) => {
-    const cappedLength = Math.min(results.length, 10);
-    if (cappedLength === 0) return;
+    if (flatResults.length === 0) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev + 1) % cappedLength);
+      setSelectedIndex(prev => (prev + 1) % flatResults.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev - 1 + cappedLength) % cappedLength);
+      setSelectedIndex(prev => (prev - 1 + flatResults.length) % flatResults.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const topResults = results.slice(0, 10);
-      if (topResults[selectedIndex]) {
-        topResults[selectedIndex].action();
-      } else if (searchQuery.length > 3 && onOpenRagQuery) {
+      if (flatResults[selectedIndex]) {
+        flatResults[selectedIndex].action();
+      } else if (searchQuery.length > 2 && onOpenRagQuery) {
         onOpenRagQuery(searchQuery);
         onClose();
       }
@@ -179,17 +225,17 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ backdropFilter: 'blur(4px)', background: 'rgba(43, 33, 24, 0.4)' }}>
+    <div className="modal-overlay" onClick={onClose} style={{ backdropFilter: 'blur(8px)', background: 'rgba(15, 23, 42, 0.55)' }}>
       <div 
         className="modal-content"
         style={{
-          maxWidth: '640px',
+          maxWidth: '680px',
           padding: 0,
           overflow: 'hidden',
-          background: 'var(--color-surface)',
-          borderRadius: '14px',
-          boxShadow: '0 20px 45px -10px rgba(43, 33, 24, 0.15)',
-          border: '1px solid var(--color-border)'
+          background: '#FFFFFF',
+          borderRadius: '20px',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)',
+          border: '1px solid rgba(226, 232, 240, 0.9)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -198,15 +244,15 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--color-border)',
-          background: 'var(--color-surface)'
+          padding: '16px 22px',
+          borderBottom: '1px solid var(--border-light)',
+          background: '#FFFFFF'
         }}>
-          <Search size={18} color="var(--color-primary)" />
+          <Search size={19} color="var(--primary-blue)" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a subject, syllabus topic, roll number, or question..."
+            placeholder="Search subjects, problems, notes, PYQs, people..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -218,7 +264,7 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              color: 'var(--color-text)',
+              color: 'var(--text-primary)',
               fontSize: '15px',
               fontFamily: 'inherit',
               fontWeight: 500
@@ -227,132 +273,177 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
-              style={{ background: 'none', border: 'none', color: 'var(--color-text)', opacity: 0.6, cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
             >
               <X size={16} />
             </button>
           )}
           <span style={{
             fontSize: '11px',
-            color: 'var(--color-text)',
-            opacity: 0.7,
+            color: 'var(--text-muted)',
             fontFamily: 'JetBrains Mono, monospace',
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
+            background: 'var(--bg-canvas)',
+            border: '1px solid var(--border-light)',
             padding: '2px 8px',
             borderRadius: '4px',
-            fontWeight: 600
+            fontWeight: 700
           }}>
             ESC
           </span>
         </div>
 
-        {/* Quick Action Hint if search query looks like an AI question */}
-        {searchQuery.length > 3 && (
+        {/* AI Query Prompt Trigger */}
+        {searchQuery.length > 2 && (
           <div
             onClick={() => {
-              onOpenRagQuery(searchQuery);
+              if (onOpenRagQuery) onOpenRagQuery(searchQuery);
               onClose();
             }}
             style={{
-              padding: '12px 20px',
-              background: 'var(--color-bg)',
-              borderBottom: '1px solid var(--color-border)',
+              padding: '11px 22px',
+              background: '#FFF7ED',
+              borderBottom: '1px solid #FED7AA',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               cursor: 'pointer',
-              transition: 'all 0.18s var(--ease-spring)'
+              transition: 'background-color 0.15s ease'
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFEDD5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={16} color="var(--color-primary)" />
-              <span style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 600 }}>
-                Ask GMRIT RAG AI: "{searchQuery}"
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '9px', fontSize: '13px', color: '#9A3412', fontWeight: 600 }}>
+              <Sparkles size={16} color="#EA580C" />
+              <span>Ask GMRIT AI Copilot: <strong style={{ color: '#7C2D12' }}>"{searchQuery}"</strong></span>
             </div>
-            <ArrowRight size={14} color="var(--color-primary)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#EA580C', fontWeight: 700 }}>
+              <span>Press Enter</span>
+              <ArrowRight size={13} />
+            </div>
           </div>
         )}
 
-        {/* Results List */}
-        <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '10px' }} role="listbox">
-          {results.length === 0 ? (
-            <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--color-text)', opacity: 0.7 }}>
-              <p style={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>No academic records found</p>
-              <p style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: 0.6 }}>Try searching "Machine Learning", "Data Structures", or course codes</p>
+        {/* Categorized Results List */}
+        <div style={{ maxHeight: '420px', overflowY: 'auto', padding: '10px 14px' }}>
+          {flatResults.length === 0 ? (
+            <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Search size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                No matching results found
+              </p>
+              <p style={{ fontSize: '12.5px', margin: 0 }}>
+                Try searching for "Arrays", "Algorithms", "Machine Learning", "PYQ", or ask the AI Copilot.
+              </p>
             </div>
           ) : (
-            results.slice(0, 10).map((res, index) => {
-              const Icon = res.icon;
-              const isSelected = index === selectedIndex;
-              return (
-                <div
-                  key={res.id}
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={res.action}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    background: isSelected ? 'var(--color-bg)' : 'transparent',
-                    border: isSelected ? '1px solid var(--color-border)' : '1px solid transparent',
-                    transition: 'all 0.18s var(--ease-spring)'
-                  }}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                >
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--color-primary)',
-                    transition: 'transform 0.2s var(--ease-spring)'
-                  }}>
-                    <Icon size={16} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {res.title}
-                      </span>
-                      <span className="badge badge-gray" style={{ fontSize: '10px', padding: '1px 6px' }}>
-                        {res.type}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.6, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {res.subtitle}
-                    </p>
-                  </div>
-                  <ArrowRight size={14} color="var(--color-text)" style={{ opacity: 0.5 }} />
+            categorizedResults.map((group) => (
+              <div key={group.name} style={{ marginBottom: '14px' }}>
+                <div style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.6px',
+                  color: 'var(--text-muted)',
+                  padding: '4px 10px 6px'
+                }}>
+                  {group.name}
                 </div>
-              );
-            })
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  {group.items.map((item) => {
+                    const globalIdx = flatResults.findIndex(r => r.id === item.id);
+                    const isSelected = selectedIndex === globalIdx;
+                    const Icon = item.icon;
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={item.action}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '9px 12px',
+                          borderRadius: '8px',
+                          backgroundColor: isSelected ? 'var(--pastel-blue-bg)' : 'transparent',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.12s ease'
+                        }}
+                        onMouseEnter={() => setSelectedIndex(globalIdx)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+                          <div style={{
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '6px',
+                            backgroundColor: isSelected ? '#DBEAFE' : 'var(--bg-canvas)',
+                            border: '1px solid var(--border-light)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: isSelected ? 'var(--primary-blue)' : 'var(--text-secondary)',
+                            flexShrink: 0
+                          }}>
+                            <Icon size={15} />
+                          </div>
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color: isSelected ? 'var(--primary-blue)' : 'var(--text-primary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {item.title}
+                            </div>
+                            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.subtitle}
+                            </div>
+                          </div>
+                        </div>
+
+                        {item.badge && (
+                          <span style={{
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: isSelected ? '#FFFFFF' : 'var(--bg-canvas)',
+                            color: isSelected ? 'var(--primary-blue)' : 'var(--text-secondary)',
+                            border: '1px solid var(--border-light)',
+                            flexShrink: 0,
+                            marginLeft: '10px'
+                          }}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
           )}
         </div>
 
-        {/* Footer info */}
+        {/* Footer Shortcut Bar */}
         <div style={{
-          padding: '12px 20px',
-          borderTop: '1px solid var(--color-border)',
-          background: 'var(--color-bg)',
+          padding: '10px 18px',
+          borderTop: '1px solid var(--border-light)',
+          backgroundColor: '#F8FAFC',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '12px',
-          color: 'var(--color-text)',
-          opacity: 0.8
+          fontSize: '11.5px',
+          color: 'var(--text-muted)'
         }}>
-          <span>Navigate with mouse or keyboard</span>
-          <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>GMRIT Semantic AI Search</span>
+          <div style={{ display: 'flex', gap: '14px' }}>
+            <span><kbd style={{ padding: '1px 5px', borderRadius: '3px', background: '#FFFFFF', border: '1px solid var(--border-light)' }}>↑</kbd> <kbd style={{ padding: '1px 5px', borderRadius: '3px', background: '#FFFFFF', border: '1px solid var(--border-light)' }}>↓</kbd> to navigate</span>
+            <span><kbd style={{ padding: '1px 5px', borderRadius: '3px', background: '#FFFFFF', border: '1px solid var(--border-light)' }}>↵</kbd> to select</span>
+          </div>
+          <span>GMRIT Academic Search Engine</span>
         </div>
       </div>
     </div>

@@ -296,7 +296,7 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
                       {courseName}
                     </h3>
                     <span 
-                      className="badge badge-blue"
+                      className="badge badge-orange"
                       style={{
                         fontFamily: 'JetBrains Mono, monospace',
                         fontWeight: 700,

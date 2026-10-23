@@ -1314,6 +1314,21 @@ class CodeExecutionService {
 
     const activeUser = user || authService.getCurrentUser();
 
+    // Persist solved problem in localStorage
+    if (allPassed) {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const solved = JSON.parse(localStorage.getItem('gmrit_solved_problems') || '[]');
+          if (!solved.includes(problemId)) {
+            solved.push(problemId);
+            localStorage.setItem('gmrit_solved_problems', JSON.stringify(solved));
+          }
+        }
+      } catch (e) {
+        console.warn('Could not save solved problem state:', e);
+      }
+    }
+
     auditService.logAction({
       user: activeUser?.name || 'Student',
       role: activeUser?.role || 'student',
@@ -1401,6 +1416,17 @@ class CodeExecutionService {
     } catch (e) {
       console.warn("Could not clear draft", e);
     }
+  }
+  getSolvedProblems() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('gmrit_solved_problems');
+        if (stored) return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.warn("Could not retrieve solved problems", e);
+    }
+    return [];
   }
 }
 

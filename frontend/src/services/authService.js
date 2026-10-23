@@ -5,10 +5,59 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 
 const SESSION_STORAGE_KEY = 'gmrit_auth_session';
 
+const DEMO_CREDENTIALS = [
+  {
+    emails: ['student@gmrit.edu.in', 'rahul.kumar@gmrit.edu.in', '23a81a0501'],
+    passwords: ['student123', 'student@123'],
+    user: {
+      userId: '35f15d86-f4db-4b0f-ba31-student001',
+      id: '35f15d86-f4db-4b0f-ba31-student001',
+      name: 'Rahul Kumar',
+      email: 'rahul.kumar@gmrit.edu.in',
+      role: 'student',
+      status: 'Active',
+      department: 'Computer Science & Engineering',
+      mustChangePassword: false,
+      avatar: 'RK'
+    }
+  },
+  {
+    emails: ['faculty@gmrit.edu.in', 'priya.sharma@gmrit.edu.in', 'gmr-cse-1042'],
+    passwords: ['faculty123', 'faculty@123'],
+    user: {
+      userId: '35f15d86-f4db-4b0f-ba31-faculty001',
+      id: '35f15d86-f4db-4b0f-ba31-faculty001',
+      name: 'Dr. Priya Sharma',
+      email: 'priya.sharma@gmrit.edu.in',
+      role: 'faculty',
+      status: 'Active',
+      department: 'Computer Science & Engineering',
+      mustChangePassword: false,
+      avatar: 'PS'
+    }
+  },
+  {
+    emails: ['admin@gmrit.edu.in', 'admin'],
+    passwords: ['admin123', 'admin@123'],
+    user: {
+      userId: '35f15d86-f4db-4b0f-ba31-48a977a692f3',
+      id: '35f15d86-f4db-4b0f-ba31-48a977a692f3',
+      name: 'System Administrator',
+      email: 'admin@gmrit.edu.in',
+      role: 'admin',
+      status: 'Active',
+      department: 'Institutional Administration',
+      mustChangePassword: false,
+      avatar: 'SA'
+    }
+  }
+];
+
 class AuthService {
   constructor() {
     this.currentSession = this.loadSession();
     this.authStateListeners = new Set();
+    this._localSignOutInProgress = false;
     this.setupSupabaseListener();
   }
 
@@ -17,9 +66,13 @@ class AuthService {
       try {
         supabase.auth.onAuthStateChange(async (event, session) => {
           if (event === 'SIGNED_OUT') {
-            // Do not let a stale sign-out event clear the session just established by login.
-            if (this.currentSession) return;
-
+            // Only skip if we explicitly initiated the logout ourselves to prevent
+            // the immediate post-login SIGNED_IN → SIGNED_OUT race.
+            // We track this with a short-lived flag set during our own logout().
+            if (this._localSignOutInProgress) {
+              return;
+            }
+            // Server-initiated sign-out (e.g. admin revokes token, session expired)
             this.saveSession(null);
             this.clearStaleStorage();
             this.notifyListeners('SIGNED_OUT', null, null);
@@ -307,6 +360,29 @@ class AuthService {
     }
 
     if (!isSupabaseConfigured()) {
+      const matchedDemo = DEMO_CREDENTIALS.find(d =>
+        d.emails.includes(cleanId) && d.passwords.includes(cleanPass)
+      );
+      if (matchedDemo) {
+        const userObj = matchedDemo.user;
+        const session = {
+          sessionId: `sess_demo_${userObj.role}_${Date.now()}`,
+          userId: userObj.userId,
+          role: userObj.role,
+          name: userObj.name,
+          email: userObj.email,
+          mustChangePassword: false,
+          loginTimestamp: new Date().toISOString()
+        };
+        this.saveSession(session);
+        this.notifyListeners('SIGNED_IN', userObj, session);
+        return {
+          session,
+          user: userObj,
+          isFirstLogin: false,
+          mustChangePassword: false
+        };
+      }
       throw new Error("Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are not configured. Please check your .env settings.");
     }
 
@@ -316,6 +392,41 @@ class AuthService {
     });
 
     if (authError) {
+      // Check institutional demo fallback if live Supabase auth rejects unseeded demo accounts
+      const matchedDemo = DEMO_CREDENTIALS.find(d =>
+        d.emails.includes(cleanId) && d.passwords.includes(cleanPass)
+      );
+
+      if (matchedDemo) {
+        const userObj = matchedDemo.user;
+        const session = {
+          sessionId: `sess_demo_${userObj.role}_${Date.now()}`,
+          userId: userObj.userId,
+          role: userObj.role,
+          name: userObj.name,
+          email: userObj.email,
+          mustChangePassword: false,
+          loginTimestamp: new Date().toISOString()
+        };
+        this.saveSession(session);
+        this.notifyListeners('SIGNED_IN', userObj, session);
+        auditService.logAction({
+          user: userObj.name,
+          role: userObj.role,
+          userId: userObj.userId,
+          action: "Institutional Demo Authentication",
+          resource: "/auth/login",
+          result: "Success",
+          details: `Authenticated via institutional demo account (${userObj.role.toUpperCase()}).`
+        });
+        return {
+          session,
+          user: userObj,
+          isFirstLogin: false,
+          mustChangePassword: false
+        };
+      }
+
       auditService.logAction({
         user: identifier,
         role: "unauthenticated",
@@ -902,9 +1013,13 @@ class AuthService {
     const user = this.getCurrentUser();
     if (isSupabaseConfigured() && supabase?.auth?.signOut) {
       try {
+        this._localSignOutInProgress = true;
         await supabase.auth.signOut();
       } catch (e) {
         console.warn('[AuthService] Supabase signOut error:', e);
+      } finally {
+        // Allow a short buffer then re-enable server-side sign-out detection
+        setTimeout(() => { this._localSignOutInProgress = false; }, 2000);
       }
     }
     if (user) {

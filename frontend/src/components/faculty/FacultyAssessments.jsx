@@ -12,6 +12,44 @@ import assessmentService from '../../services/assessmentService';
 import authService from '../../services/authService';
 import RagUploadModal from '../admin/RagUploadModal';
 
+const STORAGE_KEY = 'gmrit_faculty_assessments';
+
+const DEFAULT_ASSESSMENTS = [
+  {
+    id: 'f_quiz_101',
+    title: 'Machine Learning — Quiz 4 (Supervised Models)',
+    subject: 'Machine Learning',
+    questionsCount: 20,
+    studentsCount: 64,
+    submittedCount: 58,
+    averageScore: '78.6%',
+    status: 'Graded',
+    dueDate: 'Closed Yesterday'
+  },
+  {
+    id: 'f_quiz_102',
+    title: 'Database Systems — Normalization & ER Diagrams',
+    subject: 'Database Management Systems',
+    questionsCount: 15,
+    studentsCount: 64,
+    submittedCount: 61,
+    averageScore: '82.4%',
+    status: 'Graded',
+    dueDate: 'Closed 3 Days Ago'
+  },
+  {
+    id: 'f_quiz_103',
+    title: 'Cloud Computing — Containerization & Microservices',
+    subject: 'Cloud Computing',
+    questionsCount: 25,
+    studentsCount: 64,
+    submittedCount: 0,
+    averageScore: '—',
+    status: 'Scheduled',
+    dueDate: 'Next Monday, 11:59 PM'
+  }
+];
+
 export default function FacultyAssessments({ onOpenRagQuery }) {
   const [assessments, setAssessments] = useState([]);
   const [assignedClasses, setAssignedClasses] = useState([]);

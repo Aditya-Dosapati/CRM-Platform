@@ -148,20 +148,20 @@ export const studentCodingKPIs = {
 };
 
 export const codingTopicCategories = [
-  { id: 'arrays', name: 'Arrays', problems: 42, solved: 0, percentage: 0, icon: 'Layers', color: '#2563EB' },
+  { id: 'arrays', name: 'Arrays', problems: 42, solved: 0, percentage: 0, icon: 'Layers', color: '#EA580C' },
   { id: 'strings', name: 'Strings', problems: 38, solved: 0, percentage: 0, icon: 'FileText', color: '#059669' },
   { id: 'linked-lists', name: 'Linked Lists', problems: 26, solved: 0, percentage: 0, icon: 'GitCommit', color: '#7C3AED' },
-  { id: 'stacks', name: 'Stacks', problems: 20, solved: 0, percentage: 0, icon: 'Layers', color: '#EA580C' },
+  { id: 'stacks', name: 'Stacks', problems: 20, solved: 0, percentage: 0, icon: 'Layers', color: '#C2410C' },
   { id: 'queues', name: 'Queues', problems: 18, solved: 0, percentage: 0, icon: 'AlignLeft', color: '#0891B2' },
   { id: 'trees', name: 'Trees', problems: 34, solved: 0, percentage: 0, icon: 'GitFork', color: '#059669' },
   { id: 'graphs', name: 'Graphs', problems: 28, solved: 0, percentage: 0, icon: 'Share2', color: '#DC2626' },
-  { id: 'sorting', name: 'Sorting', problems: 24, solved: 0, percentage: 0, icon: 'ArrowUpDown', color: '#2563EB' },
+  { id: 'sorting', name: 'Sorting', problems: 24, solved: 0, percentage: 0, icon: 'ArrowUpDown', color: '#D97706' },
   { id: 'searching', name: 'Searching', problems: 22, solved: 0, percentage: 0, icon: 'Search', color: '#059669' },
   { id: 'recursion', name: 'Recursion', problems: 16, solved: 0, percentage: 0, icon: 'Repeat', color: '#7C3AED' },
   { id: 'dp', name: 'Dynamic Programming', problems: 30, solved: 0, percentage: 0, icon: 'Grid', color: '#EA580C' },
   { id: 'greedy', name: 'Greedy Algorithms', problems: 18, solved: 0, percentage: 0, icon: 'Zap', color: '#D97706' },
   { id: 'hashing', name: 'Hashing', problems: 25, solved: 0, percentage: 0, icon: 'Hash', color: '#0891B2' },
-  { id: 'oop', name: 'Object-Oriented Programming', problems: 15, solved: 0, percentage: 0, icon: 'Box', color: '#2563EB' },
+  { id: 'oop', name: 'Object-Oriented Programming', problems: 15, solved: 0, percentage: 0, icon: 'Box', color: '#9A3412' },
   { id: 'db', name: 'Database Programming', problems: 14, solved: 0, percentage: 0, icon: 'Database', color: '#059669' },
   { id: 'math', name: 'Mathematical Problems', problems: 20, solved: 0, percentage: 0, icon: 'Cpu', color: '#7C3AED' }
 ];
@@ -1156,7 +1156,7 @@ export const adminCodingAnalytics = {
   averageSuccessRate: '68.4%',
   totalAssessmentsConducted: 42,
   languageUsage: [
-    { name: 'Python', percentage: 42, color: '#3B82F6' },
+    { name: 'Python', percentage: 42, color: '#EA580C' },
     { name: 'Java', percentage: 28, color: '#10B981' },
     { name: 'C++', percentage: 18, color: '#8B5CF6' },
     { name: 'C', percentage: 8, color: '#F97316' },

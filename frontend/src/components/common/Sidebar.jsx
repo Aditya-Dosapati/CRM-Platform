@@ -1,23 +1,22 @@
 import React, { useMemo } from 'react';
-import GmritLogo from './GmritLogo';
 import {
   LayoutDashboard,
   BookOpen,
+  CheckSquare,
   FileText,
   HelpCircle,
-  CheckSquare,
+  FolderArchive,
   BarChart2,
   PieChart,
-  FolderArchive,
-  Sparkles,
   Settings,
-  LifeBuoy,
+  Sparkles,
   Users,
   Layers,
   Activity,
+  LogOut,
+  LifeBuoy,
   Cpu,
   Sliders,
-  LogOut,
   GraduationCap,
   Award,
   Shield,
@@ -26,8 +25,12 @@ import {
   Terminal,
   UserCheck,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
+import GmritLogo from './GmritLogo.jsx';
 
 export default function Sidebar({
   activeRole,
@@ -39,55 +42,149 @@ export default function Sidebar({
   isCollapsed = false,
   onToggleCollapse
 }) {
-  const navItems = useMemo(() => {
+  // Navigation sections configured by institutional role
+  const navSections = useMemo(() => {
     switch (activeRole) {
       case 'student':
         return [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'subjects', label: 'My Subjects', icon: BookOpen },
-          { id: 'assessments', label: 'Assessments', icon: CheckSquare },
-          { id: 'coding-practice', label: 'Coding Practice', icon: Code2 },
-          { id: 'coding-assessments', label: 'Coding Assessments', icon: Terminal },
-          { id: 'performance', label: 'Performance', icon: BarChart2 },
-          { id: 'infographics', label: 'Academic Insights', icon: PieChart },
-          { id: 'resources', label: 'Resources', icon: FolderArchive }
+          {
+            title: 'Learning & Practice',
+            items: [
+              { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { id: 'subjects', label: 'My Subjects', icon: BookOpen },
+              { id: 'coding-practice', label: 'Coding Practice', icon: Code2 },
+              { id: 'assessments', label: 'Assessments', icon: CheckSquare },
+              { id: 'ai-copilot', label: 'AI Academic Copilot', icon: Sparkles, isAction: true }
+            ]
+          },
+          {
+            title: 'Academic Resources',
+            items: [
+              { id: 'syllabus', label: 'Curriculum & Syllabus', icon: FileText },
+              { id: 'pyqs', label: 'Previous Questions (PYQs)', icon: HelpCircle },
+              { id: 'resources', label: 'Course Resources', icon: FolderArchive }
+            ]
+          },
+          {
+            title: 'Progress & Insights',
+            items: [
+              { id: 'performance', label: 'Academic Performance', icon: BarChart2 },
+              { id: 'infographics', label: 'Academic Insights', icon: PieChart }
+            ]
+          },
+          {
+            title: 'Account',
+            items: [
+              { id: 'settings', label: 'Preferences & Settings', icon: Settings }
+            ]
+          }
         ];
+
       case 'faculty':
         return [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'classes', label: 'My Subjects', icon: BookOpen },
-          { id: 'students', label: 'Students', icon: Users },
-          { id: 'assessments', label: 'Assessments', icon: CheckSquare },
-          { id: 'resources', label: 'Resources', icon: FolderArchive },
-          { id: 'analytics', label: 'Analytics', icon: Activity }
+          {
+            title: 'Teaching Overview',
+            items: [
+              { id: 'dashboard', label: 'Faculty Dashboard', icon: LayoutDashboard },
+              { id: 'classes', label: 'My Classes & Subjects', icon: BookOpen },
+              { id: 'students', label: 'Student Monitoring', icon: Users }
+            ]
+          },
+          {
+            title: 'Curriculum & Tests',
+            items: [
+              { id: 'assessments', label: 'Assessments Manager', icon: CheckSquare },
+              { id: 'resources', label: 'Syllabus & Handouts', icon: FolderArchive },
+              { id: 'ai-copilot', label: 'RAG Knowledge Assistant', icon: Sparkles, isAction: true }
+            ]
+          },
+          {
+            title: 'Coding Assessments',
+            items: [
+              { id: 'coding-assessments', label: 'Coding Challenges', icon: Terminal }
+            ]
+          },
+          {
+            title: 'Cohort Analytics',
+            items: [
+              { id: 'analytics', label: 'Performance & At-Risk', icon: Activity }
+            ]
+          },
+          {
+            title: 'Account',
+            items: [
+              { id: 'settings', label: 'Faculty Settings', icon: Settings }
+            ]
+          }
         ];
+
       case 'admin':
         return [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'users', label: 'User Provisioning', icon: Users },
-          { id: 'faculty-assignments', label: 'Faculty Assignments', icon: UserCheck },
-          { id: 'syllabus', label: 'Syllabus Management', icon: FileText },
-          { id: 'pyqs', label: 'PYQ Management', icon: HelpCircle },
-          { id: 'coding-management', label: 'Coding Management', icon: Code2 },
-          { id: 'rag-base', label: 'RAG Knowledge Base', icon: Cpu },
-          { id: 'rag-settings', label: 'RAG Vector Settings', icon: Sliders },
-          { id: 'analytics', label: 'System Analytics', icon: BarChart2 },
-          { id: 'audit-logs', label: 'Security Audit Logs', icon: ShieldAlert },
-          { id: 'settings', label: 'System Settings', icon: Settings }
+          {
+            title: 'Overview',
+            items: [
+              { id: 'dashboard', label: 'Control Center', icon: LayoutDashboard }
+            ]
+          },
+          {
+            title: 'User Governance',
+            items: [
+              { id: 'users', label: 'User Provisioning', icon: Users },
+              { id: 'faculty-assignments', label: 'Faculty Assignments', icon: UserCheck }
+            ]
+          },
+          {
+            title: 'Academic Catalog',
+            items: [
+              { id: 'syllabus', label: 'Syllabus Management', icon: FileText },
+              { id: 'pyqs', label: 'Question Bank (PYQs)', icon: HelpCircle }
+            ]
+          },
+          {
+            title: 'AI & RAG Platform',
+            items: [
+              { id: 'rag-base', label: 'Vector Knowledge Base', icon: Cpu },
+              { id: 'rag-settings', label: 'RAG Retrieval Tuning', icon: Sliders }
+            ]
+          },
+          {
+            title: 'Coding Runtime',
+            items: [
+              { id: 'coding-management', label: 'Execution & Problems', icon: Code2 },
+              { id: 'coding-practice', label: 'Practice Preview', icon: Terminal }
+            ]
+          },
+          {
+            title: 'Security & System',
+            items: [
+              { id: 'analytics', label: 'System Analytics', icon: BarChart2 },
+              { id: 'audit-logs', label: 'Security Audit Logs', icon: ShieldAlert },
+              { id: 'settings', label: 'Platform Settings', icon: Settings }
+            ]
+          }
         ];
+
       default:
         return [];
     }
   }, [activeRole]);
 
-  const roleThemeBg = activeRole === 'student' ? 'var(--pastel-blue-bg)' : activeRole === 'faculty' ? 'var(--pastel-green-bg)' : 'var(--pastel-purple-bg)';
-  const roleThemeBorder = activeRole === 'student' ? 'var(--pastel-blue-border)' : activeRole === 'faculty' ? 'var(--pastel-green-border)' : 'var(--pastel-purple-border)';
-  const roleThemeColor = activeRole === 'student' ? 'var(--primary-blue)' : activeRole === 'faculty' ? 'var(--pastel-green-text)' : 'var(--pastel-purple-text)';
-  const roleLabel = activeRole === 'student' ? 'Student' : activeRole === 'faculty' ? 'Faculty' : 'Admin';
+  const roleLabel = activeRole === 'student' ? 'Student' : activeRole === 'faculty' ? 'Faculty' : 'Administrator';
+  const roleBadgeBg = activeRole === 'student' ? 'var(--pastel-blue-bg)' : activeRole === 'faculty' ? 'var(--pastel-green-bg)' : 'var(--pastel-purple-bg)';
+  const roleBadgeText = activeRole === 'student' ? 'var(--pastel-blue-text)' : activeRole === 'faculty' ? 'var(--pastel-green-text)' : 'var(--pastel-purple-text)';
+  const roleBadgeBorder = activeRole === 'student' ? 'var(--pastel-blue-border)' : activeRole === 'faculty' ? 'var(--pastel-green-border)' : 'var(--pastel-purple-border)';
+  const RoleIcon = activeRole === 'student' ? GraduationCap : activeRole === 'faculty' ? Award : Shield;
 
   const displayName = currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : 'User');
-  const displayEmail = currentUser?.email || '';
   const displayAvatar = currentUser?.avatar || (displayName ? displayName.slice(0, 2).toUpperCase() : 'U');
+
+  const handleItemClick = (item) => {
+    if (item.id === 'ai-copilot') {
+      if (onOpenRag) onOpenRag();
+    } else {
+      if (onNavigate) onNavigate(item.id);
+    }
+  };
 
   return (
     <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`} aria-label="Main Navigation Sidebar">
@@ -142,34 +239,34 @@ export default function Sidebar({
       {/* Role Pill Banner */}
       {!isCollapsed ? (
         <div style={{
-          margin: '8px 10px 4px',
-          padding: '5px 10px',
+          margin: '8px 12px 6px',
+          padding: '6px 12px',
           borderRadius: 'var(--radius-sm)',
-          backgroundColor: roleThemeBg,
-          border: `1px solid ${roleThemeBorder}`,
+          backgroundColor: roleBadgeBg,
+          border: `1px solid ${roleBadgeBorder}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           minWidth: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            {activeRole === 'student' && <GraduationCap size={13} color="var(--pastel-blue-text)" style={{ flexShrink: 0 }} />}
-            {activeRole === 'faculty' && <Award size={13} color="var(--pastel-green-text)" style={{ flexShrink: 0 }} />}
-            {activeRole === 'admin' && <Shield size={13} color="var(--pastel-purple-text)" style={{ flexShrink: 0 }} />}
+            <RoleIcon size={14} color={roleBadgeText} style={{ flexShrink: 0 }} />
             <span style={{
               fontSize: '11px',
-              fontWeight: 700,
+              fontWeight: 800,
               textTransform: 'uppercase',
-              letterSpacing: '0.4px',
-              color: roleThemeColor,
+              letterSpacing: '0.5px',
+              color: roleBadgeText,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
-              {activeRole} Portal
+              {roleLabel} Portal
             </span>
           </div>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>R20/R23</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '0.4px', backgroundColor: 'rgba(255, 255, 255, 0.65)', padding: '2px 6px', borderRadius: '4px' }}>
+            R20/R23
+          </span>
         </div>
       ) : (
         <div 
@@ -179,218 +276,155 @@ export default function Sidebar({
             width: '36px',
             height: '30px',
             borderRadius: 'var(--radius-sm)',
-            backgroundColor: roleThemeBg,
-            border: `1px solid ${roleThemeBorder}`,
+            backgroundColor: roleBadgeBg,
+            border: `1px solid ${roleBadgeBorder}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'default'
           }}
         >
-          {activeRole === 'student' && <GraduationCap size={15} color="var(--pastel-blue-text)" />}
-          {activeRole === 'faculty' && <Award size={15} color="var(--pastel-green-text)" />}
-          {activeRole === 'admin' && <Shield size={15} color="var(--pastel-purple-text)" />}
+          <RoleIcon size={15} color={roleBadgeText} />
         </div>
       )}
 
-      {/* Main Navigation List */}
+      {/* Navigation Groups */}
       <nav className="sidebar-nav">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentView === item.id;
-          return (
-            <div
-              key={item.id}
-              role="button"
-              tabIndex={0}
-              aria-current={isActive ? 'page' : undefined}
-              aria-label={item.label}
-              title={item.label}
-              onClick={() => onNavigate(item.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onNavigate(item.id);
-                }
-              }}
-              className={`nav-item ${isActive ? 'active' : ''}`}
-              style={isCollapsed ? { justifyContent: 'center', padding: '9px 0' } : undefined}
-            >
-              <Icon size={16} color={isActive ? 'var(--primary-blue)' : 'var(--text-secondary)'} style={{ flexShrink: 0 }} />
-              {!isCollapsed && (
-                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.label}
-                </span>
-              )}
+        {navSections.map((section, sIdx) => (
+          <div key={section.title || sIdx} style={{ marginBottom: isCollapsed ? '4px' : '8px' }}>
+            {section.title && !isCollapsed && (
+              <div className="sidebar-section-title">
+                {section.title}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentView === item.id;
+                const isSpecial = item.id === 'ai-copilot';
+
+                return (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-current={isActive ? 'page' : undefined}
+                    aria-label={item.label}
+                    title={item.label}
+                    onClick={() => handleItemClick(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleItemClick(item);
+                      }
+                    }}
+                    className={`nav-item ${isActive ? 'active' : ''}`}
+                    style={{
+                      ...(isSpecial ? {
+                        backgroundColor: '#FFF7ED',
+                        color: '#C2410C',
+                        fontWeight: 600,
+                        border: '1px solid #FED7AA'
+                      } : {}),
+                      ...(isCollapsed ? { justifyContent: 'center', padding: '9px 0' } : {})
+                    }}
+                  >
+                    <Icon 
+                      size={16} 
+                      color={isActive ? 'var(--color-primary)' : (isSpecial ? '#EA580C' : 'var(--text-secondary)')} 
+                      style={{ flexShrink: 0 }}
+                    />
+                    {!isCollapsed && (
+                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {item.label}
+                      </span>
+                    )}
+                    {isSpecial && !isCollapsed && (
+                      <span style={{
+                        fontSize: '9.5px',
+                        fontWeight: 800,
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        backgroundColor: '#EA580C',
+                        color: '#FFFFFF'
+                      }}>
+                        AI
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-
-        {/* Divider */}
-        <div className="sidebar-divider" />
-
-        {!isCollapsed && <div className="sidebar-section-title">Support & Intelligence</div>}
-
-        {/* AI Assistant shortcut */}
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Open GMRIT AI Assistant"
-          title="AI Assistant (RAG Knowledge Base)"
-          onClick={onOpenRag}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onOpenRag();
-            }
-          }}
-          className="nav-item"
-          style={{
-            color: 'var(--pastel-blue-text)',
-            backgroundColor: 'var(--pastel-blue-bg)',
-            border: '1px solid var(--pastel-blue-border)',
-            fontWeight: 600,
-            margin: '2px 0 4px',
-            transition: 'transform var(--transition-spring), box-shadow var(--transition-spring), background-color var(--transition-smooth)',
-            ...(isCollapsed ? { justifyContent: 'center', padding: '9px 0' } : {})
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 3px 10px rgba(37, 99, 235, 0.12)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'none';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <Sparkles size={16} color="var(--primary-blue)" style={{ flexShrink: 0 }} />
-          {!isCollapsed && (
-            <>
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>AI Assistant</span>
-              <span className="badge badge-blue" style={{ fontSize: '9px', padding: '1px 5px', flexShrink: 0 }}>RAG</span>
-            </>
-          )}
-        </div>
-
-        {/* Settings Navigation Item */}
-        <div
-          role="button"
-          tabIndex={0}
-          aria-current={currentView === 'settings' ? 'page' : undefined}
-          aria-label="Settings"
-          title="System Settings"
-          onClick={() => onNavigate('settings')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onNavigate('settings');
-            }
-          }}
-          className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
-          style={isCollapsed ? { justifyContent: 'center', padding: '9px 0' } : undefined}
-        >
-          <Settings size={16} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
-          {!isCollapsed && (
-            <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Settings</span>
-          )}
-        </div>
-
-        {/* Help & Support Navigation Item */}
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Help & Support"
-          title="Help & Support (helpdesk@gmrit.edu.in • Ext: 4402)"
-          onClick={() => alert("GMRIT Academic Helpdesk: helpdesk@gmrit.edu.in • Ext: 4402")}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              alert("GMRIT Academic Helpdesk: helpdesk@gmrit.edu.in • Ext: 4402");
-            }
-          }}
-          className="nav-item"
-          style={isCollapsed ? { justifyContent: 'center', padding: '9px 0' } : undefined}
-        >
-          <LifeBuoy size={16} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
-          {!isCollapsed && (
-            <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Help & Support</span>
-          )}
-        </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Bottom Profile & Logout Footer */}
+      {/* User Footer Profile Card */}
       {!isCollapsed ? (
         <div style={{
           padding: '12px 14px',
-          borderTop: '1px solid var(--border-subtle)',
+          borderTop: '1px solid rgba(226, 232, 240, 0.85)',
+          backgroundColor: '#F8FAFC',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          backgroundColor: '#FFFFFF',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           minWidth: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <div style={{
-              width: '30px',
-              height: '30px',
-              borderRadius: '50%',
-              backgroundColor: roleThemeBg,
-              border: `1px solid ${roleThemeBorder}`,
-              color: roleThemeColor,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '11px',
-              flexShrink: 0
-            }}>
-              {displayAvatar}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                backgroundColor: roleBadgeBg,
+                border: `1.5px solid ${roleBadgeBorder}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '12px',
+                color: roleBadgeText
+              }}>
+                {displayAvatar}
+              </div>
+              <span style={{
+                position: 'absolute',
+                bottom: '-1px',
+                right: '-1px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#10B981',
+                border: '1.5px solid #FFFFFF'
+              }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, overflow: 'hidden' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+              <div style={{ 
+                fontSize: '12.5px', 
+                fontWeight: 700, 
+                color: 'var(--text-primary)', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis' 
+              }}>
                 {displayName}
-              </span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {displayEmail}
-              </span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser?.email || roleLabel}
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '2px', fontSize: '11px' }}>
-            <span
-              onClick={() => onNavigate('settings')}
-              style={{ color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500, transition: 'color var(--transition-smooth)' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-blue)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-            >
-              Settings
-            </span>
-            <span style={{ color: 'var(--border-subtle)' }}>|</span>
-            <button
-              onClick={onLogout}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--error)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '2px 4px',
-                borderRadius: '4px',
-                transition: 'transform var(--transition-spring), opacity var(--transition-smooth)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-              onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
-            >
-              <LogOut size={11} />
-              <span>Logout</span>
-            </button>
-          </div>
+          <button
+            onClick={onLogout}
+            className="btn-icon"
+            style={{ width: '30px', height: '30px', border: '1px solid rgba(226, 232, 240, 0.9)', background: '#FFFFFF', borderRadius: '8px', flexShrink: 0 }}
+            title="Sign Out"
+            aria-label="Sign Out"
+          >
+            <LogOut size={14} color="#DC2626" />
+          </button>
         </div>
       ) : (
         <div style={{
@@ -402,16 +436,15 @@ export default function Sidebar({
           gap: '8px',
           backgroundColor: '#FFFFFF'
         }}>
-          {/* Collapsed Avatar Circle */}
           <div 
-            title={`${displayName} (${displayEmail})`}
+            title={`${displayName} (${currentUser?.email || roleLabel})`}
             style={{
               width: '30px',
               height: '30px',
               borderRadius: '50%',
-              backgroundColor: roleThemeBg,
-              border: `1px solid ${roleThemeBorder}`,
-              color: roleThemeColor,
+              backgroundColor: roleBadgeBg,
+              border: `1px solid ${roleBadgeBorder}`,
+              color: roleBadgeText,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -424,7 +457,6 @@ export default function Sidebar({
             {displayAvatar}
           </div>
 
-          {/* Collapsed Logout Icon Button */}
           <button
             onClick={onLogout}
             title="Logout"
@@ -442,16 +474,6 @@ export default function Sidebar({
               color: 'var(--error)',
               transition: 'background-color var(--transition-smooth), transform var(--transition-spring)'
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-subtle)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.transform = 'none';
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
           >
             <LogOut size={13} />
           </button>
