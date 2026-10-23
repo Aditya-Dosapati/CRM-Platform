@@ -1,38 +1,44 @@
 // GMR CRM - Reusable Supabase Client Integration
 import { createClient } from '@supabase/supabase-js';
 
-let rawUrl = '';
-let supabaseAnonKey = '';
-
-try {
-  // Vite statically replaces import.meta.env.VITE_* during build and dev transformation
-  rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-} catch (e) {
-  // Fallback for non-Vite environments (e.g. Node CLI testing)
-  if (typeof process !== 'undefined' && process?.env) {
-    rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-    supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+export const getSupabaseUrl = () => {
+  let url = '';
+  try {
+    url = import.meta.env.VITE_SUPABASE_URL || '';
+  } catch (e) {
+    if (typeof process !== 'undefined' && process?.env) {
+      url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    }
   }
-}
+  if (!url && typeof process !== 'undefined' && process?.env) {
+    url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  }
+  return (url || '').replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+};
 
-// Ensure Node test scripts that load process.env after module load also work
-if (!rawUrl && typeof process !== 'undefined' && process?.env) {
-  rawUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-}
-if (!supabaseAnonKey && typeof process !== 'undefined' && process?.env) {
-  supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
-}
-
-const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
-
+export const getSupabaseAnonKey = () => {
+  let key = '';
+  try {
+    key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  } catch (e) {
+    if (typeof process !== 'undefined' && process?.env) {
+      key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+    }
+  }
+  if (!key && typeof process !== 'undefined' && process?.env) {
+    key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  }
+  return key || '';
+};
 
 /**
  * Checks whether Supabase environment variables are properly configured with active values.
  */
 export const isSupabaseConfigured = () => {
-  const isUrlValid = Boolean(supabaseUrl && !supabaseUrl.includes('your-project-id') && supabaseUrl.startsWith('http'));
-  const isKeyValid = Boolean(supabaseAnonKey && supabaseAnonKey !== 'your-anon-key-here' && supabaseAnonKey.length > 20);
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+  const isUrlValid = Boolean(url && !url.includes('your-project-id') && url.startsWith('http'));
+  const isKeyValid = Boolean(key && key !== 'your-anon-key-here' && key.length > 20);
   return isUrlValid && isKeyValid;
 };
 
@@ -40,9 +46,12 @@ export const isSupabaseConfigured = () => {
 const fallbackUrl = 'https://placeholder.supabase.co';
 const fallbackKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder';
 
+const resolvedUrl = isSupabaseConfigured() ? getSupabaseUrl() : fallbackUrl;
+const resolvedKey = isSupabaseConfigured() ? getSupabaseAnonKey() : fallbackKey;
+
 export const supabase = createClient(
-  isSupabaseConfigured() ? supabaseUrl : fallbackUrl,
-  isSupabaseConfigured() ? supabaseAnonKey : fallbackKey,
+  resolvedUrl,
+  resolvedKey,
   {
     auth: {
       persistSession: true,
