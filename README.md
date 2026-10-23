@@ -180,6 +180,10 @@ python -m venv venv
 venv\Scripts\activate
 # Linux/macOS:
 source venv/bin/activate
+
+
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
 ```
 
 #### Install Recommended Python Dependencies

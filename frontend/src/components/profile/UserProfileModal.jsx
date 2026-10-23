@@ -1,4 +1,4 @@
-import React from 'react';
+ import React from 'react';
 import { X, User, Mail, Shield, BookOpen, Award, CheckCircle, Calendar, Hash, Building } from 'lucide-react';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
@@ -8,7 +8,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ backdropFilter: 'blur(4px)', background: 'rgba(15, 23, 42, 0.4)' }}>
+    <div className="modal-overlay" onClick={onClose} style={{ backdropFilter: 'blur(8px)', background: 'rgba(15, 23, 42, 0.55)' }}>
       <div 
         className="modal-content"
         style={{
@@ -16,29 +16,29 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
           padding: 0,
           overflow: 'hidden',
           background: '#FFFFFF',
-          borderRadius: '14px',
-          boxShadow: '0 20px 45px -10px rgba(0, 0, 0, 0.15)',
-          border: '1px solid var(--border-light)'
+          borderRadius: '20px',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)',
+          border: '1px solid rgba(226, 232, 240, 0.9)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Banner with clean vibrant gradient */}
         <div style={{
-          height: '96px',
-          background: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
+          height: '100px',
+          background: 'linear-gradient(135deg, #9A3412 0%, #C2410C 50%, #EA580C 100%)',
           position: 'relative'
         }}>
           <button
             onClick={onClose}
             style={{
               position: 'absolute',
-              top: '12px',
-              right: '12px',
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
+              top: '14px',
+              right: '14px',
+              background: 'rgba(255,255,255,0.22)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
               borderRadius: '50%',
-              width: '28px',
-              height: '28px',
+              width: '30px',
+              height: '30px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -58,7 +58,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
               width: '72px',
               height: '72px',
               borderRadius: '14px',
-              background: 'linear-gradient(135deg, #2563EB, #60A5FA)',
+              background: 'linear-gradient(135deg, #C2410C, #EA580C)',
               border: '3px solid #FFFFFF',
               display: 'flex',
               alignItems: 'center',
@@ -66,7 +66,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
               fontSize: '24px',
               fontWeight: 800,
               color: '#FFFFFF',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+              boxShadow: '0 4px 14px rgba(234, 88, 12, 0.3)'
             }}>
               {currentUser.avatar}
             </div>
@@ -98,7 +98,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
             border: '1px solid var(--border-light)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: '#DBEAFE', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: '#FFEDD5', color: '#EA580C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Hash size={14} />
               </div>
               <div>
@@ -122,7 +122,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: '#DBEAFE', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: '#FFEDD5', color: '#EA580C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Mail size={14} />
               </div>
               <div>

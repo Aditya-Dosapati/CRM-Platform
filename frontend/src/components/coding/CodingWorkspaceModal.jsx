@@ -458,7 +458,7 @@ export default function CodingWorkspaceModal({
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
                     {problem.hints?.slice(0, revealedHints).map((h, idx) => (
-                      <div key={idx} style={{ fontSize: '12px', color: '#1E40AF', lineHeight: 1.4, padding: '6px 8px', backgroundColor: '#FFFFFF', borderRadius: '4px', border: '1px solid var(--pastel-blue-border)' }}>
+                      <div key={idx} style={{ fontSize: '12px', color: '#9A3412', lineHeight: 1.4, padding: '6px 8px', backgroundColor: '#FFFFFF', borderRadius: '4px', border: '1px solid var(--pastel-blue-border)' }}>
                         {h}
                       </div>
                     ))}

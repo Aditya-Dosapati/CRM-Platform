@@ -301,8 +301,9 @@ class RagDocumentService {
 
   /**
    * Fetch all RAG documents from Supabase rag_documents
+   * Accepts optional filters: { subjectId, departmentId, documentType }
    */
-  async getDocuments() {
+  async getDocuments(filters = {}) {
     if (!isSupabaseConfigured()) {
       return {
         data: [],
@@ -312,7 +313,7 @@ class RagDocumentService {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rag_documents')
         .select(`
           *,
@@ -321,6 +322,22 @@ class RagDocumentService {
           rag_ingestion_jobs (id, status, chunks_created, started_at, completed_at, error_message)
         `)
         .order('created_at', { ascending: false });
+
+      // Apply optional filters
+      if (filters.subjectId) {
+        query = query.eq('subject_id', filters.subjectId);
+      }
+      if (filters.departmentId) {
+        query = query.eq('department_id', filters.departmentId);
+      }
+      if (filters.documentType) {
+        query = query.eq('document_type', filters.documentType);
+      }
+      if (filters.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.warn('[RagDocumentService] Error fetching rag_documents:', error.message);

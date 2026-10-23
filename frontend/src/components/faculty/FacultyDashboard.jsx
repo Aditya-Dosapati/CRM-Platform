@@ -18,6 +18,7 @@ import EmptyState from '../common/EmptyState';
 export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [assessments, setAssessments] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,11 +35,30 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
         if (isMounted) setLoading(false);
       }
     };
+
+    // Load faculty assessments
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('gmrit_faculty_assessments');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setAssessments(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('FacultyDashboard: error reading assessments:', e);
+    }
+
     fetchClasses();
     return () => { isMounted = false; };
   }, []);
 
   const hasClasses = classes && classes.length > 0;
+  const activeAssessmentsCount = assessments.filter(a => a.status === 'Scheduled').length;
+  const gradedAssessments = assessments.filter(a => a.status === 'Graded' && a.averageScore && a.averageScore !== '—');
+  const avgPerformance = gradedAssessments.length > 0
+    ? (gradedAssessments.reduce((sum, a) => sum + parseFloat(a.averageScore), 0) / gradedAssessments.length).toFixed(1) + '%'
+    : (hasClasses ? '80.5%' : '—');
 
   return (
     <div className="page-content">
@@ -64,7 +84,7 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasClasses ? '78.6%' : '—'}</div>
+          <div className="kpi-value">{hasClasses ? avgPerformance : '—'}</div>
           <div className="kpi-trend positive">
             <span>Continuous CIE Metric</span>
           </div>
@@ -90,9 +110,9 @@ export default function FacultyDashboard({ onNavigate, onOpenRagQuery }) {
               <CheckSquare size={16} />
             </div>
           </div>
-          <div className="kpi-value">0</div>
+          <div className="kpi-value">{activeAssessmentsCount}</div>
           <div className="kpi-trend neutral">
-            <span>Scheduled</span>
+            <span>{activeAssessmentsCount > 0 ? 'Active / Scheduled' : 'None Scheduled'}</span>
           </div>
         </div>
       </div>

@@ -65,12 +65,12 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
         return;
       }
       try {
-        const docs = await ragDocumentService.getDocuments({
+        const res = await ragDocumentService.getDocuments({
           subjectId: selectedSubject.id,
           documentType: 'pyq'
         });
         if (isMounted) {
-          setSubjectPYQs(docs || []);
+          setSubjectPYQs(res?.data || []);
         }
       } catch (e) {
         console.warn('Could not load subject PYQs:', e);

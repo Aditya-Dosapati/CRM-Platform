@@ -77,25 +77,40 @@ class AuditService {
 
   loadLogs() {
     try {
-      if (typeof sessionStorage !== 'undefined') {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } else if (typeof sessionStorage !== 'undefined') {
         const stored = sessionStorage.getItem(STORAGE_KEY);
         if (stored) {
-          return JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
         }
       }
     } catch (e) {
-      console.warn("Could not read audit logs from sessionStorage", e);
+      console.warn("[AuditService] Could not read audit logs from storage", e);
     }
     return [...initialAuditLogs];
   }
 
   saveLogs() {
     try {
+      const payload = JSON.stringify(this.logs);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, payload);
+      }
       if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.logs));
+        sessionStorage.setItem(STORAGE_KEY, payload);
       }
     } catch (e) {
-      console.warn("Could not persist audit logs to sessionStorage", e);
+      console.warn("[AuditService] Could not persist audit logs to storage", e);
     }
   }
 

@@ -15,8 +15,8 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
           width: boxSize,
           height: boxSize,
           borderRadius: '10px',
-          background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+          background: 'linear-gradient(135deg, #C2410C 0%, #EA580C 100%)',
+          boxShadow: '0 2px 10px rgba(234, 88, 12, 0.28)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -25,14 +25,14 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
           overflow: 'hidden'
         }}
       >
-        {/* Subtle orange accent stripe */}
+        {/* Subtle gold accent corner */}
         <div style={{
           position: 'absolute',
           top: 0,
           right: 0,
           width: '12px',
           height: '12px',
-          background: '#EA580C',
+          background: '#F59E0B',
           clipPath: 'polygon(100% 0, 0 0, 100% 100%)'
         }} />
         <svg viewBox="0 0 40 40" width={svgSize} height={svgSize}>
@@ -64,10 +64,10 @@ export default function GmritLogo({ size = 'medium', showSubtitle = true, collap
               fontWeight: 800,
               fontSize: isLarge ? '18px' : isSmall ? '14px' : '15px',
               letterSpacing: '-0.2px',
-              color: '#111827',
+              color: '#14171F',
               fontFamily: "'Plus Jakarta Sans', sans-serif"
             }}>
-              GMR <span style={{ color: '#2563EB' }}>CRM</span>
+              GMR <span style={{ color: '#EA580C' }}>CRM</span>
             </span>
           </div>
           {showSubtitle && (

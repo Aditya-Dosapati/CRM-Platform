@@ -335,7 +335,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
                       <div style={{
                         width: `${cat.percentage}%`,
                         height: '100%',
-                        backgroundColor: cat.percentage > 70 ? '#10B981' : cat.percentage > 40 ? '#3B82F6' : '#F59E0B'
+                        backgroundColor: cat.percentage > 70 ? '#10B981' : cat.percentage > 40 ? '#EA580C' : '#F59E0B'
                       }} />
                     </div>
                   </div>

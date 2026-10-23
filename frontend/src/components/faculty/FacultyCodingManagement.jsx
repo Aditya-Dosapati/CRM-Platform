@@ -236,8 +236,8 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                 alignItems: 'center',
                 gap: '0.45rem',
                 backgroundColor: '#FFFFFF',
-                color: '#2563EB',
-                border: '1px solid #BFDBFE',
+                color: '#EA580C',
+                border: '1px solid #FED7AA',
                 borderRadius: '8px',
                 padding: '0.55rem 1rem',
                 fontSize: '0.85rem',
@@ -255,7 +255,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                backgroundColor: 'var(--primary-blue, #2563EB)',
+                backgroundColor: 'var(--color-primary, #EA580C)',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '8px',
@@ -263,7 +263,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                 fontSize: '0.85rem',
                 fontWeight: '700',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                boxShadow: '0 2px 4px rgba(234, 88, 12, 0.2)',
                 transition: 'background-color 0.15s'
               }}
             >
@@ -284,7 +284,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: activeTab === 'assessments' ? 'var(--primary-blue, #2563EB)' : '#F1F5F9',
+              backgroundColor: activeTab === 'assessments' ? 'var(--color-primary, #EA580C)' : '#F1F5F9',
               color: activeTab === 'assessments' ? '#FFFFFF' : '#475569',
               fontSize: '0.85rem',
               fontWeight: '700',
@@ -314,7 +314,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: activeTab === 'problems' ? 'var(--primary-blue, #2563EB)' : '#F1F5F9',
+              backgroundColor: activeTab === 'problems' ? 'var(--color-primary, #EA580C)' : '#F1F5F9',
               color: activeTab === 'problems' ? '#FFFFFF' : '#475569',
               fontSize: '0.85rem',
               fontWeight: '700',
@@ -344,7 +344,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: activeTab === 'struggles' ? 'var(--primary-blue, #2563EB)' : '#F1F5F9',
+              backgroundColor: activeTab === 'struggles' ? 'var(--color-primary, #EA580C)' : '#F1F5F9',
               color: activeTab === 'struggles' ? '#FFFFFF' : '#475569',
               fontSize: '0.85rem',
               fontWeight: '700',
@@ -493,7 +493,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                     <td style={{ padding: '0.85rem 1rem', color: '#334155', fontWeight: '600' }}>
                       {a.questionsCount}
                     </td>
-                    <td style={{ padding: '0.85rem 1rem', color: '#2563EB', fontWeight: '700' }}>
+                    <td style={{ padding: '0.85rem 1rem', color: '#EA580C', fontWeight: '700' }}>
                       {a.totalMarks}
                     </td>
                     <td style={{ padding: '0.85rem 1rem' }}>
@@ -503,9 +503,9 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                           fontWeight: '700',
                           padding: '0.15rem 0.5rem',
                           borderRadius: '9999px',
-                          backgroundColor: a.status === 'completed' ? '#ECFDF5' : '#EFF6FF',
-                          color: a.status === 'completed' ? '#059669' : '#2563EB',
-                          border: `1px solid ${a.status === 'completed' ? '#A7F3D0' : '#BFDBFE'}`
+                          backgroundColor: a.status === 'completed' ? '#ECFDF5' : '#FFF7ED',
+                          color: a.status === 'completed' ? '#059669' : '#EA580C',
+                          border: `1px solid ${a.status === 'completed' ? '#A7F3D0' : '#FED7AA'}`
                         }}
                       >
                         {a.status}
@@ -517,9 +517,9 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                         style={{
                           padding: '0.35rem 0.75rem',
                           borderRadius: '6px',
-                          border: '1px solid #E2E8F0',
-                          backgroundColor: '#FFFFFF',
-                          color: '#2563EB',
+                          border: '1px solid #FED7AA',
+                          backgroundColor: '#FFF7ED',
+                          color: '#EA580C',
                           fontSize: '0.78rem',
                           fontWeight: '600',
                           cursor: 'pointer'
@@ -622,9 +622,9 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                           style={{
                             padding: '0.35rem 0.75rem',
                             borderRadius: '6px',
-                            border: '1px solid #BFDBFE',
-                            backgroundColor: '#EFF6FF',
-                            color: '#2563EB',
+                            border: '1px solid #FED7AA',
+                            backgroundColor: '#FFF7ED',
+                            color: '#EA580C',
                             fontSize: '0.78rem',
                             fontWeight: '600',
                             cursor: 'pointer'
@@ -687,8 +687,8 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                     width: '36px',
                     height: '36px',
                     borderRadius: '8px',
-                    backgroundColor: '#EFF6FF',
-                    color: '#2563EB',
+                    backgroundColor: '#FFF7ED',
+                    color: '#EA580C',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
@@ -832,7 +832,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
 
               {/* Sample Test Case */}
               <div style={{ backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#1E40AF', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#9A3412', textTransform: 'uppercase' }}>
                   Sample Test Case (Visible to Students)
                 </span>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
@@ -930,7 +930,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                     padding: '0.55rem 1.35rem',
                     borderRadius: '8px',
                     border: 'none',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#EA580C',
                     color: '#FFFFFF',
                     fontSize: '0.85rem',
                     fontWeight: '700',
@@ -991,8 +991,8 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                     width: '36px',
                     height: '36px',
                     borderRadius: '8px',
-                    backgroundColor: '#EFF6FF',
-                    color: '#2563EB',
+                    backgroundColor: '#FFF7ED',
+                    color: '#EA580C',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
@@ -1164,7 +1164,7 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
                     padding: '0.55rem 1.35rem',
                     borderRadius: '8px',
                     border: 'none',
-                    backgroundColor: '#2563EB',
+                    backgroundColor: '#EA580C',
                     color: '#FFFFFF',
                     fontSize: '0.85rem',
                     fontWeight: '700',

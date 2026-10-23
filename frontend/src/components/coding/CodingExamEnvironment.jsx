@@ -291,12 +291,12 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
                     height: '32px',
                     borderRadius: '6px',
                     border: isActive
-                      ? '2px solid #3B82F6'
+                      ? '2px solid #EA580C'
                       : isAnswered
                       ? '1px solid #10B981'
                       : '1px solid #334155',
                     backgroundColor: isActive
-                      ? '#2563EB'
+                      ? '#EA580C'
                       : isAnswered
                       ? 'rgba(16, 185, 129, 0.2)'
                       : '#1E293B',
@@ -434,7 +434,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#2563EB', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#EA580C', textTransform: 'uppercase' }}>
                   Question {currentQuestionIndex + 1} of {examQuestions.length}
                 </span>
                 <span
@@ -458,14 +458,14 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
             <div
               style={{
                 textAlign: 'right',
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
+                backgroundColor: '#FFF7ED',
+                border: '1px solid #FED7AA',
                 borderRadius: '8px',
                 padding: '0.35rem 0.75rem'
               }}
             >
-              <div style={{ fontSize: '0.7rem', color: '#1E40AF', fontWeight: '600' }}>WEIGHTAGE</div>
-              <div style={{ fontSize: '1rem', fontWeight: '800', color: '#2563EB' }}>
+              <div style={{ fontSize: '0.7rem', color: '#9A3412', fontWeight: '600' }}>WEIGHTAGE</div>
+              <div style={{ fontSize: '1rem', fontWeight: '800', color: '#EA580C' }}>
                 {Math.round((assessment?.totalMarks || 100) / examQuestions.length)} Marks
               </div>
             </div>
@@ -752,9 +752,9 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
                   style={{
                     padding: '0.35rem 0.75rem',
                     border: 'none',
-                    borderBottom: activeBottomTab === 'tests' ? '2px solid #3B82F6' : '2px solid transparent',
+                    borderBottom: activeBottomTab === 'tests' ? '2px solid #EA580C' : '2px solid transparent',
                     backgroundColor: 'transparent',
-                    color: activeBottomTab === 'tests' ? '#60A5FA' : '#94A3B8',
+                    color: activeBottomTab === 'tests' ? '#FB923C' : '#94A3B8',
                     fontSize: '0.78rem',
                     fontWeight: '700',
                     cursor: 'pointer'
@@ -767,9 +767,9 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
                   style={{
                     padding: '0.35rem 0.75rem',
                     border: 'none',
-                    borderBottom: activeBottomTab === 'output' ? '2px solid #3B82F6' : '2px solid transparent',
+                    borderBottom: activeBottomTab === 'output' ? '2px solid #EA580C' : '2px solid transparent',
                     backgroundColor: 'transparent',
-                    color: activeBottomTab === 'output' ? '#60A5FA' : '#94A3B8',
+                    color: activeBottomTab === 'output' ? '#FB923C' : '#94A3B8',
                     fontSize: '0.78rem',
                     fontWeight: '700',
                     cursor: 'pointer'
@@ -787,7 +787,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.4rem',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#EA580C',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '6px',
@@ -954,7 +954,7 @@ export default function CodingExamEnvironment({ assessment, onExit, onSubmitExam
                   padding: '0.55rem 1.25rem',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#EA580C',
                   color: '#FFFFFF',
                   fontSize: '0.85rem',
                   fontWeight: '700',

@@ -3,8 +3,60 @@ import { Plus, BarChart2, X, CheckCircle, Award } from 'lucide-react';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import EmptyState from '../common/EmptyState';
 
+const STORAGE_KEY = 'gmrit_faculty_assessments';
+
+const DEFAULT_ASSESSMENTS = [
+  {
+    id: 'f_quiz_101',
+    title: 'Machine Learning — Quiz 4 (Supervised Models)',
+    subject: 'Machine Learning',
+    questionsCount: 20,
+    studentsCount: 64,
+    submittedCount: 58,
+    averageScore: '78.6%',
+    status: 'Graded',
+    dueDate: 'Closed Yesterday'
+  },
+  {
+    id: 'f_quiz_102',
+    title: 'Database Systems — Normalization & ER Diagrams',
+    subject: 'Database Management Systems',
+    questionsCount: 15,
+    studentsCount: 64,
+    submittedCount: 61,
+    averageScore: '82.4%',
+    status: 'Graded',
+    dueDate: 'Closed 3 Days Ago'
+  },
+  {
+    id: 'f_quiz_103',
+    title: 'Cloud Computing — Containerization & Microservices',
+    subject: 'Cloud Computing',
+    questionsCount: 25,
+    studentsCount: 64,
+    submittedCount: 0,
+    averageScore: '—',
+    status: 'Scheduled',
+    dueDate: 'Next Monday, 11:59 PM'
+  }
+];
+
 export default function FacultyAssessments({ onOpenRagQuery }) {
-  const [assessments, setAssessments] = useState([]);
+  const [assessments, setAssessments] = useState(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load faculty assessments:', e);
+    }
+    return DEFAULT_ASSESSMENTS;
+  });
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(null);
 
@@ -29,16 +81,23 @@ export default function FacultyAssessments({ onOpenRagQuery }) {
       title: newTitle,
       subject: newSubject,
       questionsCount: Number(newQuestions),
-      studentsCount: 60,
+      studentsCount: 64,
       submittedCount: 0,
-      averageScore: "0%",
-      status: "Scheduled",
-      dueDate: newDueDate || "Next Week"
+      averageScore: '—',
+      status: 'Scheduled',
+      dueDate: newDueDate || 'Next Week'
     };
-    setAssessments([created, ...assessments]);
+    const updated = [created, ...assessments];
+    setAssessments(updated);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      }
+    } catch (err) {
+      console.warn('Could not persist created assessment:', err);
+    }
     setShowCreateModal(false);
     setNewTitle('');
-    alert(`Assessment "${newTitle}" created and scheduled for student portals.`);
   };
 
   return (

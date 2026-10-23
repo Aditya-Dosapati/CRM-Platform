@@ -24,11 +24,8 @@ export default function RagChatbot({
 I can assist you with your **R20/R23 syllabus PDFs, faculty lecture notes, PYQs (2020-2025), and personal gradebook**.
 
 What would you like to explore today?`,
-      sources: [
-        { title: "GMRIT R20 Academic Regulations", doc: "GMRIT_Curriculum_R20.pdf", page: 1 },
-        { title: "CSE Course Catalog 2025-26", doc: "CSE_Catalog.pdf", page: 3 }
-      ],
-      retrievalSteps: ["Connected to GMRIT Vector Store", "Loaded active semester syllabus"]
+      sources: [],
+      retrievalSteps: ["RAG Knowledge Base connected", "Awaiting your query to retrieve course-specific content"]
     }
   ]);
 
@@ -136,7 +133,7 @@ What would you like to explore today?`,
 
   return (
     <>
-      {/* Floating Action Button (Clean bright blue with subtle shadow) */}
+      {/* Floating Action Button (Refined terracotta gradient with luminous warm glow) */}
       <button
         onClick={onToggle}
         style={{
@@ -144,32 +141,32 @@ What would you like to explore today?`,
           bottom: '24px',
           right: '28px',
           zIndex: 900,
-          backgroundColor: 'var(--primary-blue)',
+          background: 'linear-gradient(135deg, #EA580C 0%, #C2410C 100%)',
           color: '#FFFFFF',
           borderRadius: 'var(--radius-full)',
-          padding: '12px 20px',
+          padding: '11px 18px',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-          border: 'none',
+          boxShadow: '0 8px 24px -4px rgba(234, 88, 12, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
           cursor: 'pointer',
           transition: 'transform var(--transition-spring), box-shadow var(--transition-spring)',
           userSelect: 'none'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.45)';
+          e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+          e.currentTarget.style.boxShadow = '0 12px 28px -2px rgba(234, 88, 12, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'none';
-          e.currentTarget.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.35)';
+          e.currentTarget.style.boxShadow = '0 8px 24px -4px rgba(234, 88, 12, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)';
         }}
-        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.94)'}
+        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.96)'}
         onMouseUp={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
       >
         <Sparkles size={16} />
-        <span style={{ fontWeight: 700, fontSize: '13.5px' }}>
+        <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '-0.1px' }}>
           GMRIT AI
         </span>
       </button>
@@ -181,14 +178,14 @@ What would you like to explore today?`,
             position: 'fixed',
             bottom: '80px',
             right: '28px',
-            width: '440px',
-            maxWidth: 'calc(100vw - 40px)',
-            height: '620px',
-            maxHeight: 'calc(100vh - 110px)',
+            width: '450px',
+            maxWidth: 'calc(100vw - 36px)',
+            height: '630px',
+            maxHeight: 'calc(100vh - 100px)',
             backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-light)',
-            borderRadius: 'var(--radius-xl)',
-            boxShadow: 'var(--shadow-modal)',
+            border: '1px solid rgba(226, 232, 240, 0.95)',
+            borderRadius: '20px',
+            boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)',
             display: 'flex',
             flexDirection: 'column',
             zIndex: 950,

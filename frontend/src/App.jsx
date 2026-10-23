@@ -9,6 +9,7 @@ import RagChatbot from './components/ai/RagChatbot';
 import LoginView from './components/auth/LoginView';
 import AccessRestricted from './components/common/AccessRestricted';
 import FirstLoginModal from './components/auth/FirstLoginModal';
+import { ToastContainer } from './components/common/Toast';
 
 // Student Views
 import StudentDashboard from './components/student/StudentDashboard';
@@ -133,6 +134,87 @@ const VIEW_METADATA = {
   }
 };
 
+const DEFAULT_NOTIFICATIONS = {
+  student: [
+    {
+      id: 'notif_stu_1',
+      type: 'rag',
+      title: 'New Syllabus Document Indexed',
+      desc: 'Machine Learning Unit 4 syllabus & PYQs have been indexed into the GMRIT AI RAG system.',
+      time: '15 mins ago',
+      read: false
+    },
+    {
+      id: 'notif_stu_2',
+      type: 'default',
+      title: 'Continuous Internal Evaluation (CIE)',
+      desc: 'DBMS Quiz 3 scheduled for upcoming assessment cycle. Review past year questions in the portal.',
+      time: '2 hours ago',
+      read: false
+    },
+    {
+      id: 'notif_stu_3',
+      type: 'default',
+      title: 'Institutional Attendance Status',
+      desc: 'Your aggregate semester attendance is currently recorded at 91% (Good Standing).',
+      time: '1 day ago',
+      read: true
+    }
+  ],
+  faculty: [
+    {
+      id: 'notif_fac_1',
+      type: 'warning',
+      title: 'At-Risk Student Attendance Warning',
+      desc: '3 students in Section CSE-B have fallen below the mandatory 75% attendance threshold.',
+      time: '30 mins ago',
+      read: false
+    },
+    {
+      id: 'notif_fac_2',
+      type: 'rag',
+      title: 'RAG Knowledge Base Synchronization',
+      desc: 'Vector embeddings updated for curriculum documents in CSE department.',
+      time: '3 hours ago',
+      read: false
+    },
+    {
+      id: 'notif_fac_3',
+      type: 'default',
+      title: 'Assessment Submissions Ready',
+      desc: 'Machine Learning Quiz 4 submissions from Section A are ready for evaluation.',
+      time: 'Yesterday',
+      read: true
+    }
+  ],
+  admin: [
+    {
+      id: 'notif_adm_1',
+      type: 'warning',
+      title: 'User Registration Requests',
+      desc: 'New student and faculty registration requests are awaiting institutional verification.',
+      time: '10 mins ago',
+      read: false
+    },
+    {
+      id: 'notif_adm_2',
+      type: 'default',
+      title: 'Institutional Security Audit',
+      desc: 'Automated RBAC authorization check completed. All table-level RLS policies verified.',
+      time: '2 hours ago',
+      read: false
+    },
+    {
+      id: 'notif_adm_3',
+      type: 'rag',
+      title: 'Vector Index Optimization',
+      desc: 'PostgreSQL pgvector IVFFlat indexes optimized across all course chunks.',
+      time: 'Yesterday',
+      read: true
+    }
+  ]
+};
+
 export default function App() {
   // Institutional Authentication Session State
   const [session, setSession] = useState(() => authService.getCurrentSession());
@@ -153,8 +235,34 @@ export default function App() {
   const [ragInitialQuery, setRagInitialQuery] = useState('');
   const [activePdfSource, setActivePdfSource] = useState(null);
 
-  // Live Notifications State
-  const [allNotifications, setAllNotifications] = useState({ student: [], faculty: [], admin: [] });
+  // Live Notifications State with LocalStorage Persistence
+  const [allNotifications, setAllNotifications] = useState(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('gmrit_notifications');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.student || parsed.faculty || parsed.admin)) {
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read notifications from storage:', e);
+    }
+    return DEFAULT_NOTIFICATIONS;
+  });
+
+  // Persist notifications whenever they change
+  useEffect(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('gmrit_notifications', JSON.stringify(allNotifications));
+      }
+    } catch (e) {
+      console.warn('Could not save notifications to storage:', e);
+    }
+  }, [allNotifications]);
 
   const activeRole = session?.role || 'student';
   const activeNotifications = allNotifications[activeRole] || [];
@@ -268,9 +376,11 @@ export default function App() {
         case 'dashboard':
           return <StudentDashboard onNavigate={setCurrentView} onOpenRagQuery={handleOpenRagQuery} />;
         case 'subjects':
-        case 'syllabus':
-        case 'pyqs':
           return <StudentSubjects onOpenPdf={handleOpenPdf} onOpenRagQuery={handleOpenRagQuery} />;
+        case 'syllabus':
+          return <StudentSyllabus onOpenPdf={handleOpenPdf} onOpenRagQuery={handleOpenRagQuery} />;
+        case 'pyqs':
+          return <StudentPYQs onOpenPdf={handleOpenPdf} onOpenRagQuery={handleOpenRagQuery} />;
         case 'assessments':
           return <StudentAssessments onOpenRagQuery={handleOpenRagQuery} />;
         case 'coding-practice':
@@ -438,6 +548,9 @@ export default function App() {
         onClose={() => setActivePdfSource(null)}
         source={activePdfSource}
       />
+
+      {/* Global In-App Notifications Toast */}
+      <ToastContainer />
     </div>
   );
 }

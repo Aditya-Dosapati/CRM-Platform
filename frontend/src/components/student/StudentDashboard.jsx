@@ -1,28 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp,
-  UserCheck,
-  CheckSquare,
-  Award,
-  Sparkles,
-  FileText,
-  HelpCircle,
-  Clock,
-  Calendar,
-  ChevronRight,
-  BookOpen,
-  Code2,
-  Terminal,
-  ArrowRight,
-  RefreshCw
+  TrendingUp, UserCheck, CheckSquare, Award, Sparkles, FileText, 
+  HelpCircle, Clock, Calendar, ChevronRight, BookOpen, Code2, 
+  Terminal, ArrowRight, Play, CheckCircle2, AlertCircle, Bookmark,
+  Layers, ExternalLink
 } from 'lucide-react';
 import academicDataService from '../../services/academicDataService';
+import authService from '../../services/authService';
+import codeExecutionService from '../../services/codeExecutionService';
+import auditService from '../../services/auditService';
+import { codingProblemsList } from '../../data/codingData';
 import EmptyState from '../common/EmptyState';
 
 export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
-  const [selectedSemester, setSelectedSemester] = useState('Sem 4');
   const [subjects, setSubjects] = useState([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
+  const [solvedProblems, setSolvedProblems] = useState([]);
+  const [facultyAssessments, setFacultyAssessments] = useState([]);
+  const [recentLogs, setRecentLogs] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -39,15 +35,174 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         if (isMounted) setLoadingSubjects(false);
       }
     };
+
+    // Load user and assessment stats
+    setCurrentUser(authService.getCurrentUser());
+    const solved = codeExecutionService.getSolvedProblems();
+    setSolvedProblems(solved);
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('gmrit_faculty_assessments');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setFacultyAssessments(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('StudentDashboard: error reading assessments:', e);
+    }
+
+    // Load recent activity from audit service
+    const logs = auditService.getLogs();
+    setRecentLogs(logs.slice(0, 4));
+
     fetchDashboardSubjects();
     return () => { isMounted = false; };
   }, []);
 
   const hasSubjects = subjects && subjects.length > 0;
+  const activeSubject = hasSubjects ? subjects[0] : null;
+  const studentCgpa = currentUser?.cgpa || (hasSubjects ? '8.42' : '—');
+  const studentAttendance = currentUser?.attendance ? `${currentUser.attendance}%` : (hasSubjects ? '91%' : '—');
+  const studentAttendanceStatus = currentUser?.attendanceStatus || (hasSubjects ? 'Good Standing' : 'Tracking Pending');
+  const overallPerformance = studentCgpa !== '—'
+    ? `${(parseFloat(studentCgpa) * 9.75).toFixed(1)}%`
+    : (hasSubjects ? '82.4%' : '—');
+
+  const scheduledAssessments = facultyAssessments.filter(a => a.status === 'Scheduled');
+  const assessmentsDisplay = scheduledAssessments.length > 0
+    ? `${scheduledAssessments.length} Scheduled`
+    : (solvedProblems.length > 0 ? `${solvedProblems.length} Solved` : '0 Scheduled');
+
+  const displayName = currentUser?.name || 'Rahul Kumar';
+  const recommendedProblem = codingProblemsList[0] || {
+    id: 'prob-1',
+    title: 'Two Sum',
+    topic: 'Arrays',
+    difficulty: 'Easy'
+  };
 
   return (
     <div className="page-content">
-      {/* 5 Minimal Academic KPI Cards */}
+      
+      {/* 1. WELCOME HEADER */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: '22px',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Academic Portal • Semester 4 Active
+            </span>
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>
+            Good day, {displayName} 👋
+          </h1>
+          <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Continue your academic curriculum and coding assessment journey.
+          </p>
+        </div>
+
+        <button
+          onClick={() => onOpenRagQuery && onOpenRagQuery("Help me prepare revision notes for my upcoming Semester 4 assessments")}
+          className="btn btn-sm"
+          style={{
+            background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
+            color: '#C2410C',
+            border: '1px solid #FED7AA',
+            fontWeight: 700,
+            gap: '8px',
+            padding: '7px 14px',
+            borderRadius: '9px',
+            boxShadow: '0 1px 3px rgba(234, 88, 12, 0.12)'
+          }}
+        >
+          <Sparkles size={15} color="#EA580C" />
+          <span>Ask AI Study Copilot</span>
+        </button>
+      </div>
+
+      {/* 2. CONTINUE LEARNING HERO BANNER */}
+      {activeSubject && (
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          border: '1px solid rgba(226, 232, 240, 0.85)',
+          padding: '22px 26px',
+          marginBottom: '24px',
+          boxShadow: '0 4px 20px -4px rgba(15, 23, 42, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.9)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '20px',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '4px',
+            bottom: 0,
+            background: 'linear-gradient(180deg, #EA580C 0%, #C2410C 100%)'
+          }} />
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <span className="badge badge-blue">
+                Active Course
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                {activeSubject.code} • Unit 3
+              </span>
+            </div>
+
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px', margin: '0 0 6px' }}>
+              {activeSubject.name}
+            </h2>
+
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+              Next Unit Topic: <strong>Dynamic Programming & Optimal Substructure</strong>
+            </p>
+
+            <div style={{ marginTop: '12px', maxWidth: '380px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Curriculum Completion</span>
+                <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>68% Completed</span>
+              </div>
+              <div className="progress-bar-container">
+                <div className="progress-bar-fill" style={{ width: '68%' }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button
+              onClick={() => onNavigate('subjects')}
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', gap: '8px' }}
+            >
+              <Play size={15} fill="#FFFFFF" />
+              <span>Continue Learning →</span>
+            </button>
+            <button
+              onClick={() => onNavigate('syllabus')}
+              className="btn btn-secondary"
+            >
+              <FileText size={15} />
+              <span>Syllabus</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. 5 ACADEMIC KPI CARDS */}
       <div className="kpi-grid">
         {/* Overall Performance */}
         <div className="kpi-card">
@@ -57,9 +212,9 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '82.4%' : '—'}</div>
+          <div className="kpi-value">{hasSubjects ? overallPerformance : '—'}</div>
           <div className="kpi-trend positive">
-            <span>{hasSubjects ? '↑ Active Semester' : 'No graded evaluations yet'}</span>
+            <span>{hasSubjects ? '↑ Active Semester (CIE)' : 'No graded evaluations'}</span>
           </div>
         </div>
 
@@ -67,13 +222,13 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Attendance</span>
-            <div className="kpi-icon-wrap">
+            <div className="kpi-icon-wrap" style={{ backgroundColor: 'var(--pastel-green-bg)', color: 'var(--pastel-green-text)', borderColor: 'var(--pastel-green-border)' }}>
               <UserCheck size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '91%' : '—'}</div>
+          <div className="kpi-value">{hasSubjects ? studentAttendance : '—'}</div>
           <div className="kpi-trend positive">
-            <span>{hasSubjects ? 'Good Standing' : 'Tracking pending'}</span>
+            <span>{studentAttendanceStatus}</span>
           </div>
         </div>
 
@@ -81,13 +236,13 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Assessments</span>
-            <div className="kpi-icon-wrap">
+            <div className="kpi-icon-wrap" style={{ backgroundColor: 'var(--pastel-yellow-bg)', color: 'var(--pastel-yellow-text)', borderColor: 'var(--pastel-yellow-border)' }}>
               <CheckSquare size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '0 / 0' : '0'}</div>
+          <div className="kpi-value">{assessmentsDisplay}</div>
           <div className="kpi-trend neutral">
-            <span>Scheduled</span>
+            <span>{scheduledAssessments.length > 0 ? 'Due Next Week' : 'Continuous CIE'}</span>
           </div>
         </div>
 
@@ -95,11 +250,11 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Current CGPA</span>
-            <div className="kpi-icon-wrap">
+            <div className="kpi-icon-wrap" style={{ backgroundColor: 'var(--pastel-purple-bg)', color: 'var(--pastel-purple-text)', borderColor: 'var(--pastel-purple-border)' }}>
               <Award size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? '8.42' : '—'}</div>
+          <div className="kpi-value">{hasSubjects ? studentCgpa : '—'}</div>
           <div className="kpi-trend positive">
             <span>{hasSubjects ? 'Institutional Scale' : 'Cumulative'}</span>
           </div>
@@ -108,7 +263,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         {/* Learning Progress */}
         <div className="kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Learning Progress</span>
+            <span className="kpi-label">Registered Courses</span>
             <div className="kpi-icon-wrap">
               <Sparkles size={16} />
             </div>
@@ -120,416 +275,209 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         </div>
       </div>
 
-      {/* Quick Actions Section */}
-      <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '12px', letterSpacing: '-0.2px' }}>
-          Quick Actions
-        </h2>
+      {/* 4. QUICK ACTION SHORTCUT TILES */}
+      <div style={{ marginBottom: '26px' }}>
+        <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+          Quick Workspaces
+        </h3>
         <div className="quick-actions-grid">
-          {/* View Syllabus */}
-          <div
-            className="quick-action-card"
-            onClick={() => onNavigate('syllabus')}
-          >
+          <div className="quick-action-card" onClick={() => onNavigate('subjects')}>
             <div className="quick-action-icon">
-              <FileText size={18} />
+              <BookOpen size={18} />
             </div>
             <div>
-              <div className="quick-action-title">View Syllabus</div>
-              <div className="quick-action-desc">Explore subject-wise curriculum</div>
+              <div className="quick-action-title">My Subjects</div>
+              <div className="quick-action-desc">Explore units & lecture notes</div>
             </div>
           </div>
 
-          {/* Practice PYQs */}
-          <div
-            className="quick-action-card"
-            onClick={() => onNavigate('pyqs')}
-          >
-            <div className="quick-action-icon">
+          <div className="quick-action-card" onClick={() => onNavigate('coding-practice')}>
+            <div className="quick-action-icon" style={{ backgroundColor: 'var(--pastel-green-bg)', color: 'var(--pastel-green-text)', borderColor: 'var(--pastel-green-border)' }}>
+              <Code2 size={18} />
+            </div>
+            <div>
+              <div className="quick-action-title">Coding Practice</div>
+              <div className="quick-action-desc">{solvedProblems.length} Problems Solved</div>
+            </div>
+          </div>
+
+          <div className="quick-action-card" onClick={() => onNavigate('pyqs')}>
+            <div className="quick-action-icon" style={{ backgroundColor: 'var(--pastel-yellow-bg)', color: 'var(--pastel-yellow-text)', borderColor: 'var(--pastel-yellow-border)' }}>
               <HelpCircle size={18} />
             </div>
             <div>
-              <div className="quick-action-title">Practice PYQs</div>
-              <div className="quick-action-desc">Solve previous year questions</div>
+              <div className="quick-action-title">PYQ Question Bank</div>
+              <div className="quick-action-desc">Previous semester exam papers</div>
             </div>
           </div>
 
-          {/* Take Assessment */}
-          <div
-            className="quick-action-card"
-            onClick={() => onNavigate('assessments')}
-          >
-            <div className="quick-action-icon">
+          <div className="quick-action-card" onClick={() => onNavigate('assessments')}>
+            <div className="quick-action-icon" style={{ backgroundColor: 'var(--pastel-purple-bg)', color: 'var(--pastel-purple-text)', borderColor: 'var(--pastel-purple-border)' }}>
               <CheckSquare size={18} />
             </div>
             <div>
               <div className="quick-action-title">Assessments</div>
-              <div className="quick-action-desc">Check your course evaluations</div>
-            </div>
-          </div>
-
-          {/* Ask GMRIT AI */}
-          <div
-            className="quick-action-card"
-            onClick={() => onOpenRagQuery("What should I study next to prepare for my upcoming academic assessments?")}
-          >
-            <div className="quick-action-icon">
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <div className="quick-action-title">Ask GMRIT AI</div>
-              <div className="quick-action-desc">Get instant RAG study assistance</div>
+              <div className="quick-action-desc">CIE quizzes & lab practicals</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area: Large Analytics Card + Right Sidebar */}
+      {/* 5. SPLIT SECTION: TODAY'S LEARNING & RECENT ACTIVITY */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(12, 1fr)',
-        gap: '18px',
-        marginBottom: '22px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: '20px'
       }}>
-        {/* Large Academic Performance Chart Card */}
-        <div className="card" style={{ gridColumn: 'span 8' }}>
+        
+        {/* LEFT: Today's Recommendations */}
+        <div className="card">
           <div className="card-header">
             <div>
               <h3 className="card-title">
-                <span>Academic Performance</span>
+                <Sparkles size={16} color="var(--primary-blue)" />
+                <span>Today's Learning Focus</span>
               </h3>
-              <p className="card-subtitle">Enrolled subject mastery & evaluation benchmarks</p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <select
-                className="input-field"
-                value={selectedSemester}
-                onChange={(e) => setSelectedSemester(e.target.value)}
-                style={{ paddingBlock: '4px', paddingLeft: '8px', fontSize: '11.5px', width: 'auto' }}
-              >
-                <option value="Sem 4">Semester 4 (Current)</option>
-                <option value="Sem 3">Semester 3</option>
-                <option value="Sem 2">Semester 2</option>
-              </select>
+              <p className="card-subtitle">Personalized algorithmic & curriculum tasks</p>
             </div>
           </div>
 
-          {!hasSubjects ? (
-            <EmptyState
-              icon={BookOpen}
-              title="No Performance Metrics Available"
-              description="Subject evaluations will appear here once academic scores are posted."
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
-              {subjects.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{item.name}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Code: {item.code}</span>
-                      <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                        {item.progress || 0}% Progress
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="progress-bar-container" style={{ height: '7px' }}>
-                    <div
-                      className="progress-bar-fill"
-                      style={{ width: `${item.progress || 0}%`, backgroundColor: 'var(--color-primary)' }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
+          {/* Recommended Problem Tile */}
           <div style={{
+            padding: '14px 16px',
+            borderRadius: '10px',
+            backgroundColor: 'var(--bg-canvas)',
+            border: '1px solid var(--border-light)',
+            marginBottom: '12px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: '18px',
-            paddingTop: '12px',
-            borderTop: '1px solid var(--color-border)',
-            fontSize: '12px',
-            color: 'var(--color-text-muted)'
+            justifyContent: 'space-between'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <div style={{ width: '9px', height: '9px', borderRadius: '2px', backgroundColor: 'var(--color-primary)' }} />
-                <span>Curriculum Progress</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--pastel-green-bg)',
+                color: 'var(--pastel-green-text)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Code2 size={18} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {recommendedProblem.title}
+                  </span>
+                  <span className="badge badge-green" style={{ fontSize: '10.5px' }}>
+                    {recommendedProblem.difficulty}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Topic: {recommendedProblem.topic} • Core DSA Practice
+                </div>
               </div>
             </div>
+
             <button
-              onClick={() => onNavigate('performance')}
+              onClick={() => onNavigate('coding-practice')}
               className="btn btn-secondary btn-sm"
             >
-              <span>Full Analytics</span>
-              <ChevronRight size={13} />
+              <span>Solve →</span>
             </button>
           </div>
-        </div>
 
-        {/* Right Column: Recent Activity + Upcoming Compact Cards */}
-        <div style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Recent Activity Card */}
-          <div className="card">
-            <div className="card-header" style={{ marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ fontSize: '13.5px' }}>
-                <Clock size={15} color="var(--color-primary)" />
-                <span>Recent Activity</span>
-              </h3>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { icon: Sparkles, text: 'GMRIT AI Knowledge Base active', time: 'Online' },
-                { icon: FileText, text: 'R20 Academic Regulation curriculum loaded', time: 'Active' },
-                { icon: BookOpen, text: 'Digital course library connected', time: 'Ready' }
-              ].map((act, aIdx) => {
-                const Icon = act.icon;
-                return (
-                  <div
-                    key={aIdx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '9px',
-                      padding: '4px 6px',
-                      borderRadius: 'var(--radius-xs)',
-                      transition: 'all 0.16s ease',
-                      cursor: 'default'
-                    }}
-                  >
-                    <div style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: 'var(--radius-xs)',
-                      backgroundColor: 'var(--color-bg)',
-                      color: 'var(--color-primary)',
-                      border: '1px solid var(--color-border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      marginTop: '1px'
-                    }}>
-                      <Icon size={13} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '12px', color: 'var(--color-text)', lineHeight: 1.3, fontWeight: 500, margin: 0 }}>
-                        {act.text}
-                      </p>
-                      <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>
-                        {act.time}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Upcoming Card */}
-          <div className="card">
-            <div className="card-header" style={{ marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ fontSize: '13.5px' }}>
-                <Calendar size={15} color="var(--color-primary)" />
-                <span>Upcoming</span>
-              </h3>
-              <span className="badge" style={{ fontSize: '10px' }}>0 Pending</span>
-            </div>
-
-            <div style={{ padding: '12px 0', textAlign: 'center' }}>
-              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
-                No pending assessments or submission deadlines.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Coding Practice & Assessment Quick Action Banner */}
-      <div
-        className="card-interactive"
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-md, 14px)',
-          border: '1px solid var(--color-border)',
-          padding: '1.25rem 1.5rem',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div
+          {/* AI Quick Inquiry Chip */}
+          <div 
+            onClick={() => onOpenRagQuery && onOpenRagQuery("What are the most frequent 10-mark questions in Design and Analysis of Algorithms?")}
             style={{
-              width: '42px',
-              height: '42px',
+              padding: '12px 14px',
               borderRadius: '10px',
-              backgroundColor: 'var(--color-primary)',
-              color: 'var(--color-surface)',
+              backgroundColor: 'var(--pastel-blue-bg)',
+              border: '1px solid var(--pastel-blue-border)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease'
             }}
           >
-            <Code2 size={22} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Coding Hub
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12.5px', color: 'var(--pastel-blue-text)', fontWeight: 600 }}>
+              <Sparkles size={16} />
+              <span>Ask AI: Frequent 10-mark questions in DAA</span>
             </div>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--color-text)' }}>
-              Interactive Coding & Algorithm Practice
-            </h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Practice DSA in Python, C++, Java, C, and JS with automated test evaluation
-            </p>
+            <ChevronRight size={15} color="var(--primary-blue)" />
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <button
-            onClick={() => onNavigate('coding-assessments')}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Terminal size={14} />
-            Assessments
-          </button>
-          <button
-            onClick={() => onNavigate('coding-practice')}
-            className="btn btn-primary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            Practice Workspace
-            <ArrowRight size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* Subject Performance Section */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <div>
-            <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.2px' }}>
-              Subject Performance & Enrolled Courses
-            </h2>
-            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-              Comprehensive curriculum tracking and assessment velocity
-            </p>
+        {/* RIGHT: Recent Activity Timeline */}
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">
+                <Clock size={16} color="var(--primary-blue)" />
+                <span>Recent Academic Activity</span>
+              </h3>
+              <p className="card-subtitle">Your submissions, logins, and test events</p>
+            </div>
           </div>
-          <button onClick={() => onNavigate('subjects')} className="btn btn-secondary btn-sm">
-            View All Subjects
-          </button>
-        </div>
 
-        {!hasSubjects ? (
-          <EmptyState
-            icon={BookOpen}
-            title="No Courses Enrolled"
-            description="No course subjects registered for this semester yet."
-            actionText="Browse Curriculum"
-            onAction={() => onNavigate('syllabus')}
-          />
-        ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '14px'
-          }}>
-            {subjects.slice(0, 3).map((sub, idx) => (
-              <div
-                key={sub.id || idx}
-                className={`card card-interactive stagger-${idx + 1}`}
-                style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor: 'var(--color-bg)',
-                        color: 'var(--color-primary)',
-                        border: '1px solid var(--color-border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700
-                      }}>
-                        <BookOpen size={16} />
-                      </div>
-                      <div>
-                        <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text)' }}>{sub.name}</h4>
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{sub.code} • {sub.faculty || 'Department Faculty'}</span>
-                      </div>
-                    </div>
-                    <span className="badge">
-                      {sub.progress || 0}%
-                    </span>
-                  </div>
-
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {recentLogs.length === 0 ? (
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '10px 0' }}>
+                No recent activity recorded yet.
+              </p>
+            ) : (
+              recentLogs.map((log) => (
+                <div 
+                  key={log.id} 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    paddingBottom: '12px',
+                    borderBottom: '1px solid var(--border-light)'
+                  }}
+                >
                   <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '8px',
-                    padding: '10px',
-                    backgroundColor: 'var(--color-bg)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '11.5px',
-                    margin: '10px 0 14px'
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    backgroundColor: log.result === 'Success' ? 'var(--pastel-green-bg)' : 'var(--pastel-blue-bg)',
+                    color: log.result === 'Success' ? 'var(--pastel-green-text)' : 'var(--pastel-blue-text)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '2px'
                   }}>
-                    <div>
-                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Progress</span>
-                      <strong style={{ color: 'var(--color-text)' }}>{sub.progress || 0}%</strong>
+                    {log.result === 'Success' ? <CheckCircle2 size={14} /> : <Bookmark size={14} />}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {log.action}
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {log.formattedTime}
+                      </span>
                     </div>
-                    <div>
-                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Credits</span>
-                      <strong style={{ color: 'var(--color-text)' }}>{sub.credits || 3}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Syllabus</span>
-                      <strong style={{ color: 'var(--color-text)' }}>R20 Regulation</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10.5px' }}>Status</span>
-                      <strong style={{ color: 'var(--color-primary)' }}>Active</strong>
-                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0', lineHeight: 1.4 }}>
+                      {log.details || log.resource}
+                    </p>
                   </div>
                 </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => onNavigate('subjects')}
-                    className="btn btn-secondary btn-sm"
-                    style={{ flex: 1 }}
-                  >
-                    View Subject
-                  </button>
-                  <button
-                    onClick={() => onNavigate('syllabus')}
-                    className="btn btn-secondary btn-sm"
-                    style={{ flex: 1 }}
-                  >
-                    View Syllabus
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
-        )}
+        </div>
+
       </div>
+
     </div>
   );
 }
-

@@ -165,8 +165,8 @@ export default function AdminCodingManagement() {
               width: '44px',
               height: '44px',
               borderRadius: '12px',
-              backgroundColor: '#EFF6FF',
-              color: '#2563EB',
+              backgroundColor: '#FFF7ED',
+              color: '#EA580C',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -297,7 +297,7 @@ export default function AdminCodingManagement() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
-          <ShieldCheck size={20} color="#2563EB" />
+          <ShieldCheck size={20} color="#EA580C" />
           <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '700', color: '#0F172A' }}>
             Container Resource Limits &amp; Airgap Security Configuration
           </h2>
@@ -422,7 +422,7 @@ export default function AdminCodingManagement() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                backgroundColor: 'var(--primary-blue, #2563EB)',
+                backgroundColor: 'var(--color-primary, #EA580C)',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '8px',
@@ -541,9 +541,9 @@ export default function AdminCodingManagement() {
                         style={{
                           padding: '0.35rem 0.85rem',
                           borderRadius: '6px',
-                          border: `1px solid ${isEnabled ? '#FECACA' : '#BFDBFE'}`,
-                          backgroundColor: isEnabled ? '#FEF2F2' : '#EFF6FF',
-                          color: isEnabled ? '#DC2626' : '#2563EB',
+                          border: `1px solid ${isEnabled ? '#FECACA' : '#FED7AA'}`,
+                          backgroundColor: isEnabled ? '#FEF2F2' : '#FFF7ED',
+                          color: isEnabled ? '#DC2626' : '#EA580C',
                           fontSize: '0.78rem',
                           fontWeight: '700',
                           cursor: 'pointer'
@@ -656,7 +656,7 @@ export default function AdminCodingManagement() {
                     style={{
                       width: '28px',
                       height: `${heightPercent}%`,
-                      backgroundColor: '#2563EB',
+                      background: 'linear-gradient(180deg, #EA580C 0%, #C2410C 100%)',
                       borderRadius: '6px 6px 0 0',
                       transition: 'height 0.3s ease'
                     }}
