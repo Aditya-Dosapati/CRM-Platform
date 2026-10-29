@@ -7,7 +7,7 @@ import authService from '../../services/authService';
 
 export default function AdminSettings() {
   const [academicYear, setAcademicYear] = useState('2025-2026');
-  const [activeRegulation, setActiveRegulation] = useState('R20');
+  const [activeRegulation, setActiveRegulation] = useState('AR23');
   const [passingThreshold, setPassingThreshold] = useState(40);
   const [attendanceMinThreshold, setAttendanceMinThreshold] = useState(75);
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(60);
@@ -95,9 +95,7 @@ export default function AdminSettings() {
                 value={activeRegulation}
                 onChange={(e) => setActiveRegulation(e.target.value)}
               >
-                <option value="R20">R20 Regulation (Autonomous)</option>
-                <option value="R19">R19 Regulation</option>
-                <option value="R23">R23 Regulation</option>
+                <option value="AR23">AR23 Regulation (Autonomous)</option>
               </select>
             </div>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, UserCheck, CheckSquare, Award, Sparkles, FileText, 
-  HelpCircle, Clock, Calendar, ChevronRight, BookOpen, Code2, 
+  TrendingUp, UserCheck, CheckSquare, Award, Sparkles, FileText,
+  HelpCircle, Clock, Calendar, ChevronRight, BookOpen, Code2,
   Terminal, ArrowRight, Play, CheckCircle2, AlertCircle, Bookmark,
   Layers, ExternalLink
 } from 'lucide-react';
@@ -89,8 +89,8 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
       window.addEventListener('gmrit_assessments_updated', handleUpdate);
     }
 
-    return () => { 
-      isMounted = false; 
+    return () => {
+      isMounted = false;
       if (typeof window !== 'undefined') {
         window.removeEventListener('gmrit_assignments_updated', handleUpdate);
         window.removeEventListener('gmrit_assessments_updated', handleUpdate);
@@ -100,12 +100,12 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
 
   const hasSubjects = subjects && subjects.length > 0;
   const activeSubject = hasSubjects ? subjects[0] : null;
-  const studentCgpa = currentUser?.cgpa || (hasSubjects ? '8.42' : '—');
-  const studentAttendance = currentUser?.attendance ? `${currentUser.attendance}%` : (hasSubjects ? '91%' : '—');
-  const studentAttendanceStatus = currentUser?.attendanceStatus || (hasSubjects ? 'Good Standing' : 'Tracking Pending');
-  const overallPerformance = studentCgpa !== '—'
+  const studentCgpa = (currentUser?.cgpa && currentUser.cgpa !== '—') ? currentUser.cgpa : 'Not available';
+  const studentAttendance = currentUser?.attendance ? `${currentUser.attendance}%` : 'Not available';
+  const studentAttendanceStatus = currentUser?.attendanceStatus || (studentAttendance !== 'Not available' ? 'Good Standing' : 'Tracking Pending');
+  const overallPerformance = (studentCgpa !== 'Not available' && studentCgpa !== '—' && !isNaN(parseFloat(studentCgpa)))
     ? `${(parseFloat(studentCgpa) * 9.75).toFixed(1)}%`
-    : (hasSubjects ? '82.4%' : '—');
+    : 'Not available';
 
   const scheduledAssessments = facultyAssessments.filter(a => a.status === 'Scheduled');
   const assessmentsDisplay = scheduledAssessments.length > 0
@@ -122,7 +122,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
 
   return (
     <div className="page-content">
-      
+
       {/* 1. WELCOME HEADER */}
       <div style={{
         display: 'flex',
@@ -135,7 +135,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Academic Portal • Semester 4 Active
+              Academic Portal
             </span>
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>
@@ -291,9 +291,9 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               <Award size={16} />
             </div>
           </div>
-          <div className="kpi-value">{hasSubjects ? studentCgpa : '8.65'}</div>
-          <div className="kpi-trend positive">
-            <span>Institutional Scale (10.0)</span>
+          <div className="kpi-value">{studentCgpa}</div>
+          <div className={`kpi-trend ${studentCgpa !== 'Not available' ? 'positive' : 'neutral'}`}>
+            <span>{studentCgpa !== 'Not available' ? 'Institutional Scale (10.0)' : 'Pending SEE Tabulation'}</span>
           </div>
         </div>
 
@@ -318,7 +318,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
         gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
         gap: '20px'
       }}>
-        
+
         {/* LEFT: Today's Recommendations */}
         <div className="card">
           <div className="card-header">
@@ -415,7 +415,7 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
           </div>
 
           {/* AI Quick Inquiry Chip */}
-          <div 
+          <div
             onClick={() => onOpenRagQuery && onOpenRagQuery("What are the most frequent 10-mark questions in Design and Analysis of Algorithms?")}
             style={{
               padding: '12px 14px',
@@ -456,8 +456,8 @@ export default function StudentDashboard({ onNavigate, onOpenRagQuery }) {
               </p>
             ) : (
               recentLogs.map((log) => (
-                <div 
-                  key={log.id} 
+                <div
+                  key={log.id}
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',

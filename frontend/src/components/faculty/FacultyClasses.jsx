@@ -116,8 +116,6 @@ export default function FacultyClasses({ onOpenRagQuery, onNavigate, initialAssi
   const handleViewAnalytics = (cls) => {
     if (onNavigate) {
       onNavigate('analytics', { selectedAssignmentId: cls.assignmentId || cls.id, selectedSection: cls.section });
-    } else if (onOpenRagQuery) {
-      onOpenRagQuery(`Provide subject performance and attendance analytics for ${cls.name || cls.subjectName || 'course'} Section ${cls.section}`);
     }
   };
 
@@ -140,16 +138,6 @@ export default function FacultyClasses({ onOpenRagQuery, onNavigate, initialAssi
             Manage assigned course sections, syllabus coverage, and student rosters
           </p>
         </div>
-
-        {currentClass && (
-          <button
-            onClick={() => onOpenRagQuery?.(`Provide attendance and syllabus performance summary for ${currentClass.name || currentClass.code} Section ${currentClass.section}`)}
-            className="btn btn-primary"
-          >
-            <Sparkles size={14} />
-            <span>AI Class Analytics</span>
-          </button>
-        )}
       </div>
 
       {/* Class Section Cards */}

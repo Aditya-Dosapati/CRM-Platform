@@ -26,7 +26,8 @@ import {
   Zap,
   BarChart3,
   Timer,
-  Bug
+  Bug,
+  ChevronLeft
 } from 'lucide-react';
 import { supportedLanguagesList, isDatabaseProblem, getLanguagesForProblem } from '../../data/codingData.js';
 import codeExecutionService from '../../services/codeExecutionService.js';
@@ -40,7 +41,8 @@ export default function CodingWorkspaceModal({
   onProblemSolved,
   activeRole = 'student',
   isAssessmentMode = false,
-  assessmentTimer = null
+  assessmentTimer = null,
+  embedded = false
 }) {
   if (!isOpen || !problem) return null;
 
@@ -73,6 +75,8 @@ export default function CodingWorkspaceModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sampleResults, setSampleResults] = useState(null);
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [consoleActiveResult, setConsoleActiveResult] = useState('run'); // 'run' | 'submit'
+  const [isConsoleMaximized, setIsConsoleMaximized] = useState(false);
   const [activeTestCaseIdx, setActiveTestCaseIdx] = useState(0);
 
   // Progressive Hints State
@@ -82,7 +86,62 @@ export default function CodingWorkspaceModal({
   // Settings dropdown
   const [showSettings, setShowSettings] = useState(false);
 
+  // AI Coding Feedback State
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [isLoadingAiFeedback, setIsLoadingAiFeedback] = useState(false);
+  const [aiFeedbackError, setAiFeedbackError] = useState(null);
+  const [aiHintLevel, setAiHintLevel] = useState(1);
+
   const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
+
+  const handleRequestAiFeedback = async (level = aiHintLevel) => {
+    setIsLoadingAiFeedback(true);
+    setAiFeedbackError(null);
+    setAiHintLevel(level);
+    setActiveBottomTab('ai-hints');
+
+    try {
+      const activeOutput = submissionResult?.stdout || sampleResults?.results?.[0]?.actual || sampleResults?.error || '';
+      const activeCompiler = submissionResult?.compiler_output || sampleResults?.compilerOutput || sampleResults?.error || '';
+      const activeStatus = submissionResult?.status || sampleResults?.status || (syntaxCheck?.hasErrors ? 'Syntax Error' : 'Incomplete');
+      const testCasesSummary = (sampleResults?.results || []).map(r => ({
+        passed: r.passed,
+        input: r.input,
+        expected: r.expected,
+        actual: r.actual
+      }));
+
+      const res = await fetch('http://127.0.0.1:8000/api/code/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_title: problem.title || 'Coding Problem',
+          problem_description: problem.description || '',
+          language: selectedLanguage,
+          code: code || '',
+          execution_output: activeOutput,
+          compiler_output: activeCompiler,
+          status: activeStatus,
+          test_results: testCasesSummary,
+          hint_level: level
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setAiFeedback(data);
+    } catch (err) {
+      console.error('Failed to get AI coding feedback:', err);
+      setAiFeedbackError(err.message || 'Unable to fetch AI feedback. Ensure backend server is reachable.');
+    } finally {
+      setIsLoadingAiFeedback(false);
+    }
+  };
+
 
   // Live syntax & line-by-line diagnostics check
   const syntaxCheck = useMemo(() => {
@@ -171,6 +230,7 @@ export default function CodingWorkspaceModal({
   const handleRunCode = async () => {
     if (isRunning) return;
     setIsRunning(true);
+    setConsoleActiveResult('run');
     try {
       const result = await codeExecutionService.runCode(problem.id, selectedLanguage, code);
       setSampleResults(result);
@@ -203,6 +263,7 @@ export default function CodingWorkspaceModal({
   const handleSubmitCode = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
+    setConsoleActiveResult('submit');
     try {
       const result = await codeExecutionService.submitCode(problem.id, selectedLanguage, code);
       setSubmissionResult(result);
@@ -239,6 +300,7 @@ export default function CodingWorkspaceModal({
     codeExecutionService.clearDraft(problem.id, selectedLanguage);
     setSampleResults(null);
     setSubmissionResult(null);
+    setConsoleActiveResult('run');
   };
 
   const currentLangObj = availableLanguages.find(l => l.id === selectedLanguage) || availableLanguages[0] || supportedLanguagesList[0];
@@ -270,44 +332,70 @@ export default function CodingWorkspaceModal({
   const lcRed = '#EF4743';
   const lcYellow = '#FFC01E';
 
-  return (
+  const workspaceBody = (
     <div
-      className="modal-overlay"
+      className="coding-workspace-card"
       style={{
-        padding: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        zIndex: 1000
+        width: isFullscreen ? '100vw' : '100%',
+        maxWidth: isFullscreen ? '100vw' : (embedded ? '100%' : '1600px'),
+        height: isFullscreen ? '100vh' : '100%',
+        backgroundColor: lcSurface,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        borderRadius: isFullscreen ? 0 : '10px',
+        boxShadow: isFullscreen ? 'none' : (embedded ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08)'),
+        border: isFullscreen ? 'none' : `1px solid ${lcBorder}`,
+        position: isFullscreen ? 'fixed' : 'relative',
+        inset: isFullscreen ? 0 : undefined,
+        zIndex: isFullscreen ? 9999 : undefined
       }}
     >
-      <div
-        style={{
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: lcSurface,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}
-      >
-        {/* ===== TOP NAVBAR (LeetCode-style) ===== */}
-        <div style={{
-          height: '44px',
-          backgroundColor: '#1A1A1A',
-          borderBottom: `1px solid ${lcBorder}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
-          flexShrink: 0
-        }}>
-          {/* Left: Problem info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Code2 size={18} color={lcGreen} />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: lcTextPrimary }}>
-                {problem.title}
-              </span>
-            </div>
+      {/* ===== TOP NAVBAR (LeetCode-style) ===== */}
+      <div style={{
+        height: '44px',
+        backgroundColor: '#1A1A1A',
+        borderBottom: `1px solid ${lcBorder}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 16px',
+        flexShrink: 0
+      }}>
+        {/* Left: Problem info + optional Back button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {embedded && (
+            <>
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: `1px solid ${lcBorder}`,
+                  color: lcTextPrimary,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s'
+                }}
+                title="Return to Problem Library"
+              >
+                <ChevronLeft size={14} />
+                <span>Problem Library</span>
+              </button>
+              <span style={{ color: lcTextMuted }}>|</span>
+            </>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Code2 size={18} color={lcGreen} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: lcTextPrimary }}>
+              {problem.title}
+            </span>
+          </div>
             <span style={{
               fontSize: '11px',
               fontWeight: 600,
@@ -332,6 +420,17 @@ export default function CodingWorkspaceModal({
           {/* Right: Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
+              onClick={() => setIsFullscreen(prev => !prev)}
+              style={{
+                background: 'none', border: 'none', color: lcTextSecondary,
+                cursor: 'pointer', padding: '4px', borderRadius: '4px',
+                display: 'flex', alignItems: 'center'
+              }}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+            <button
               onClick={() => setShowSettings(!showSettings)}
               style={{
                 background: 'none', border: 'none', color: lcTextSecondary,
@@ -355,6 +454,7 @@ export default function CodingWorkspaceModal({
             </button>
           </div>
         </div>
+
 
         {/* Settings dropdown */}
         {showSettings && (
@@ -397,10 +497,10 @@ export default function CodingWorkspaceModal({
         )}
 
         {/* ===== MAIN 3-PANE LAYOUT ===== */}
-        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div className="coding-workspace-main-pane" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
           {/* ============ LEFT PANEL: Problem Description ============ */}
-          <div style={{
+          <div className="coding-workspace-left-panel" style={{
             width: '42%',
             minWidth: '320px',
             display: 'flex',
@@ -660,7 +760,7 @@ export default function CodingWorkspaceModal({
           </div>
 
           {/* ============ RIGHT PANEL: Code Editor + Console ============ */}
-          <div style={{
+          <div className="coding-workspace-right-panel" style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
@@ -775,18 +875,21 @@ export default function CodingWorkspaceModal({
               position: 'relative'
             }}>
               {/* Line Numbers Gutter with Multi-Error & Warning Indicators */}
-              <div style={{
-                width: '54px',
-                padding: '10px 0',
-                textAlign: 'right',
-                userSelect: 'none',
-                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                fontSize: `${fontSize}px`,
-                lineHeight: 1.6,
-                backgroundColor: '#1E1E1E',
-                borderRight: '1px solid #2D2D2D',
-                overflowY: 'hidden'
-              }}>
+              <div
+                ref={gutterRef}
+                style={{
+                  width: '54px',
+                  padding: '10px 0',
+                  textAlign: 'right',
+                  userSelect: 'none',
+                  fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                  fontSize: `${fontSize}px`,
+                  lineHeight: 1.6,
+                  backgroundColor: '#1E1E1E',
+                  borderRight: '1px solid #2D2D2D',
+                  overflowY: 'hidden'
+                }}
+              >
                 {lineNumbers.map(n => {
                   const isErr = errorLinesSet.has(n);
                   const isWarn = !isErr && warningLinesSet.has(n);
@@ -840,6 +943,11 @@ export default function CodingWorkspaceModal({
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onScroll={(e) => {
+                  if (gutterRef.current) {
+                    gutterRef.current.scrollTop = e.target.scrollTop;
+                  }
+                }}
                 spellCheck={false}
                 style={{
                   flex: 1,
@@ -862,12 +970,15 @@ export default function CodingWorkspaceModal({
 
             {/* ===== BOTTOM CONSOLE PANEL ===== */}
             <div style={{
-              height: '260px',
+              height: isConsoleMaximized ? '55vh' : '280px',
+              minHeight: '180px',
+              maxHeight: '75vh',
               borderTop: `1px solid ${lcBorder}`,
               backgroundColor: lcSurface,
               display: 'flex',
               flexDirection: 'column',
-              flexShrink: 0
+              flexShrink: 0,
+              transition: 'height 0.2s ease'
             }}>
               {/* Console Header: Tabs + Run/Submit */}
               <div style={{
@@ -884,7 +995,8 @@ export default function CodingWorkspaceModal({
                   {[
                     { id: 'testcase', label: 'Testcase' },
                     { id: 'testresult', label: 'Test Result' },
-                    { id: 'debugger', label: 'Line Debugger', isDebugger: true }
+                    { id: 'debugger', label: 'Line Debugger', isDebugger: true },
+                    { id: 'ai-hints', label: 'AI Tutor & Hints', isAiHints: true }
                   ].map(tab => {
                     const isSelected = activeBottomTab === tab.id;
                     const errorCount = allCurrentErrors.length;
@@ -897,7 +1009,7 @@ export default function CodingWorkspaceModal({
                           background: 'none',
                           border: 'none',
                           borderBottom: isSelected
-                            ? `2px solid ${tab.isDebugger && errorCount > 0 ? lcRed : lcTextPrimary}`
+                            ? `2px solid ${tab.isDebugger && errorCount > 0 ? lcRed : tab.isAiHints ? '#A855F7' : lcTextPrimary}`
                             : '2px solid transparent',
                           color: isSelected ? lcTextPrimary : lcTextSecondary,
                           padding: '8px 14px',
@@ -916,12 +1028,28 @@ export default function CodingWorkspaceModal({
                             color={errorCount > 0 ? lcRed : warningCount > 0 ? lcYellow : lcGreen}
                           />
                         )}
+                        {tab.isAiHints && (
+                          <Sparkles
+                            size={13}
+                            color="#C084FC"
+                          />
+                        )}
                         {tab.label}
-                        {tab.id === 'testresult' && sampleResults && (
+                        {tab.isAiHints && aiFeedback && (
                           <span style={{
                             width: '6px', height: '6px',
                             borderRadius: '50%',
-                            backgroundColor: (sampleResults.status === 'Accepted' || sampleResults.allPassed) ? lcGreen : lcRed,
+                            backgroundColor: '#C084FC',
+                            display: 'inline-block'
+                          }} />
+                        )}
+                        {tab.id === 'testresult' && (sampleResults || submissionResult) && (
+                          <span style={{
+                            width: '6px', height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: consoleActiveResult === 'submit'
+                              ? (submissionResult?.status === 'Accepted' ? lcGreen : lcRed)
+                              : ((sampleResults?.status === 'Accepted' || sampleResults?.allPassed) ? lcGreen : lcRed),
                             display: 'inline-block'
                           }} />
                         )}
@@ -965,8 +1093,31 @@ export default function CodingWorkspaceModal({
                   })}
                 </div>
 
-                {/* Run + Submit Buttons (LeetCode-style) */}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                {/* Run + Submit + AI Tutor + Maximize Buttons */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => handleRequestAiFeedback(aiHintLevel)}
+                    disabled={isLoadingAiFeedback}
+                    style={{
+                      backgroundColor: 'rgba(168, 85, 247, 0.15)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                      color: '#D8B4FE',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      padding: '5px 14px',
+                      borderRadius: '6px',
+                      cursor: isLoadingAiFeedback ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s'
+                    }}
+                    title="Get intelligent AI diagnostic feedback and progressive hints"
+                  >
+                    <Sparkles size={13} color="#C084FC" />
+                    {isLoadingAiFeedback ? 'Analyzing...' : 'AI Tutor'}
+                  </button>
+
                   <button
                     onClick={handleRunCode}
                     disabled={isRunning || isSubmitting}
@@ -1011,6 +1162,26 @@ export default function CodingWorkspaceModal({
                   >
                     <Upload size={13} />
                     {isSubmitting ? 'Submitting...' : 'Submit'}
+                  </button>
+
+                  <button
+                    onClick={() => setIsConsoleMaximized(prev => !prev)}
+                    title={isConsoleMaximized ? "Restore Console" : "Expand Console"}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: `1px solid ${lcBorder}`,
+                      color: lcTextSecondary,
+                      fontSize: '13px',
+                      padding: '5px 9px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {isConsoleMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                   </button>
                 </div>
               </div>
@@ -1078,11 +1249,84 @@ export default function CodingWorkspaceModal({
                 {/* TEST RESULT TAB */}
                 {activeBottomTab === 'testresult' && (
                   <div>
-                    {/* Submission result view */}
-                    {submissionResult ? (
+                    {/* Toggle between Run Result and Submission */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '14px',
+                      borderBottom: `1px solid ${lcBorder}`,
+                      paddingBottom: '8px'
+                    }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => setConsoleActiveResult('run')}
+                          style={{
+                            backgroundColor: consoleActiveResult === 'run' ? lcSurfaceLight : 'transparent',
+                            border: `1px solid ${consoleActiveResult === 'run' ? lcBorder : 'transparent'}`,
+                            color: consoleActiveResult === 'run' ? lcTextPrimary : lcTextSecondary,
+                            borderRadius: '6px',
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <span>Run Result</span>
+                          {sampleResults && (
+                            <span style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: (sampleResults.status === 'Accepted' || sampleResults.allPassed) ? lcGreen : lcRed
+                            }} />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setConsoleActiveResult('submit')}
+                          style={{
+                            backgroundColor: consoleActiveResult === 'submit' ? lcSurfaceLight : 'transparent',
+                            border: `1px solid ${consoleActiveResult === 'submit' ? lcBorder : 'transparent'}`,
+                            color: consoleActiveResult === 'submit' ? lcTextPrimary : lcTextSecondary,
+                            borderRadius: '6px',
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <span>Submission</span>
+                          {submissionResult && (
+                            <span style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: submissionResult.status === 'Accepted' ? lcGreen : lcRed
+                            }} />
+                          )}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '11px', color: lcTextMuted }}>
+                        {consoleActiveResult === 'run' ? 'Sample Testcases' : 'All Testcases (Hidden + Sample)'}
+                      </div>
+                    </div>
+
+                    {/* RUN RESULT VIEW */}
+                    {consoleActiveResult === 'run' && (
                       <div>
-                        {/* Compilation Error */}
-                        {(submissionResult.status === 'Compilation Error' || submissionResult.status === 'Syntax Error') ? (
+                        {!sampleResults ? (
+                          <div style={{ color: lcTextMuted, textAlign: 'center', padding: '30px 0', fontSize: '13px' }}>
+                            You must run your code first to view sample test results.
+                          </div>
+                        ) : (sampleResults.status === 'Compilation Error' || sampleResults.status === 'Syntax Error' || sampleResults.isCompileError) ? (
                           <div>
                             <div style={{
                               display: 'flex',
@@ -1126,22 +1370,237 @@ export default function CodingWorkspaceModal({
                               overflowX: 'auto',
                               whiteSpace: 'pre-wrap'
                             }}>
-                              {submissionResult.compilerOutput || submissionResult.compileOutput}
+                              {sampleResults.compilerOutput || sampleResults.compileOutput || 'Compilation failed.'}
                             </pre>
                           </div>
+                        ) : sampleResults.status === 'Service Unavailable' ? (
+                          <div>
+                            <div style={{ fontSize: '16px', fontWeight: 700, color: '#FB923C', marginBottom: '8px' }}>
+                              Service Unavailable
+                            </div>
+                            <div style={{ fontSize: '13px', color: lcTextSecondary, marginBottom: '12px' }}>
+                              The code execution backend is currently unreachable. Make sure the local backend server is running on port 8000.
+                            </div>
+                            {sampleResults.compilerOutput && (
+                              <pre style={{
+                                backgroundColor: '#373737',
+                                borderRadius: '8px',
+                                padding: '12px',
+                                fontSize: '12px',
+                                color: lcTextMuted,
+                                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                                margin: 0,
+                                overflowX: 'auto',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {sampleResults.compilerOutput}
+                              </pre>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            {/* Status header */}
+                            <div style={{
+                              fontSize: '16px',
+                              fontWeight: 700,
+                              marginBottom: '12px',
+                              color: sampleResults.allPassed ? lcGreen : lcRed
+                            }}>
+                              {sampleResults.allPassed
+                                ? 'Accepted'
+                                : (sampleResults.status === 'Time Limit Exceeded'
+                                  ? 'Time Limit Exceeded'
+                                  : sampleResults.status === 'Runtime Error'
+                                    ? 'Runtime Error'
+                                    : 'Wrong Answer')}
+                            </div>
+
+                            {/* Execution stats */}
+                            <div style={{
+                              display: 'flex', gap: '16px', marginBottom: '14px',
+                              fontSize: '12px', color: lcTextSecondary
+                            }}>
+                              <span>Runtime: <strong style={{ color: lcTextPrimary }}>{sampleResults.totalTime || sampleResults.executionTime || '0 ms'}</strong></span>
+                              <span>Memory: <strong style={{ color: lcTextPrimary }}>{sampleResults.totalMemory || '0 MB'}</strong></span>
+                            </div>
+
+                            {/* Case pills */}
+                            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                              {sampleResults.testResults?.map((tr, idx) => (
+                                <button
+                                  key={tr.id || idx}
+                                  onClick={() => setActiveTestCaseIdx(idx)}
+                                  style={{
+                                    backgroundColor: activeTestCaseIdx === idx ? lcSurfaceLight : 'transparent',
+                                    color: tr.passed ? lcGreen : lcRed,
+                                    border: `1px solid ${activeTestCaseIdx === idx ? lcBorder : 'transparent'}`,
+                                    borderRadius: '6px',
+                                    padding: '4px 14px',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  {tr.passed ? <Check size={12} /> : <X size={12} />}
+                                  Case {idx + 1}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Selected case detail */}
+                            {sampleResults.testResults?.[activeTestCaseIdx] && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div>
+                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Input</div>
+                                  <div style={{
+                                    backgroundColor: '#373737', borderRadius: '6px', padding: '8px 12px',
+                                    fontFamily: 'Menlo, Monaco, "Courier New", monospace', fontSize: '13px', color: lcTextPrimary,
+                                    overflowX: 'auto', whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {sampleResults.testResults[activeTestCaseIdx].input}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Output</div>
+                                  <div style={{
+                                    backgroundColor: '#373737', borderRadius: '6px', padding: '8px 12px',
+                                    fontFamily: 'Menlo, Monaco, "Courier New", monospace', fontSize: '13px',
+                                    color: sampleResults.testResults[activeTestCaseIdx].passed ? lcTextPrimary : lcRed,
+                                    overflowX: 'auto', whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {sampleResults.testResults[activeTestCaseIdx].actual}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Expected</div>
+                                  <div style={{
+                                    backgroundColor: '#373737', borderRadius: '6px', padding: '8px 12px',
+                                    fontFamily: 'Menlo, Monaco, "Courier New", monospace', fontSize: '13px', color: lcTextPrimary,
+                                    overflowX: 'auto', whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {sampleResults.testResults[activeTestCaseIdx].expected}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {sampleResults.compilerOutput && !sampleResults.allPassed && (
+                              <div style={{ marginTop: '12px' }}>
+                                <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Diagnostic Output</div>
+                                <pre style={{
+                                  backgroundColor: '#373737',
+                                  borderRadius: '6px',
+                                  padding: '10px 12px',
+                                  fontSize: '12px',
+                                  color: lcRed,
+                                  fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                                  margin: 0,
+                                  overflowX: 'auto',
+                                  whiteSpace: 'pre-wrap'
+                                }}>
+                                  {sampleResults.compilerOutput}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SUBMISSION RESULT VIEW */}
+                    {consoleActiveResult === 'submit' && (
+                      <div>
+                        {!submissionResult ? (
+                          <div style={{ color: lcTextMuted, textAlign: 'center', padding: '30px 0', fontSize: '13px' }}>
+                            You must submit your code first to evaluate against all testcases.
+                          </div>
+                        ) : (submissionResult.status === 'Compilation Error' || submissionResult.status === 'Syntax Error' || submissionResult.isCompileError) ? (
+                          <div>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: '12px'
+                            }}>
+                              <div style={{ fontSize: '16px', fontWeight: 700, color: lcRed }}>
+                                Compile Error
+                              </div>
+                              <button
+                                onClick={() => setActiveBottomTab('debugger')}
+                                style={{
+                                  backgroundColor: '#2D1F1F',
+                                  border: `1px solid ${lcRed}66`,
+                                  color: lcRed,
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  borderRadius: '6px',
+                                  padding: '5px 12px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                <Bug size={13} />
+                                View Line-by-Line Debugger ({allCurrentErrors.length > 0 ? `${allCurrentErrors.length} errors` : 'Inspect'})
+                              </button>
+                            </div>
+                            <pre style={{
+                              backgroundColor: '#373737',
+                              borderRadius: '8px',
+                              padding: '14px',
+                              fontSize: '13px',
+                              color: lcRed,
+                              fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                              lineHeight: 1.6,
+                              margin: 0,
+                              overflowX: 'auto',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {submissionResult.compilerOutput || submissionResult.compileOutput || 'Compilation failed.'}
+                            </pre>
+                          </div>
+                        ) : submissionResult.status === 'Service Unavailable' ? (
+                          <div>
+                            <div style={{ fontSize: '16px', fontWeight: 700, color: '#FB923C', marginBottom: '8px' }}>
+                              Service Unavailable
+                            </div>
+                            <div style={{ fontSize: '13px', color: lcTextSecondary, marginBottom: '12px' }}>
+                              The code execution backend is currently unreachable. Make sure the local backend server is running on port 8000.
+                            </div>
+                            {submissionResult.compilerOutput && (
+                              <pre style={{
+                                backgroundColor: '#373737',
+                                borderRadius: '8px',
+                                padding: '12px',
+                                fontSize: '12px',
+                                color: lcTextMuted,
+                                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                                margin: 0,
+                                overflowX: 'auto',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {submissionResult.compilerOutput}
+                              </pre>
+                            )}
+                          </div>
                         ) : submissionResult.status === 'Accepted' ? (
-                          /* Accepted view (LeetCode-style) */
                           <div>
                             <div style={{ fontSize: '20px', fontWeight: 700, color: lcGreen, marginBottom: '16px' }}>
                               Accepted
                             </div>
-                            <div style={{ display: 'flex', gap: '32px', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', gap: '24px', marginBottom: '16px', flexWrap: 'wrap' }}>
                               {/* Runtime */}
                               <div style={{
                                 backgroundColor: '#2D2D2D',
                                 padding: '12px 18px',
                                 borderRadius: '8px',
-                                border: `1px solid ${lcBorder}`
+                                border: `1px solid ${lcBorder}`,
+                                minWidth: '140px'
                               }}>
                                 <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px' }}>Runtime</div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
@@ -1161,7 +1620,8 @@ export default function CodingWorkspaceModal({
                                 backgroundColor: '#2D2D2D',
                                 padding: '12px 18px',
                                 borderRadius: '8px',
-                                border: `1px solid ${lcBorder}`
+                                border: `1px solid ${lcBorder}`,
+                                minWidth: '140px'
                               }}>
                                 <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px' }}>Memory</div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
@@ -1175,13 +1635,35 @@ export default function CodingWorkspaceModal({
                                   </div>
                                 )}
                               </div>
+
+                              {/* Testcases count */}
+                              <div style={{
+                                backgroundColor: '#2D2D2D',
+                                padding: '12px 18px',
+                                borderRadius: '8px',
+                                border: `1px solid ${lcBorder}`,
+                                minWidth: '140px'
+                              }}>
+                                <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px' }}>Testcases</div>
+                                <div style={{ fontSize: '22px', fontWeight: 700, color: lcGreen }}>
+                                  {submissionResult.passedCount || submissionResult.totalCount} / {submissionResult.totalCount} Passed
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ) : (
-                          /* Wrong Answer / TLE / Other */
                           <div>
-                            <div style={{ fontSize: '20px', fontWeight: 700, color: lcRed, marginBottom: '12px' }}>
-                              {submissionResult.status === 'Time Limit Exceeded' ? 'Time Limit Exceeded' : 'Wrong Answer'}
+                            <div style={{
+                              fontSize: '20px',
+                              fontWeight: 700,
+                              color: lcRed,
+                              marginBottom: '12px'
+                            }}>
+                              {submissionResult.status === 'Time Limit Exceeded'
+                                ? 'Time Limit Exceeded'
+                                : submissionResult.status === 'Runtime Error'
+                                  ? 'Runtime Error'
+                                  : 'Wrong Answer'}
                             </div>
                             <div style={{ fontSize: '13px', color: lcTextSecondary, marginBottom: '8px' }}>
                               {submissionResult.passedCount} / {submissionResult.totalCount} testcases passed
@@ -1204,143 +1686,6 @@ export default function CodingWorkspaceModal({
                             )}
                           </div>
                         )}
-                      </div>
-                    ) : sampleResults ? (
-                      /* Run results view */
-                      <div>
-                        {/* Compilation Error from Run */}
-                        {(sampleResults.status === 'Compilation Error' || sampleResults.status === 'Syntax Error') ? (
-                          <div>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              marginBottom: '12px'
-                            }}>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: lcRed }}>
-                                Compile Error
-                              </div>
-                              <button
-                                onClick={() => setActiveBottomTab('debugger')}
-                                style={{
-                                  backgroundColor: '#2D1F1F',
-                                  border: `1px solid ${lcRed}66`,
-                                  color: lcRed,
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  borderRadius: '6px',
-                                  padding: '5px 12px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  transition: 'all 0.15s'
-                                }}
-                              >
-                                <Bug size={13} />
-                                View Line-by-Line Debugger ({allCurrentErrors.length > 0 ? `${allCurrentErrors.length} errors` : 'Inspect'})
-                              </button>
-                            </div>
-                            <pre style={{
-                              backgroundColor: '#373737',
-                              borderRadius: '8px',
-                              padding: '14px',
-                              fontSize: '13px',
-                              color: lcRed,
-                              fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                              lineHeight: 1.6,
-                              margin: 0,
-                              overflowX: 'auto',
-                              whiteSpace: 'pre-wrap'
-                            }}>
-                              {sampleResults.compilerOutput || sampleResults.compileOutput}
-                            </pre>
-                          </div>
-                        ) : (
-                          /* Normal test result */
-                          <div>
-                            {/* Status header */}
-                            <div style={{
-                              fontSize: '16px', fontWeight: 700, marginBottom: '12px',
-                              color: sampleResults.allPassed ? lcGreen : lcRed
-                            }}>
-                              {sampleResults.allPassed ? 'Accepted' : (sampleResults.status === 'Time Limit Exceeded' ? 'Time Limit Exceeded' : 'Wrong Answer')}
-                            </div>
-
-                            {/* Execution stats */}
-                            <div style={{
-                              display: 'flex', gap: '16px', marginBottom: '14px',
-                              fontSize: '12px', color: lcTextSecondary
-                            }}>
-                              <span>Runtime: <strong style={{ color: lcTextPrimary }}>{sampleResults.totalTime || sampleResults.executionTime}</strong></span>
-                              <span>Memory: <strong style={{ color: lcTextPrimary }}>{sampleResults.totalMemory}</strong></span>
-                            </div>
-
-                            {/* Case pills */}
-                            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                              {sampleResults.testResults?.map((tr, idx) => (
-                                <button
-                                  key={tr.id}
-                                  onClick={() => setActiveTestCaseIdx(idx)}
-                                  style={{
-                                    backgroundColor: activeTestCaseIdx === idx ? lcSurfaceLight : 'transparent',
-                                    color: tr.passed ? lcGreen : lcRed,
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    padding: '4px 14px',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  {tr.passed ? <Check size={12} /> : <X size={12} />}
-                                  Case {idx + 1}
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Selected case detail */}
-                            {sampleResults.testResults?.[activeTestCaseIdx] && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div>
-                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Input</div>
-                                  <div style={{
-                                    backgroundColor: '#373737', borderRadius: '6px', padding: '8px 12px',
-                                    fontFamily: 'Menlo, Monaco, "Courier New", monospace', fontSize: '13px', color: lcTextPrimary
-                                  }}>
-                                    {sampleResults.testResults[activeTestCaseIdx].input}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Output</div>
-                                  <div style={{
-                                    backgroundColor: '#373737', borderRadius: '6px', padding: '8px 12px',
-                                    fontFamily: 'Menlo, Monaco, "Courier New", monospace', fontSize: '13px',
-                                    color: sampleResults.testResults[activeTestCaseIdx].passed ? lcTextPrimary : lcRed
-                                  }}>
-                                    {sampleResults.testResults[activeTestCaseIdx].actual}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: '12px', color: lcTextSecondary, marginBottom: '4px', fontWeight: 500 }}>Expected</div>
-                                  <div style={{
-                                    backgroundColor: '#373737', borderRadius: '6px', padding: '8px 12px',
-                                    fontFamily: 'Menlo, Monaco, "Courier New", monospace', fontSize: '13px', color: lcTextPrimary
-                                  }}>
-                                    {sampleResults.testResults[activeTestCaseIdx].expected}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ color: lcTextMuted, textAlign: 'center', marginTop: '30px', fontSize: '13px' }}>
-                        You must run your code first.
                       </div>
                     )}
                   </div>
@@ -1801,10 +2146,300 @@ export default function CodingWorkspaceModal({
                     </div>
                   );
                 })()}
+
+                {/* AI HINTS & FEEDBACK TAB */}
+                {activeBottomTab === 'ai-hints' && (
+                  <div style={{ padding: '4px 0' }}>
+                    {isLoadingAiFeedback ? (
+                      <div style={{ textAlign: 'center', padding: '36px 20px' }}>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(168, 85, 247, 0.15)',
+                          marginBottom: '12px'
+                        }}>
+                          <Sparkles size={22} color="#C084FC" />
+                        </div>
+                        <h4 style={{ color: lcTextPrimary, fontSize: '15px', fontWeight: 600, margin: '0 0 6px 0' }}>
+                          Analyzing Solution with AI Coding Mentor...
+                        </h4>
+                        <p style={{ color: lcTextSecondary, fontSize: '13px', margin: 0 }}>
+                          Reviewing syntax, execution state, and formulating progressive hints.
+                        </p>
+                      </div>
+                    ) : aiFeedbackError ? (
+                      <div style={{
+                        padding: '16px',
+                        backgroundColor: '#2D1F1F',
+                        border: `1px solid ${lcRed}55`,
+                        borderRadius: '8px',
+                        textAlign: 'center'
+                      }}>
+                        <AlertTriangle size={24} color={lcRed} style={{ marginBottom: '8px' }} />
+                        <div style={{ color: lcRed, fontWeight: 600, fontSize: '14px', marginBottom: '6px' }}>
+                          Failed to Retrieve AI Feedback
+                        </div>
+                        <div style={{ color: lcTextSecondary, fontSize: '12px', marginBottom: '14px' }}>
+                          {aiFeedbackError}
+                        </div>
+                        <button
+                          onClick={() => handleRequestAiFeedback(aiHintLevel)}
+                          style={{
+                            backgroundColor: lcSurfaceLight,
+                            border: `1px solid ${lcBorder}`,
+                            color: lcTextPrimary,
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Retry AI Analysis
+                        </button>
+                      </div>
+                    ) : aiFeedback ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {/* Top Summary Bar */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '8px',
+                          paddingBottom: '10px',
+                          borderBottom: `1px solid ${lcBorder}`
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              backgroundColor: aiFeedback.is_verified_execution ? 'rgba(44, 187, 93, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                              border: `1px solid ${aiFeedback.is_verified_execution ? 'rgba(44, 187, 93, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`,
+                              borderRadius: '12px',
+                              padding: '2px 10px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: aiFeedback.is_verified_execution ? lcGreen : '#60A5FA'
+                            }}>
+                              <Zap size={11} />
+                              {aiFeedback.is_verified_execution ? 'Verified with Execution Engine' : 'Algorithmic Review'}
+                            </div>
+                            <span style={{ fontSize: '12px', color: lcTextMuted }}>
+                              Current Hint: <strong style={{ color: lcTextPrimary }}>Level {aiHintLevel}</strong>
+                            </span>
+                          </div>
+
+                          {/* Progressive Hint Switcher */}
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleRequestAiFeedback(1)}
+                              disabled={isLoadingAiFeedback}
+                              style={{
+                                backgroundColor: aiHintLevel === 1 ? 'rgba(168, 85, 247, 0.25)' : lcSurfaceLight,
+                                border: `1px solid ${aiHintLevel === 1 ? '#A855F7' : lcBorder}`,
+                                color: aiHintLevel === 1 ? '#E9D5FF' : lcTextSecondary,
+                                borderRadius: '6px',
+                                padding: '3px 10px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Level 1: Concept
+                            </button>
+                            <button
+                              onClick={() => handleRequestAiFeedback(2)}
+                              disabled={isLoadingAiFeedback}
+                              style={{
+                                backgroundColor: aiHintLevel === 2 ? 'rgba(168, 85, 247, 0.25)' : lcSurfaceLight,
+                                border: `1px solid ${aiHintLevel === 2 ? '#A855F7' : lcBorder}`,
+                                color: aiHintLevel === 2 ? '#E9D5FF' : lcTextSecondary,
+                                borderRadius: '6px',
+                                padding: '3px 10px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Level 2: Structure
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* What Went Wrong */}
+                        <div style={{
+                          backgroundColor: '#271B1B',
+                          border: `1px solid ${lcRed}44`,
+                          borderRadius: '8px',
+                          padding: '12px 14px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                            <AlertCircle size={15} color={lcRed} />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: lcRed, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              What Went Wrong
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '13px', color: lcTextPrimary, lineHeight: 1.6 }}>
+                            {aiFeedback.what_went_wrong}
+                          </div>
+                        </div>
+
+                        {/* Why It Went Wrong */}
+                        <div style={{
+                          backgroundColor: '#26221A',
+                          border: `1px solid ${lcYellow}44`,
+                          borderRadius: '8px',
+                          padding: '12px 14px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                            <Lightbulb size={15} color={lcYellow} />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: lcYellow, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Root Cause & Explanation
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '13px', color: lcTextPrimary, lineHeight: 1.6 }}>
+                            {aiFeedback.why_it_went_wrong}
+                          </div>
+                        </div>
+
+                        {/* Progressive Hint */}
+                        <div style={{
+                          backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                          border: '1px solid rgba(168, 85, 247, 0.35)',
+                          borderRadius: '8px',
+                          padding: '12px 14px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                            <Sparkles size={15} color="#C084FC" />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#D8B4FE', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Progressive Hint (Level {aiHintLevel})
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#F3E8FF', lineHeight: 1.6 }}>
+                            {aiFeedback.progressive_hint}
+                          </div>
+                        </div>
+
+                        {/* Recommended Approach */}
+                        <div style={{
+                          backgroundColor: '#1E2530',
+                          border: '1px solid rgba(59, 130, 246, 0.35)',
+                          borderRadius: '8px',
+                          padding: '12px 14px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                            <ChevronRight size={15} color="#60A5FA" />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#93C5FD', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Algorithmic Approach
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '13px', color: lcTextPrimary, lineHeight: 1.6 }}>
+                            {aiFeedback.approach_guidance}
+                          </div>
+                        </div>
+
+                        {/* Test Case Analysis */}
+                        {aiFeedback.test_case_analysis && (
+                          <div style={{
+                            backgroundColor: '#202020',
+                            border: `1px solid ${lcBorder}`,
+                            borderRadius: '8px',
+                            padding: '12px 14px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                              <CheckCircle2 size={15} color={lcTextSecondary} />
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: lcTextSecondary, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Failing / Boundary Test Case Analysis
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '13px', color: lcTextSecondary, lineHeight: 1.6 }}>
+                              {aiFeedback.test_case_analysis}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '36px 20px' }}>
+                        <div style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(168, 85, 247, 0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 12px auto'
+                        }}>
+                          <Sparkles size={22} color="#C084FC" />
+                        </div>
+                        <h4 style={{ color: lcTextPrimary, fontSize: '15px', fontWeight: 600, margin: '0 0 6px 0' }}>
+                          Intelligent AI Coding Mentor
+                        </h4>
+                        <p style={{ color: lcTextSecondary, fontSize: '13px', maxWidth: '440px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
+                          Need guidance without giving away the full code? Request root-cause diagnosis, conceptual nudges, and step-by-step logic.
+                        </p>
+                        <button
+                          onClick={() => handleRequestAiFeedback(1)}
+                          disabled={isLoadingAiFeedback}
+                          style={{
+                            backgroundColor: '#8B5CF6',
+                            border: 'none',
+                            color: '#FFFFFF',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            padding: '7px 20px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <Sparkles size={14} />
+                          Analyze Solution with AI Tutor
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
             </div>
           </div>
         </div>
+    </div>
+  );
+
+  if (embedded || isFullscreen) {
+    return workspaceBody;
+  }
+
+  return (
+    <div
+      className="modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        padding: '16px',
+        background: 'rgba(15, 23, 42, 0.72)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div style={{ width: '96vw', maxWidth: '1600px', height: '94vh', display: 'flex' }}>
+        {workspaceBody}
       </div>
     </div>
   );

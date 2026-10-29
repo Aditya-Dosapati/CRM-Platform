@@ -169,7 +169,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
 
   const sectionDisplay = activeUser.section ? `Section ${String(activeUser.section).toUpperCase().trim()}` : 'Not available';
   const academicYearDisplay = activeUser.academicYear || activeUser.academic_year || '2025-2026';
-  const regulationDisplay = activeUser.regulation || 'AR23';
+  const regulationDisplay = 'AR23';
   const programDisplay = activeUser.program || 'B.Tech';
 
   // Subtitle Resolution
@@ -257,26 +257,25 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
 
         {/* Profile Avatar & Identity Header (Positioned with zero overlap) */}
         <div style={{
-          padding: '0 24px',
-          marginTop: '-44px',
+          padding: '0 24px 10px',
           position: 'relative',
           zIndex: 2,
           display: 'flex',
-          alignItems: 'flex-end',
+          alignItems: 'flex-start',
           gap: '16px',
-          flexWrap: 'wrap',
           flexShrink: 0
         }}>
           <div style={{
-            width: '84px',
-            height: '84px',
+            marginTop: '-40px',
+            width: '80px',
+            height: '80px',
             borderRadius: '16px',
             background: 'linear-gradient(135deg, #C2410C, #EA580C)',
             border: '4px solid var(--color-surface, #FFFDF8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '28px',
+            fontSize: '26px',
             fontWeight: 800,
             color: '#FFFFFF',
             boxShadow: '0 8px 18px -4px rgba(234, 88, 12, 0.35)',
@@ -285,37 +284,37 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
             {avatarText}
           </div>
 
-          <div style={{ flex: 1, minWidth: '200px', paddingBottom: '4px' }}>
+          <div style={{ flex: 1, minWidth: 0, paddingTop: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
               <span className={`badge ${
                 currentRole === 'student' ? 'badge-orange' :
                 currentRole === 'faculty' ? 'badge-green' : 'badge-purple'
-              }`} style={{ textTransform: 'capitalize', fontSize: '11.5px', fontWeight: 700, padding: '3px 10px' }}>
+              }`} style={{ textTransform: 'capitalize', fontSize: '11px', fontWeight: 700, padding: '2px 8px' }}>
                 {currentRole} Profile
               </span>
 
-              <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '3px 8px' }}>
+              <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '2px 8px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#059669' }}></span>
                 Active Account
               </span>
             </div>
 
             <h2 style={{
-              fontSize: '20px',
+              fontSize: '19px',
               fontWeight: 800,
               color: 'var(--color-text, #2B2118)',
               letterSpacing: '-0.3px',
-              margin: 0,
-              lineHeight: 1.25,
+              margin: '0 0 3px 0',
+              lineHeight: 1.3,
               wordBreak: 'break-word'
             }}>
               {displayName}
             </h2>
             <p style={{
-              fontSize: '13px',
+              fontSize: '12.5px',
               color: 'var(--color-text-muted, #786C5E)',
-              marginTop: '3px',
-              marginBottom: 0,
+              margin: 0,
+              lineHeight: 1.4,
               wordBreak: 'break-word'
             }}>
               {subtitle}
@@ -544,7 +543,7 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                     </div>
                   </div>
 
-                  {/* Academic Metrics (CGPA & Attendance) */}
+                  {/* Academic Metrics (CGPA & Attendance) - Strictly from available data */}
                   <div style={{
                     padding: '14px 16px',
                     backgroundColor: 'rgba(234, 88, 12, 0.05)',
@@ -560,8 +559,10 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                       <p style={{ fontSize: '11px', color: '#EA580C', fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>
                         Cumulative CGPA
                       </p>
-                      <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', margin: '2px 0 0 0' }}>
-                        {activeUser.cgpa !== undefined && activeUser.cgpa !== null && activeUser.cgpa !== '' ? activeUser.cgpa : 'Not available'}
+                      <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', margin: '2px 0 0 0' }}>
+                        {activeUser.cgpa !== undefined && activeUser.cgpa !== null && activeUser.cgpa !== '' && activeUser.cgpa !== '—'
+                          ? activeUser.cgpa
+                          : 'Not available'}
                       </p>
                     </div>
 
@@ -569,9 +570,9 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, activeR
                       <p style={{ fontSize: '11px', color: '#EA580C', fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>
                         Attendance Standing
                       </p>
-                      <p style={{ fontSize: '13.5px', fontWeight: 700, color: '#059669', margin: '2px 0 0 0' }}>
-                        {activeUser.attendance !== undefined && activeUser.attendance !== null && activeUser.attendance !== ''
-                          ? `${activeUser.attendanceStatus || 'Good'} (${activeUser.attendance}%)`
+                      <p style={{ fontSize: '13.5px', fontWeight: 700, color: (activeUser.attendance !== undefined && activeUser.attendance !== null && activeUser.attendance !== '') ? '#059669' : 'var(--color-text-muted)', margin: '2px 0 0 0' }}>
+                        {activeUser.attendance !== undefined && activeUser.attendance !== null && activeUser.attendance !== '' && activeUser.attendance !== '—'
+                          ? (activeUser.attendanceStatus ? `${activeUser.attendanceStatus} (${activeUser.attendance}%)` : `${activeUser.attendance}%`)
                           : (activeUser.attendance_percentage ? `${activeUser.attendance_percentage}%` : 'Not available')}
                       </p>
                     </div>

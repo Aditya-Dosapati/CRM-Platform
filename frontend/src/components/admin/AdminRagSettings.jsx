@@ -334,7 +334,7 @@ export default function AdminRagSettings() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
               <div>
                 <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Official Course Syllabi</span>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>BOS approved handouts (R20/R23)</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>BOS approved handouts (AR23)</p>
               </div>
               <input
                 type="checkbox"

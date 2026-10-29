@@ -62,7 +62,7 @@ export default function CodingAssessmentResultModal({ assessment, onClose }) {
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid #E2E8F0',
           overflow: 'hidden',
-          animation: 'fadeIn 0.2s ease-out'
+          animation: 'modalSlideSpring 0.24s cubic-bezier(0.16, 1, 0.3, 1) both'
         }}
         onClick={e => e.stopPropagation()}
       >

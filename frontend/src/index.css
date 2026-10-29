@@ -145,6 +145,7 @@
   --transition-normal: 0.2s ease;
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-card-morph: cubic-bezier(0.22, 1, 0.36, 1);
   --transition-spring: 0.22s var(--ease-spring);
   --transition-smooth: 0.18s var(--ease-smooth);
 }
@@ -1311,7 +1312,95 @@ select.input-field {
 @keyframes modalSlideSpring {
   from {
     opacity: 0;
-    transform: scale(0.96) translateY(10px);
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes drawerSlideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0.8;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes signinFormEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes regFieldEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authFormEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authRowStagger {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes noticeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chatModalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
   }
   to {
     opacity: 1;
@@ -1356,6 +1445,124 @@ select.input-field {
     transform: scale(1.18);
     opacity: 0.82;
   }
+}
+
+@keyframes spinSmooth {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes typingDot {
+  0%, 80%, 100% {
+    transform: scale(0.65);
+    opacity: 0.35;
+  }
+  40% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes resultCardPop {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ==========================================================================
+   AUTHENTICATION VIEW TRANSITIONS & FLUID CARD MORPHING
+   ========================================================================== */
+.auth-card-wrapper {
+  width: 100%;
+  margin: 0 auto;
+  will-change: max-width;
+}
+
+.auth-card-surface {
+  position: relative;
+  will-change: padding;
+}
+
+/* 2-column Registration Form Grid that fluidly scales without column snapping */
+.reg-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 580px) {
+  .reg-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .auth-card-surface {
+    padding: 24px 20px !important;
+  }
+}
+
+/* Sign In Form Entrance (Preserving the smooth reverse transition) */
+.signin-form-enter {
+  animation: signinFormEntrance 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Registration Form Container & Staggered Field Entrance */
+.reg-form-container {
+  display: block;
+  width: 100%;
+}
+
+.reg-role-container {
+  display: block;
+  width: 100%;
+}
+
+.reg-stagger-1 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.02s both; }
+.reg-stagger-2 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.045s both; }
+.reg-stagger-3 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.07s both; }
+.reg-stagger-4 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.095s both; }
+.reg-stagger-5 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.12s both; }
+.reg-stagger-6 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.145s both; }
+.reg-stagger-7 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.17s both; }
+.reg-stagger-8 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.195s both; }
+
+/* Backward compatibility aliases */
+.auth-form-enter {
+  animation: signinFormEntrance 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.auth-stagger-1 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.02s both; }
+.auth-stagger-2 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.045s both; }
+.auth-stagger-3 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.07s both; }
+.auth-stagger-4 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.095s both; }
+.auth-stagger-5 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.12s both; }
+.auth-stagger-6 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.145s both; }
+.auth-stagger-7 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.17s both; }
+.auth-stagger-8 { animation: regFieldEntrance 0.42s var(--ease-card-morph) 0.195s both; }
+
+.animate-spin {
+  animation: spinSmooth 0.8s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-modal-spring {
+  animation: modalSlideSpring 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-notice-down {
+  animation: noticeSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Responsive & Mobile */
@@ -1452,5 +1659,73 @@ select.input-field {
   .quick-actions-grid {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+}
+
+
+/* ==========================================================================
+   CODING WORKSPACE INTEGRATED & RESPONSIVE STYLES
+   ========================================================================== */
+.coding-practice-workspace-wrapper {
+  height: calc(100vh - 72px);
+  min-height: 620px;
+  width: 100%;
+  padding: 12px 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.coding-workspace-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  background-color: #282828;
+}
+
+.coding-workspace-main-pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.coding-workspace-left-panel {
+  width: 42%;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #3E3E3E;
+  background-color: #282828;
+}
+
+.coding-workspace-right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: #282828;
+}
+
+@media (max-width: 960px) {
+  .coding-practice-workspace-wrapper {
+    height: auto;
+    min-height: auto;
+    padding: 10px;
+  }
+  .coding-workspace-main-pane {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .coding-workspace-left-panel {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-height: 45vh;
+    border-right: none !important;
+    border-bottom: 1px solid #3E3E3E;
+  }
+  .coding-workspace-right-panel {
+    min-height: 500px;
   }
 }

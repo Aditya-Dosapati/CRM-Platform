@@ -8,6 +8,18 @@ export const ragKnowledgeBase = [];
  * Returns genuine response with empty state when 0 chunks exist.
  */
 export async function queryRagEngine(query, activeSubject = null) {
+  // Guard faculty access
+  try {
+    const session = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('gmrit_academic_crm_session') || '{}') : null;
+    if (session?.role === 'faculty') {
+      return {
+        text: "Faculty access to the Student AI Academic Copilot is restricted.",
+        sources: [],
+        retrievalSteps: ["Authorization guard: Faculty role restricted"]
+      };
+    }
+  } catch (_) {}
+
   if (!query || !query.trim()) {
     return {
       text: "Please enter an academic or course-related question to query the GMRIT RAG Knowledge Base.",

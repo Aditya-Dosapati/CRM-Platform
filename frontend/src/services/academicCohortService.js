@@ -330,14 +330,10 @@ export function normalizeAcademicYear(input) {
 }
 
 /**
- * Normalizes Regulation string ('AR23', 'R20', 'R23').
+ * Normalizes Regulation string. The institution uses AR23 only.
  */
 export function normalizeRegulation(input) {
-  if (!input) return 'AR23';
-  const str = String(input).toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
-  if (str.includes('20')) return 'R20';
-  if (str.includes('23')) return 'AR23';
-  return str || 'AR23';
+  return 'AR23';
 }
 
 /**

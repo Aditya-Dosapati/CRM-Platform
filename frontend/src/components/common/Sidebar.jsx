@@ -9,7 +9,6 @@ import {
   BarChart2,
   PieChart,
   Settings,
-  Sparkles,
   Users,
   Layers,
   Activity,
@@ -53,8 +52,8 @@ export default function Sidebar({
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { id: 'subjects', label: 'My Subjects', icon: BookOpen },
               { id: 'coding-practice', label: 'Coding Practice', icon: Code2 },
-              { id: 'assessments', label: 'Assessments', icon: CheckSquare },
-              { id: 'ai-copilot', label: 'AI Academic Copilot', icon: Sparkles, isAction: true }
+              { id: 'coding-assessments', label: 'Coding Assessments', icon: Terminal },
+              { id: 'assessments', label: 'Assessments', icon: CheckSquare }
             ]
           },
           {
@@ -94,8 +93,7 @@ export default function Sidebar({
             title: 'Curriculum & Tests',
             items: [
               { id: 'assessments', label: 'Assessments Manager', icon: CheckSquare },
-              { id: 'resources', label: 'Syllabus & Handouts', icon: FolderArchive },
-              { id: 'ai-copilot', label: 'RAG Knowledge Assistant', icon: Sparkles, isAction: true }
+              { id: 'resources', label: 'Syllabus & Handouts', icon: FolderArchive }
             ]
           },
           {
@@ -265,12 +263,12 @@ export default function Sidebar({
             </span>
           </div>
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '0.4px', backgroundColor: 'rgba(255, 255, 255, 0.65)', padding: '2px 6px', borderRadius: '4px' }}>
-            R20/R23
+            AR23
           </span>
         </div>
       ) : (
         <div 
-          title={`${roleLabel} Portal (R20/R23)`}
+          title={`${roleLabel} Portal (AR23)`}
           style={{
             margin: '8px auto 4px',
             width: '36px',

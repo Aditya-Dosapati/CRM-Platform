@@ -144,14 +144,6 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
             Real-time assessment grading, student score distributions, and section performance diagnostics
           </p>
         </div>
-
-        <button
-          onClick={() => onOpenRagQuery?.(`Analyze the performance distribution for ${selectedAsmt?.title || 'Natural Language Processing'} and generate targeted remediation strategies for students.`)}
-          className="btn btn-primary"
-        >
-          <Sparkles size={14} />
-          <span>AI Performance Diagnostic</span>
-        </button>
       </div>
 
       {/* Top Level Summary Card (Enrolled Cohort Summary) */}
@@ -477,14 +469,6 @@ export default function FacultyAnalytics({ onNavigate, onOpenRagQuery }) {
                       Roll: {st.rollNumber} • Score: {st.score || '—'} ({pctFormatted})
                     </span>
                   </div>
-                  <button
-                    onClick={() => onOpenRagQuery?.(`Provide personalized remedial study plan for ${st.name} (Roll: ${st.rollNumber}) who scored ${pctFormatted} in ${selectedAsmt?.title || 'assessment'}`)}
-                    className="btn btn-secondary btn-sm"
-                    style={{ fontSize: '11.5px' }}
-                  >
-                    <Sparkles size={12} />
-                    <span>Generate Remedial Plan</span>
-                  </button>
                 </div>
               );
             })}

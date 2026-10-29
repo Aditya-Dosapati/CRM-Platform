@@ -20,6 +20,7 @@ export const ROLE_ROUTE_MATRIX = {
     'classes',
     'students',
     'assessments',
+    'coding-assessments',
     'performance',
     'syllabus',
     'resources',

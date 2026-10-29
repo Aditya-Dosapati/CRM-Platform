@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import GmritLogo from '../common/GmritLogo';
-import { 
-  Lock, Mail, ShieldAlert, LogIn, KeyRound, AlertCircle, CheckCircle2, 
-  ShieldCheck, ArrowRight, Eye, EyeOff, UserPlus, UserCheck, Building2, 
+import {
+  Lock, Mail, ShieldAlert, LogIn, KeyRound, AlertCircle, CheckCircle2,
+  ShieldCheck, ArrowRight, Eye, EyeOff, UserPlus, UserCheck, Building2,
   GraduationCap, Briefcase, Sparkles, Code2, BookOpen, Layers, Check,
-  ChevronRight, Shield, Award
+  ChevronRight, Shield, Award, Loader2
 } from 'lucide-react';
 import authService from '../../services/authService';
 import academicDataService from '../../services/academicDataService';
@@ -15,6 +15,45 @@ const REGISTRATION_DEPARTMENT_FALLBACKS = [
   { id: 'AIDS', code: 'AIDS', name: 'CSE - Artificial Intelligence and Data Science' },
   { id: 'AIML', code: 'AIML', name: 'CSE - Artificial Intelligence and Machine Learning' }
 ];
+
+export const MASTER_BRANCH_OPTIONS = [
+  { branch: 'CSE', displayName: 'CSE', name: 'Computer Science and Engineering', dbId: 'b9cce72e-288c-4091-88a7-fcb31a08863f' },
+  { branch: 'AIML', displayName: 'CSE-AIML', name: 'CSE - Artificial Intelligence and Machine Learning', dbId: '835f1428-d1ec-47b9-87e0-d281feba4234' },
+  { branch: 'AIDS', displayName: 'CSE-AIDS', name: 'CSE - Artificial Intelligence and Data Science', dbId: 'e126f2f2-8159-4c22-8d86-4ff57ee3d66c' }
+];
+
+const regLabelStyle = {
+  display: 'block',
+  fontSize: '11.5px',
+  fontWeight: 600,
+  color: '#475569',
+  marginBottom: '4px'
+};
+
+const regInputStyle = {
+  width: '100%',
+  padding: '8.5px 11px',
+  borderRadius: '8px',
+  border: '1px solid #CBD5E1',
+  fontSize: '12.5px',
+  color: '#0F172A',
+  backgroundColor: '#FFFFFF',
+  outline: 'none',
+  boxSizing: 'border-box',
+  transition: 'border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease'
+};
+
+const handleInputFocus = (e, role = 'student') => {
+  const accentColor = role === 'faculty' ? '#059669' : '#EA580C';
+  const shadowColor = role === 'faculty' ? 'rgba(5, 150, 105, 0.15)' : 'rgba(234, 88, 12, 0.15)';
+  e.target.style.borderColor = accentColor;
+  e.target.style.boxShadow = `0 0 0 3px ${shadowColor}`;
+};
+
+const handleInputBlur = (e) => {
+  e.target.style.borderColor = '#CBD5E1';
+  e.target.style.boxShadow = 'none';
+};
 
 const DEMO_ACCOUNTS = [
   {
@@ -54,7 +93,7 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginView({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'register'
-  
+
   // Dynamic Departments State from Supabase
   const [departments, setDepartments] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
@@ -63,21 +102,24 @@ export default function LoginView({ onLoginSuccess }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Registration State
   const [regRole, setRegRole] = useState('student'); // 'student' | 'faculty'
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regDepartment, setRegDepartment] = useState('');
+  const [regDepartment, setRegDepartment] = useState('CSE');
+  const [regBranch, setRegBranch] = useState('CSE');
   const [regRollNumber, setRegRollNumber] = useState('');
   const [regEmployeeId, setRegEmployeeId] = useState('');
   const [regProgram, setRegProgram] = useState('B.Tech');
-  const [regYear, setRegYear] = useState('II Year');
-  const [regSection, setRegSection] = useState('Section A');
+  const [regYear, setRegYear] = useState('1');
+  const [regSemester, setRegSemester] = useState('1');
+  const [regSection, setRegSection] = useState('A');
   const [regDesignation, setRegDesignation] = useState('Assistant Professor');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
 
   // Load departments from Supabase
   useEffect(() => {
@@ -173,6 +215,18 @@ export default function LoginView({ onLoginSuccess }) {
       return;
     }
 
+    if (regRole === 'student') {
+      if (!regRollNumber || regRollNumber.trim().length < 4) {
+        setError("Please enter a valid Roll Number / JNTU ID.");
+        return;
+      }
+    } else {
+      if (!regEmployeeId || regEmployeeId.trim().length < 2) {
+        setError("Please enter a valid Faculty Employee ID.");
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const registered = await authService.registerUser({
@@ -180,10 +234,12 @@ export default function LoginView({ onLoginSuccess }) {
         name: regName,
         email: regEmail,
         department: regDepartment,
+        branch: regRole === 'student' ? regBranch : undefined,
         rollNumber: regRole === 'student' ? regRollNumber : undefined,
         employeeId: regRole === 'faculty' ? regEmployeeId : undefined,
         program: regRole === 'student' ? regProgram : undefined,
-        year: regRole === 'student' ? regYear : undefined,
+        year: regRole === 'student' ? Number(regYear) : undefined,
+        semester: regRole === 'student' ? Number(regSemester) : undefined,
         section: regRole === 'student' ? regSection : undefined,
         designation: regRole === 'faculty' ? regDesignation : undefined,
         password: regPassword
@@ -191,11 +247,11 @@ export default function LoginView({ onLoginSuccess }) {
 
       setIsLoading(false);
       setSuccessMessage("Registration submitted successfully. Your account is pending administrator verification.");
-      
+
       setIdentifier(registered.email);
       setPassword('');
       setAuthMode('signin');
-      
+
       setRegName('');
       setRegEmail('');
       setRegRollNumber('');
@@ -212,13 +268,13 @@ export default function LoginView({ onLoginSuccess }) {
     <div style={{
       minHeight: '100vh',
       width: '100%',
-      backgroundColor: '#0F1219',
-      backgroundImage: 'radial-gradient(ellipse 900px 500px at 15% 15%, rgba(234, 88, 12, 0.18) 0%, transparent 70%), radial-gradient(ellipse 700px 500px at 85% 85%, rgba(194, 65, 12, 0.15) 0%, transparent 65%), radial-gradient(circle 500px at 50% 50%, rgba(20, 23, 31, 0.7) 0%, transparent 100%)',
+      backgroundColor: '#FAF8F5',
+      backgroundImage: 'radial-gradient(ellipse 900px 500px at 15% 15%, rgba(234, 88, 12, 0.08) 0%, transparent 70%), radial-gradient(ellipse 700px 500px at 85% 85%, rgba(194, 65, 12, 0.06) 0%, transparent 65%), radial-gradient(circle 600px at 50% 50%, rgba(241, 245, 249, 0.6) 0%, transparent 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '32px 20px',
-      color: '#FFFFFF'
+      color: '#0F172A'
     }}>
       <div style={{
         maxWidth: '1200px',
@@ -228,7 +284,7 @@ export default function LoginView({ onLoginSuccess }) {
         gap: '48px',
         alignItems: 'center'
       }}>
-        
+
         {/* LEFT COLUMN: HERO SHOWCASE & PLATFORM HIGHLIGHTS */}
         <div style={{ padding: '8px 12px' }}>
           {/* Institution Badge */}
@@ -238,22 +294,22 @@ export default function LoginView({ onLoginSuccess }) {
             gap: '8px',
             padding: '6px 14px',
             borderRadius: '9999px',
-            backgroundColor: 'rgba(234, 88, 12, 0.16)',
-            border: '1px solid rgba(251, 146, 60, 0.35)',
+            backgroundColor: '#FFF7ED',
+            border: '1px solid #FED7AA',
             marginBottom: '22px',
-            boxShadow: '0 0 20px -2px rgba(234, 88, 12, 0.2)'
+            boxShadow: '0 2px 8px rgba(234, 88, 12, 0.08)'
           }}>
             <span style={{
               width: '7px',
               height: '7px',
               borderRadius: '50%',
-              backgroundColor: '#34D399',
-              boxShadow: '0 0 8px #34D399',
+              backgroundColor: '#059669',
+              boxShadow: '0 0 8px rgba(5, 150, 105, 0.4)',
               display: 'inline-block'
             }} />
-            <Sparkles size={13} color="#FB923C" />
-            <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#FED7AA', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              Autonomous Institution • NAAC A+ Accredited
+            <Sparkles size={13} color="#EA580C" />
+            <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#C2410C', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              Deemed to be University
             </span>
           </div>
 
@@ -261,14 +317,14 @@ export default function LoginView({ onLoginSuccess }) {
             fontSize: '36px',
             fontWeight: 800,
             lineHeight: 1.15,
-            color: '#FFFFFF',
+            color: '#0F172A',
             letterSpacing: '-0.9px',
             marginBottom: '16px'
           }}>
             GMRIT Academic Hub
             <span style={{
               display: 'block',
-              background: 'linear-gradient(90deg, #FB923C 0%, #EA580C 60%, #F59E0B 100%)',
+              background: 'linear-gradient(90deg, #EA580C 0%, #C2410C 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               fontSize: '28px',
@@ -282,7 +338,7 @@ export default function LoginView({ onLoginSuccess }) {
 
           <p style={{
             fontSize: '14.5px',
-            color: '#94A3B8',
+            color: '#64748B',
             lineHeight: 1.65,
             marginBottom: '28px',
             maxWidth: '500px'
@@ -297,33 +353,32 @@ export default function LoginView({ onLoginSuccess }) {
               alignItems: 'flex-start',
               gap: '14px',
               padding: '14px 18px',
-              backgroundColor: 'rgba(23, 32, 54, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
               borderRadius: '14px',
-              backdropFilter: 'blur(12px)',
-              boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.3)',
-              transition: 'transform 0.2s ease, border-color 0.2s ease'
+              boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.05)',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
             }}>
               <div style={{
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(234, 88, 12, 0.22)',
-                border: '1px solid rgba(251, 146, 60, 0.3)',
+                backgroundColor: '#FFF7ED',
+                border: '1px solid #FED7AA',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FB923C',
+                color: '#EA580C',
                 flexShrink: 0
               }}>
                 <Sparkles size={18} />
               </div>
               <div>
-                <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+                <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
                   AI Academic Copilot with RAG
                 </h4>
-                <p style={{ fontSize: '12px', color: '#94A3B8', margin: '3px 0 0 0', lineHeight: 1.45 }}>
-                  Grounded strictly in official GMRIT R20/R23 syllabus books with page citations and vector search.
+                <p style={{ fontSize: '12px', color: '#64748B', margin: '3px 0 0 0', lineHeight: 1.45 }}>
+                  Grounded strictly in official GMRIT AR23 syllabus books with page citations and vector search.
                 </p>
               </div>
             </div>
@@ -333,31 +388,30 @@ export default function LoginView({ onLoginSuccess }) {
               alignItems: 'flex-start',
               gap: '14px',
               padding: '14px 18px',
-              backgroundColor: 'rgba(23, 32, 54, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
               borderRadius: '14px',
-              backdropFilter: 'blur(12px)',
-              boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.3)'
+              boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.05)'
             }}>
               <div style={{
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                border: '1px solid rgba(52, 211, 153, 0.3)',
+                backgroundColor: '#ECFDF5',
+                border: '1px solid #A7F3D0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#34D399',
+                color: '#059669',
                 flexShrink: 0
               }}>
                 <Code2 size={18} />
               </div>
               <div>
-                <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+                <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
                   Sandboxed Coding Practice Engine
                 </h4>
-                <p style={{ fontSize: '12px', color: '#94A3B8', margin: '3px 0 0 0', lineHeight: 1.45 }}>
+                <p style={{ fontSize: '12px', color: '#64748B', margin: '3px 0 0 0', lineHeight: 1.45 }}>
                   Live JavaScript execution, algorithmic testcase evaluation, and cohort performance ranking.
                 </p>
               </div>
@@ -368,31 +422,30 @@ export default function LoginView({ onLoginSuccess }) {
               alignItems: 'flex-start',
               gap: '14px',
               padding: '14px 18px',
-              backgroundColor: 'rgba(23, 32, 54, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
               borderRadius: '14px',
-              backdropFilter: 'blur(12px)',
-              boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.3)'
+              boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.05)'
             }}>
               <div style={{
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(168, 85, 247, 0.2)',
-                border: '1px solid rgba(192, 132, 252, 0.3)',
+                backgroundColor: '#FAF5FF',
+                border: '1px solid #E9D5FF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#C084FC',
+                color: '#7C3AED',
                 flexShrink: 0
               }}>
                 <BookOpen size={18} />
               </div>
               <div>
-                <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+                <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
                   Curriculum & PYQ Knowledge Base
                 </h4>
-                <p style={{ fontSize: '12px', color: '#94A3B8', margin: '3px 0 0 0', lineHeight: 1.45 }}>
+                <p style={{ fontSize: '12px', color: '#64748B', margin: '3px 0 0 0', lineHeight: 1.45 }}>
                   Comprehensive repository of autonomous examination question papers, unit handouts, and regulations.
                 </p>
               </div>
@@ -409,9 +462,9 @@ export default function LoginView({ onLoginSuccess }) {
               color: '#64748B',
               marginBottom: '10px'
             }}>
-              Instant One-Click Demo Access:
+              {/* Instant One-Click Demo Access: */}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {/* <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {DEMO_ACCOUNTS.map((acc) => {
                 const Icon = acc.icon;
                 const isSelected = identifier === acc.email;
@@ -426,37 +479,56 @@ export default function LoginView({ onLoginSuccess }) {
                       gap: '8px',
                       padding: '8px 14px',
                       borderRadius: '10px',
-                      backgroundColor: isSelected ? 'rgba(234, 88, 12, 0.32)' : 'rgba(23, 32, 54, 0.85)',
-                      border: `1.5px solid ${isSelected ? '#EA580C' : 'rgba(255, 255, 255, 0.08)'}`,
-                      color: isSelected ? '#FFFFFF' : '#CBD5E1',
+                      backgroundColor: isSelected ? '#FFF7ED' : '#FFFFFF',
+                      border: `1.5px solid ${isSelected ? '#EA580C' : '#E2E8F0'}`,
+                      color: isSelected ? '#C2410C' : '#334155',
                       fontSize: '12px',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      boxShadow: isSelected ? '0 0 14px rgba(234, 88, 12, 0.35)' : 'none',
+                      boxShadow: isSelected ? '0 0 12px rgba(234, 88, 12, 0.18)' : '0 1px 3px rgba(15, 23, 42, 0.04)',
                       transition: 'all 0.16s ease'
                     }}
                   >
-                    <Icon size={14} color={isSelected ? '#FB923C' : '#94A3B8'} />
+                    <Icon size={14} color={isSelected ? '#EA580C' : '#64748B'} />
                     <span>{acc.label}: {acc.name.split(' ')[0]}</span>
-                    {isSelected && <Check size={12} color="#FB923C" />}
+                    {isSelected && <Check size={12} color="#EA580C" />}
                   </button>
                 );
               })}
-            </div>
+            </div> */}
           </div>
         </div>
 
         {/* RIGHT COLUMN: INTERACTIVE AUTHENTICATION CARD */}
-        <div>
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            padding: '36px 40px',
-            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 20px -5px rgba(0, 0, 0, 0.25)',
-            color: '#0F172A',
-            position: 'relative'
-          }}>
-            
+        <div
+          className="auth-card-wrapper"
+          style={{
+            maxWidth: authMode === 'register' ? '680px' : '480px',
+            width: '100%',
+            margin: '0 auto',
+            transition: authMode === 'register'
+              ? 'max-width 520ms cubic-bezier(0.22, 1, 0.36, 1)'
+              : 'max-width 360ms cubic-bezier(0.22, 1, 0.36, 1)',
+            willChange: 'max-width'
+          }}
+        >
+          <div
+            className="auth-card-surface"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '24px',
+              padding: authMode === 'register' ? '28px 32px' : '36px 40px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 20px 45px -12px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04)',
+              color: '#0F172A',
+              position: 'relative',
+              transition: authMode === 'register'
+                ? 'padding 520ms cubic-bezier(0.22, 1, 0.36, 1)'
+                : 'padding 360ms cubic-bezier(0.22, 1, 0.36, 1)',
+              willChange: 'padding'
+            }}
+          >
+
             {/* Header with Logo */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <GmritLogo size="medium" />
@@ -477,7 +549,7 @@ export default function LoginView({ onLoginSuccess }) {
               </div>
             </div>
 
-            {/* Segmented Mode Switcher */}
+            {/* Segmented Mode Switcher with Fluid Sliding Active Pill */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -485,40 +557,66 @@ export default function LoginView({ onLoginSuccess }) {
               padding: '4px',
               borderRadius: '12px',
               marginBottom: '24px',
-              border: '1px solid #E2E8F0'
+              border: '1px solid #E2E8F0',
+              position: 'relative',
+              userSelect: 'none'
             }}>
+              {/* Sliding active pill indicator */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  bottom: '4px',
+                  left: '4px',
+                  width: 'calc(50% - 4px)',
+                  borderRadius: '9px',
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)',
+                  transform: authMode === 'signin' ? 'translateX(0)' : 'translateX(100%)',
+                  transition: 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1)',
+                  pointerEvents: 'none',
+                  zIndex: 1
+                }}
+              />
               <button
                 type="button"
+                id="tab-signin"
                 onClick={() => { setAuthMode('signin'); setError(''); setSuccessMessage(''); }}
                 style={{
+                  position: 'relative',
+                  zIndex: 2,
                   padding: '9px 14px',
                   borderRadius: '9px',
                   border: 'none',
-                  backgroundColor: authMode === 'signin' ? '#FFFFFF' : 'transparent',
+                  backgroundColor: 'transparent',
                   color: authMode === 'signin' ? '#0F172A' : '#64748B',
                   fontSize: '13px',
                   fontWeight: 700,
-                  boxShadow: authMode === 'signin' ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.18s ease'
+                  transition: 'color 0.2s ease',
+                  outline: 'none'
                 }}
               >
                 Sign In
               </button>
               <button
                 type="button"
+                id="tab-register"
                 onClick={() => { setAuthMode('register'); setError(''); setSuccessMessage(''); }}
                 style={{
+                  position: 'relative',
+                  zIndex: 2,
                   padding: '9px 14px',
                   borderRadius: '9px',
                   border: 'none',
-                  backgroundColor: authMode === 'register' ? '#FFFFFF' : 'transparent',
+                  backgroundColor: 'transparent',
                   color: authMode === 'register' ? '#0F172A' : '#64748B',
                   fontSize: '13px',
                   fontWeight: 700,
-                  boxShadow: authMode === 'register' ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.18s ease'
+                  transition: 'color 0.2s ease',
+                  outline: 'none'
                 }}
               >
                 Register
@@ -527,7 +625,7 @@ export default function LoginView({ onLoginSuccess }) {
 
             {/* Error & Success Notification Banners */}
             {error && (
-              <div style={{
+              <div className="animate-notice-down" style={{
                 padding: '11px 14px',
                 borderRadius: '10px',
                 backgroundColor: '#FEF2F2',
@@ -546,7 +644,7 @@ export default function LoginView({ onLoginSuccess }) {
             )}
 
             {successMessage && (
-              <div style={{
+              <div className="animate-notice-down" style={{
                 padding: '11px 14px',
                 borderRadius: '10px',
                 backgroundColor: '#ECFDF5',
@@ -566,364 +664,723 @@ export default function LoginView({ onLoginSuccess }) {
 
             {/* ================= MODE 1: SIGN IN ================= */}
             {authMode === 'signin' && (
-              <form onSubmit={handleLoginSubmit}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Institutional Email / Identifier
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. rahul.kumar@gmrit.edu.in"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px 10px 38px',
-                        borderRadius: '10px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '13.5px',
-                        color: '#0F172A',
-                        outline: 'none',
-                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
-                      }}
-                      onFocus={(e) => { e.target.style.borderColor = '#EA580C'; e.target.style.boxShadow = '0 0 0 3px rgba(234,88,12,0.12)'; }}
-                      onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; e.target.style.boxShadow = 'none'; }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
-                      Password
+              <div key="signin-form" className="signin-form-enter">
+                <form onSubmit={handleLoginSubmit}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                      Institutional Email / Identifier
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotModal(true)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        color: '#EA580C',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Forgot password?
-                    </button>
+                    <div style={{ position: 'relative' }}>
+                      <Mail size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. 23341a4231@gmrit.edu.in"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px 10px 38px',
+                          borderRadius: '10px',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '13.5px',
+                          color: '#0F172A',
+                          outline: 'none',
+                          transition: 'border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onFocus={(e) => handleInputFocus(e, 'student')}
+                        onBlur={handleInputBlur}
+                      />
+                    </div>
                   </div>
-                  <div style={{ position: 'relative' }}>
-                    <Lock size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Enter account password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 38px 10px 38px',
-                        borderRadius: '10px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '13.5px',
-                        color: '#0F172A',
-                        outline: 'none',
-                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
-                      }}
-                      onFocus={(e) => { e.target.style.borderColor = '#EA580C'; e.target.style.boxShadow = '0 0 0 3px rgba(234,88,12,0.12)'; }}
-                      onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; e.target.style.boxShadow = 'none'; }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        color: '#94A3B8',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '12px 18px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(180deg, #EA580C 0%, #C2410C 100%)',
-                    color: '#FFFFFF',
-                    border: '1px solid #C2410C',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '9px',
-                    boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
-                    transition: 'all 0.18s ease',
-                    opacity: isLoading ? 0.75 : 1
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) {
-                      e.currentTarget.style.background = 'linear-gradient(180deg, #C2410C 0%, #9A3412 100%)';
-                      e.currentTarget.style.boxShadow = '0 6px 18px rgba(234, 88, 12, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLoading) {
-                      e.currentTarget.style.background = 'linear-gradient(180deg, #EA580C 0%, #C2410C 100%)';
-                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(234, 88, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22)';
-                      e.currentTarget.style.transform = 'none';
-                    }
-                  }}
-                >
-                  <LogIn size={16} />
-                  <span>{isLoading ? 'Authenticating with Supabase...' : 'Sign In to Portal'}</span>
-                  {!isLoading && <ArrowRight size={15} />}
-                </button>
-              </form>
+                  <div style={{ marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotModal(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: '#EA580C',
+                          cursor: 'pointer',
+                          transition: 'color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#C2410C'; e.currentTarget.style.textDecoration = 'underline'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = '#EA580C'; e.currentTarget.style.textDecoration = 'none'; }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Enter account password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 38px 10px 38px',
+                          borderRadius: '10px',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '13.5px',
+                          color: '#0F172A',
+                          outline: 'none',
+                          transition: 'border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onFocus={(e) => handleInputFocus(e, 'student')}
+                        onBlur={handleInputBlur}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '12px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          padding: '3px',
+                          borderRadius: '4px',
+                          color: '#94A3B8',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.15)';
+                          e.currentTarget.style.color = '#EA580C';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                          e.currentTarget.style.color = '#94A3B8';
+                        }}
+                        onMouseDown={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(0.92)'}
+                        onMouseUp={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1.15)'}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '12px 18px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(180deg, #EA580C 0%, #C2410C 100%)',
+                      color: '#FFFFFF',
+                      border: '1px solid #C2410C',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '9px',
+                      boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+                      transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease',
+                      opacity: isLoading ? 0.78 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isLoading) {
+                        e.currentTarget.style.background = 'linear-gradient(180deg, #C2410C 0%, #9A3412 100%)';
+                        e.currentTarget.style.boxShadow = '0 6px 18px rgba(234, 88, 12, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isLoading) {
+                        e.currentTarget.style.background = 'linear-gradient(180deg, #EA580C 0%, #C2410C 100%)';
+                        e.currentTarget.style.boxShadow = '0 4px 14px rgba(234, 88, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22)';
+                        e.currentTarget.style.transform = 'none';
+                      }
+                    }}
+                    onMouseDown={(e) => { if (!isLoading) e.currentTarget.style.transform = 'scale(0.985) translateY(0)'; }}
+                    onMouseUp={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Authenticating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogIn size={16} />
+                        <span>Sign In to Portal</span>
+                        <ArrowRight size={15} />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
             )}
 
             {/* ================= MODE 2: REGISTRATION ================= */}
             {authMode === 'register' && (
-              <form onSubmit={handleRegisterSubmit}>
-                {/* Role Selector Pill */}
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                    Registering As:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setRegRole('student')}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        border: `1.5px solid ${regRole === 'student' ? '#EA580C' : '#E2E8F0'}`,
-                        backgroundColor: regRole === 'student' ? '#FFF7ED' : '#FFFFFF',
-                        color: regRole === 'student' ? '#C2410C' : '#64748B',
-                        fontSize: '12.5px',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <GraduationCap size={15} />
-                      <span>Student</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRegRole('faculty')}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        border: `1.5px solid ${regRole === 'faculty' ? '#059669' : '#E2E8F0'}`,
-                        backgroundColor: regRole === 'faculty' ? '#ECFDF5' : '#FFFFFF',
-                        color: regRole === 'faculty' ? '#047857' : '#64748B',
-                        fontSize: '12.5px',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Award size={15} />
-                      <span>Faculty</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Name & Email */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      Full Name
+              <div key="register-form" className="reg-form-container">
+                <form onSubmit={handleRegisterSubmit}>
+                  {/* Role Selector Pill */}
+                  <div className="reg-stagger-1" style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                      Registering As:
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Rahul Kumar"
-                      value={regName}
-                      onChange={(e) => setRegName(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12.5px'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      GMRIT Email
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="name@gmrit.edu.in"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12.5px'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Department & Identifier */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      Department
-                    </label>
-                    <select
-                      value={regDepartment}
-                      onChange={(e) => setRegDepartment(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12px',
-                        backgroundColor: '#FFFFFF'
-                      }}
-                    >
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.name || d.code}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      {regRole === 'student' ? 'Roll Number / JNTU ID' : 'Employee ID'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder={regRole === 'student' ? 'e.g. 21341A0588' : 'e.g. GMR-FAC-104'}
-                      value={regRole === 'student' ? regRollNumber : regEmployeeId}
-                      onChange={(e) => regRole === 'student' ? setRegRollNumber(e.target.value) : setRegEmployeeId(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12.5px'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Password & Confirm */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      Create Password
-                    </label>
-                    <input
-                      type={showRegPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Min 6 chars"
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12.5px'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      Confirm Password
-                    </label>
-                    <input
-                      type={showRegPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Re-enter password"
-                      value={regConfirmPassword}
-                      onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12.5px'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Password Strength Meter */}
-                {regPassword && (
-                  <div style={{ marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '10.5px', color: '#64748B' }}>Password Strength:</span>
-                      <span style={{ fontSize: '10.5px', fontWeight: 700, color: pwdStrength.color }}>{pwdStrength.label}</span>
-                    </div>
-                    <div style={{ height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${(pwdStrength.score / 3) * 100}%`,
-                        backgroundColor: pwdStrength.color,
-                        transition: 'width 0.2s ease, background-color 0.2s ease'
-                      }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setRegRole('student')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          padding: '9px 12px',
+                          borderRadius: '9px',
+                          border: `1.5px solid ${regRole === 'student' ? '#EA580C' : '#E2E8F0'}`,
+                          backgroundColor: regRole === 'student' ? '#FFF7ED' : '#FFFFFF',
+                          color: regRole === 'student' ? '#C2410C' : '#64748B',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: regRole === 'student' ? '0 2px 8px rgba(234, 88, 12, 0.15)' : 'none',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (regRole !== 'student') {
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (regRole !== 'student') {
+                            e.currentTarget.style.borderColor = '#E2E8F0';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.transform = 'none';
+                          }
+                        }}
+                        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                        onMouseUp={(e) => e.currentTarget.style.transform = regRole === 'student' ? 'none' : 'translateY(-1px)'}
+                      >
+                        <GraduationCap
+                          size={15}
+                          style={{
+                            transform: regRole === 'student' ? 'scale(1.14)' : 'scale(1)',
+                            transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        />
+                        <span>Student</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegRole('faculty')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          padding: '9px 12px',
+                          borderRadius: '9px',
+                          border: `1.5px solid ${regRole === 'faculty' ? '#059669' : '#E2E8F0'}`,
+                          backgroundColor: regRole === 'faculty' ? '#ECFDF5' : '#FFFFFF',
+                          color: regRole === 'faculty' ? '#047857' : '#64748B',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: regRole === 'faculty' ? '0 2px 8px rgba(5, 150, 105, 0.15)' : 'none',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (regRole !== 'faculty') {
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                            e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (regRole !== 'faculty') {
+                            e.currentTarget.style.borderColor = '#E2E8F0';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.transform = 'none';
+                          }
+                        }}
+                        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                        onMouseUp={(e) => e.currentTarget.style.transform = regRole === 'faculty' ? 'none' : 'translateY(-1px)'}
+                      >
+                        <Award
+                          size={15}
+                          style={{
+                            transform: regRole === 'faculty' ? 'scale(1.14)' : 'scale(1)',
+                            transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        />
+                        <span>Faculty</span>
+                      </button>
                     </div>
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '11px',
-                    borderRadius: '10px',
-                    backgroundColor: regRole === 'student' ? '#EA580C' : '#059669',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '13.5px',
-                    fontWeight: 700,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                  {/* Row 1: Full Name & Institutional GMRIT Email */}
+                  <div className="reg-grid-2col reg-stagger-2">
+                    <div>
+                      <label style={regLabelStyle}>
+                        Full Name <span style={{ color: regRole === 'student' ? '#EA580C' : '#059669' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Rahul Kumar"
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        style={regInputStyle}
+                        onFocus={(e) => handleInputFocus(e, regRole)}
+                        onBlur={handleInputBlur}
+                      />
+                    </div>
+                    <div>
+                      <label style={regLabelStyle}>
+                        Institutional GMRIT Email <span style={{ color: regRole === 'student' ? '#EA580C' : '#059669' }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="name@gmrit.edu.in"
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        style={regInputStyle}
+                        onFocus={(e) => handleInputFocus(e, regRole)}
+                        onBlur={handleInputBlur}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Conditional Fields based on Role */}
+                  <div key={regRole} className="reg-role-container">
+                    {regRole === 'student' ? (
+                      <>
+                        {/* Student Row 2: Department & Branch / Specialization */}
+                        <div className="reg-grid-2col reg-stagger-3">
+                          <div>
+                            <label style={regLabelStyle}>
+                              Department <span style={{ color: '#EA580C' }}>*</span>
+                            </label>
+                            <select
+                              value={regDepartment}
+                              onChange={(e) => setRegDepartment(e.target.value)}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'student')}
+                              onBlur={handleInputBlur}
+                            >
+                              <option value="CSE">Computer Science and Engineering (CSE)</option>
+                              {departments
+                                .filter(d => d.code && d.code !== 'CSE' && !['AIML', 'AIDS', 'CSE-AIML', 'CSE-AIDS'].includes(d.code))
+                                .map(d => (
+                                  <option key={d.id} value={d.id}>{d.name || d.code}</option>
+                                ))
+                              }
+                            </select>
+                          </div>
+                          <div>
+                            <label style={regLabelStyle}>
+                              Branch / Specialization <span style={{ color: '#EA580C' }}>*</span>
+                            </label>
+                            <select
+                              value={regBranch}
+                              onChange={(e) => setRegBranch(e.target.value)}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'student')}
+                              onBlur={handleInputBlur}
+                            >
+                              {MASTER_BRANCH_OPTIONS.map(b => (
+                                <option key={b.branch} value={b.branch}>
+                                  {b.displayName} — {b.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Student Row 3: Roll Number / JNTU ID & Academic Year */}
+                        <div className="reg-grid-2col reg-stagger-4">
+                          <div>
+                            <label style={regLabelStyle}>
+                              Roll Number / JNTU ID <span style={{ color: '#EA580C' }}>*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. 23341A4206"
+                              value={regRollNumber}
+                              onChange={(e) => setRegRollNumber(e.target.value.toUpperCase())}
+                              style={{ ...regInputStyle, textTransform: 'uppercase' }}
+                              onFocus={(e) => handleInputFocus(e, 'student')}
+                              onBlur={handleInputBlur}
+                            />
+                          </div>
+                          <div>
+                            <label style={regLabelStyle}>
+                              Current Academic Year of Study <span style={{ color: '#EA580C' }}>*</span>
+                            </label>
+                            <select
+                              value={regYear}
+                              onChange={(e) => {
+                                const newYear = e.target.value;
+                                setRegYear(newYear);
+                                const n = Number(newYear) || 1;
+                                setRegSemester(String(n * 2 - 1));
+                              }}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'student')}
+                              onBlur={handleInputBlur}
+                            >
+                              <option value="1">I Year (First Year)</option>
+                              <option value="2">II Year (Second Year)</option>
+                              <option value="3">III Year (Third Year)</option>
+                              <option value="4">IV Year (Final Year)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Student Row 4: Current Semester & Section */}
+                        <div className="reg-grid-2col reg-stagger-5">
+                          <div>
+                            <label style={regLabelStyle}>
+                              Current Semester <span style={{ color: '#EA580C' }}>*</span>
+                            </label>
+                            <select
+                              value={regSemester}
+                              onChange={(e) => setRegSemester(e.target.value)}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'student')}
+                              onBlur={handleInputBlur}
+                            >
+                              <option value="1">Semester 1 (I-1)</option>
+                              <option value="2">Semester 2 (I-2)</option>
+                              <option value="3">Semester 3 (II-1)</option>
+                              <option value="4">Semester 4 (II-2)</option>
+                              <option value="5">Semester 5 (III-1)</option>
+                              <option value="6">Semester 6 (III-2)</option>
+                              <option value="7">Semester 7 (IV-1)</option>
+                              <option value="8">Semester 8 (IV-2)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={regLabelStyle}>
+                              Section <span style={{ color: '#EA580C' }}>*</span>
+                            </label>
+                            <select
+                              value={regSection}
+                              onChange={(e) => setRegSection(e.target.value)}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'student')}
+                              onBlur={handleInputBlur}
+                            >
+                              <option value="A">Section A</option>
+                              <option value="B">Section B</option>
+                              <option value="C">Section C</option>
+                              <option value="D">Section D</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Faculty Row 2: Department & Employee ID */}
+                        <div className="reg-grid-2col reg-stagger-3">
+                          <div>
+                            <label style={regLabelStyle}>
+                              Department <span style={{ color: '#059669' }}>*</span>
+                            </label>
+                            <select
+                              value={regDepartment}
+                              onChange={(e) => setRegDepartment(e.target.value)}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'faculty')}
+                              onBlur={handleInputBlur}
+                            >
+                              <option value="CSE">Computer Science and Engineering (CSE)</option>
+                              {departments
+                                .filter(d => d.code && d.code !== 'CSE')
+                                .map(d => (
+                                  <option key={d.id} value={d.id}>{d.name || d.code}</option>
+                                ))
+                              }
+                            </select>
+                          </div>
+                          <div>
+                            <label style={regLabelStyle}>
+                              Employee ID <span style={{ color: '#059669' }}>*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. GMR-FAC-104"
+                              value={regEmployeeId}
+                              onChange={(e) => setRegEmployeeId(e.target.value.toUpperCase())}
+                              style={{ ...regInputStyle, textTransform: 'uppercase' }}
+                              onFocus={(e) => handleInputFocus(e, 'faculty')}
+                              onBlur={handleInputBlur}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Faculty Row 3: Designation & Institutional Unit */}
+                        <div className="reg-grid-2col reg-stagger-4">
+                          <div>
+                            <label style={regLabelStyle}>
+                              Designation <span style={{ color: '#059669' }}>*</span>
+                            </label>
+                            <select
+                              value={regDesignation}
+                              onChange={(e) => setRegDesignation(e.target.value)}
+                              style={regInputStyle}
+                              onFocus={(e) => handleInputFocus(e, 'faculty')}
+                              onBlur={handleInputBlur}
+                            >
+                              <option value="Assistant Professor">Assistant Professor</option>
+                              <option value="Associate Professor">Associate Professor</option>
+                              <option value="Professor">Professor</option>
+                              <option value="Head of Department (HOD)">Head of Department (HOD)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={regLabelStyle}>
+                              Academic Assignment Scope
+                            </label>
+                            <input
+                              type="text"
+                              disabled
+                              value="Teaching & Mentorship"
+                              style={{
+                                ...regInputStyle,
+                                backgroundColor: '#F8FAFC',
+                                color: '#64748B',
+                                cursor: 'not-allowed'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Password & Confirm Password */}
+                  <div className="reg-grid-2col reg-stagger-6" style={{ marginBottom: '10px' }}>
+                    <div>
+                      <label style={regLabelStyle}>
+                        Create Password <span style={{ color: regRole === 'student' ? '#EA580C' : '#059669' }}>*</span>
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showRegPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Min 6 characters"
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          style={{ ...regInputStyle, paddingRight: '36px' }}
+                          onFocus={(e) => handleInputFocus(e, regRole)}
+                          onBlur={handleInputBlur}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegPassword(!showRegPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            padding: '2px',
+                            borderRadius: '4px',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), color 0.16s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-50%) scale(1.15)';
+                            e.currentTarget.style.color = regRole === 'student' ? '#EA580C' : '#059669';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                            e.currentTarget.style.color = '#94A3B8';
+                          }}
+                          aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={regLabelStyle}>
+                        Confirm Password <span style={{ color: regRole === 'student' ? '#EA580C' : '#059669' }}>*</span>
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showRegConfirmPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Re-enter password"
+                          value={regConfirmPassword}
+                          onChange={(e) => setRegConfirmPassword(e.target.value)}
+                          style={{ ...regInputStyle, paddingRight: '36px' }}
+                          onFocus={(e) => handleInputFocus(e, regRole)}
+                          onBlur={handleInputBlur}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            padding: '2px',
+                            borderRadius: '4px',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), color 0.16s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-50%) scale(1.15)';
+                            e.currentTarget.style.color = regRole === 'student' ? '#EA580C' : '#059669';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                            e.currentTarget.style.color = '#94A3B8';
+                          }}
+                          aria-label={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showRegConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Password Strength Meter */}
+                  {regPassword && (
+                    <div className="animate-notice-down" style={{ marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10.5px', color: '#64748B', fontWeight: 600 }}>Password Strength:</span>
+                        <span style={{
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          color: pwdStrength.color,
+                          transition: 'color 0.25s ease'
+                        }}>
+                          {pwdStrength.label}
+                        </span>
+                      </div>
+                      <div style={{ height: '4.5px', backgroundColor: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${(pwdStrength.score / 3) * 100}%`,
+                          backgroundColor: pwdStrength.color,
+                          boxShadow: pwdStrength.score > 0 ? `0 0 6px ${pwdStrength.color}88` : 'none',
+                          transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease, box-shadow 0.25s ease'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status Notice */}
+                  <div className="reg-stagger-7" style={{
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    backgroundColor: regRole === 'student' ? '#FFF7ED' : '#ECFDF5',
+                    border: `1px solid ${regRole === 'student' ? '#FED7AA' : '#A7F3D0'}`,
+                    color: regRole === 'student' ? '#9A3412' : '#065F46',
+                    fontSize: '11px',
+                    lineHeight: 1.4,
+                    marginBottom: '14px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
                     gap: '8px',
-                    marginTop: '10px'
-                  }}
-                >
-                  <UserPlus size={15} />
-                  <span>{isLoading ? 'Submitting Registration...' : 'Submit for Administrator Approval'}</span>
-                </button>
-              </form>
+                    transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease'
+                  }}>
+                    <ShieldCheck size={14} style={{ flexShrink: 0 }} />
+                    <span>
+                      Newly registered accounts are placed in <strong>Pending Approval</strong> state until verified by the Academic IT Cell.
+                    </span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="reg-stagger-8"
+                    style={{
+                      width: '100%',
+                      padding: '11.5px',
+                      borderRadius: '10px',
+                      backgroundColor: regRole === 'student' ? '#EA580C' : '#059669',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      fontSize: '13.5px',
+                      fontWeight: 700,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: regRole === 'student'
+                        ? '0 4px 14px rgba(234, 88, 12, 0.3)'
+                        : '0 4px 14px rgba(5, 150, 105, 0.3)',
+                      transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease',
+                      opacity: isLoading ? 0.78 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isLoading) {
+                        e.currentTarget.style.backgroundColor = regRole === 'student' ? '#C2410C' : '#047857';
+                        e.currentTarget.style.boxShadow = regRole === 'student'
+                          ? '0 6px 18px rgba(234, 88, 12, 0.45)'
+                          : '0 6px 18px rgba(5, 150, 105, 0.45)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isLoading) {
+                        e.currentTarget.style.backgroundColor = regRole === 'student' ? '#EA580C' : '#059669';
+                        e.currentTarget.style.boxShadow = regRole === 'student'
+                          ? '0 4px 14px rgba(234, 88, 12, 0.3)'
+                          : '0 4px 14px rgba(5, 150, 105, 0.3)';
+                        e.currentTarget.style.transform = 'none';
+                      }
+                    }}
+                    onMouseDown={(e) => { if (!isLoading) e.currentTarget.style.transform = 'scale(0.985) translateY(0)'; }}
+                    onMouseUp={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Submitting Registration...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={15} />
+                        <span>Submit for Administrator Approval</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
             )}
 
             {/* Footer Trust Guarantee */}

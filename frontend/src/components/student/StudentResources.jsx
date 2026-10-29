@@ -6,7 +6,7 @@ import ragDocumentService from '../../services/ragDocumentService';
 import { 
   FolderDown, BookOpen, FileText, Download, Sparkles, Filter, 
   Search, ExternalLink, Bookmark, CheckCircle2, User, Calendar, 
-  Layers, Eye, Loader2 
+  Layers, Eye, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react';
 import EmptyState from '../common/EmptyState';
 
@@ -17,10 +17,12 @@ export default function StudentResources({ onOpenPdf, onOpenRagQuery }) {
   const [subjects, setSubjects] = useState([]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
 
   const fetchStudentData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const currentUser = authService.getCurrentUser();
       const studentId = currentUser?.id || currentUser?.userId;
@@ -37,9 +39,10 @@ export default function StudentResources({ onOpenPdf, onOpenRagQuery }) {
         if (allSubs?.data) setSubjects(allSubs.data);
       }
 
-      setResources(studentDocs || []);
+      setResources(Array.isArray(studentDocs) ? studentDocs : (studentDocs?.data || []));
     } catch (err) {
       console.warn('StudentResources: could not fetch student academic data:', err);
+      setError(err.message || 'Failed to retrieve course resources.');
       setResources([]);
     } finally {
       setLoading(false);
@@ -194,19 +197,36 @@ export default function StudentResources({ onOpenPdf, onOpenRagQuery }) {
         </div>
       </div>
 
+      {/* Error State */}
+      {error && !loading && (
+        <div className="card" style={{ padding: '24px', backgroundColor: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <AlertCircle size={22} color="#DC2626" />
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#991B1B' }}>Failed to Load Course Resources</h3>
+              <p style={{ fontSize: '13px', margin: '4px 0 0 0', color: '#B91C1C' }}>{error}</p>
+            </div>
+          </div>
+          <button onClick={fetchStudentData} className="btn btn-primary btn-sm" style={{ backgroundColor: '#DC2626', borderColor: '#DC2626' }}>
+            <RefreshCw size={13} />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
+
       {/* Resources Grid */}
       {loading ? (
         <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
           <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 10px auto', color: 'var(--color-primary)' }} />
           <p style={{ margin: 0, fontSize: '14px' }}>Loading your verified course resources...</p>
         </div>
-      ) : filteredResources.length === 0 ? (
+      ) : filteredResources.length === 0 && !error ? (
         <div className="card" style={{ padding: '30px' }}>
           <EmptyState
             icon={BookOpen}
-            title="No Course Resources Found"
-            description="No lecture notes or course materials match your current category or search criteria."
-            actionText="Reset Filters"
+            title="No course resources uploaded yet."
+            description="No lecture notes, lab manuals, or course materials have been uploaded for your cohort yet."
+            actionText={selectedCategory !== 'All' || selectedSubject !== 'All' || searchQuery ? "Reset Filters" : undefined}
             onAction={() => {
               setSelectedCategory('All');
               setSelectedSubject('All');

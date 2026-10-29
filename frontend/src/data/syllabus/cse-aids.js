@@ -361,7 +361,7 @@ export const cseAIDSSyllabus = {
     {
       semester: 7,
       title: '7th Semester',
-      description: 'FSI Track Prerequisite or Career Path Professional Elective V',
+      description: 'FSI Track Prerequisite or Career Path Professional Electives',
       subjects: [],
       careerPathSubjects: [],
       fsiConfig: {
@@ -404,6 +404,35 @@ export const cseAIDSSyllabus = {
             category: 'career_path',
             description: 'Cloud vulnerability assessment, identity federation, cryptographic key management, security monitoring, and regulatory compliance.'
           }
+        ],
+        nonFsiElectiveGroups: [
+          {
+            groupName: 'Professional Elective VI',
+            rule: 'Choose one of the following electives (Non-FSI Track):',
+            options: [
+              {
+                code: '23DS002',
+                name: 'Data Visualization with Power BI',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Interactive dashboard engineering, DAX queries, data modeling, reporting ETL pipelines, and business intelligence.'
+              },
+              {
+                code: '23CS015',
+                name: 'Software Project Management',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Agile project delivery, sprint planning, risk mitigation, software estimation techniques, and stakeholder management.'
+              },
+              {
+                code: '23ML003',
+                name: 'Reinforcement Learning',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Markov decision processes, Q-learning, policy gradients, deep RL (DQN, PPO), and multi-agent reinforcement learning.'
+              }
+            ]
+          }
         ]
       }
     },
@@ -411,38 +440,48 @@ export const cseAIDSSyllabus = {
       semester: 8,
       title: '8th Semester',
       description: 'Capstone Industry Experience & Professional Elective VIII',
-      subjects: [
-        {
+      subjects: [],
+      careerPathSubjects: [],
+      electiveGroups: [],
+      fsiConfig: {
+        fsiSubject: {
           code: '23FIX01',
           name: 'Full Semester Internship (FSI)',
           credits: 10,
-          type: 'Internship',
-          category: 'internship',
+          type: 'Internship / FSI Requirement',
+          category: 'fsi_subject',
           description: 'Full semester immersive industrial or research internship in verified technology organizations and research institutions.'
-        }
-      ],
-      electiveGroups: [
-        {
-          groupName: 'Professional Elective VIII',
-          rule: 'Choose one of the following electives:',
-          options: [
-            {
-              code: '23CS018',
-              name: 'Information Retrieval Systems',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'Inverted indexing, vector space models, probabilistic retrieval, web crawling, ranking algorithms, and search evaluation.'
-            },
-            {
-              code: '23CS019',
-              name: 'Fundamentals of DevOps',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'CI/CD pipeline automation, automated testing, containerized deployments, monitoring, and cloud infrastructure management.'
-            }
-          ]
-        }
-      ]
+        },
+        nonFsiElectiveGroups: [
+          {
+            groupName: 'Professional Elective VIII',
+            rule: 'Choose one of the following electives (Non-FSI Track):',
+            options: [
+              {
+                code: '23CS018',
+                name: 'Information Retrieval Systems',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Inverted indexing, vector space models, probabilistic retrieval, web crawling, ranking algorithms, and search evaluation.'
+              },
+              {
+                code: '23CS019',
+                name: 'Fundamentals of DevOps',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'CI/CD pipeline automation, automated testing, containerized deployments, monitoring, and cloud infrastructure management.'
+              },
+              {
+                code: '23DS003',
+                name: 'Cyber Security',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Threat modeling, network penetration testing, malware analysis, cryptography protocols, and security operations.'
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 };

@@ -312,38 +312,7 @@ export const cseSyllabus = {
       title: '7th Semester',
       description: 'Advanced Cloud/Language Engineering & FSI Track Specialization',
       subjects: [],
-      careerPathSubjects: [
-        {
-          careerPathId: 'aiml',
-          careerPathName: 'AI & ML',
-          code: '23CSC13',
-          name: 'Natural Language Processing',
-          credits: 3,
-          type: 'Career Path Elective',
-          category: 'career_path',
-          description: 'Statistical language models, tokenization, POS tagging, syntactic parsing, semantic analysis, and transformer-based NLP.'
-        },
-        {
-          careerPathId: 'fsd',
-          careerPathName: 'Full Stack Developer',
-          code: '23CSC23',
-          name: 'Web Application Databases',
-          credits: 3,
-          type: 'Career Path Elective',
-          category: 'career_path',
-          description: 'NoSQL document databases, distributed caching (Redis), schema migrations, query optimization, and database clustering.'
-        },
-        {
-          careerPathId: 'cloud',
-          careerPathName: 'Cloud Computing',
-          code: '23MLC33',
-          name: 'Cloud Security Essentials',
-          credits: 3,
-          type: 'Career Path Elective',
-          category: 'career_path',
-          description: 'Cloud vulnerability assessment, identity federation, cryptographic key management, security monitoring, and regulatory compliance.'
-        }
-      ],
+      careerPathSubjects: [],
       fsiConfig: {
         fsiSubject: {
           code: '23CS019',
@@ -353,78 +322,115 @@ export const cseSyllabus = {
           category: 'fsi_subject',
           description: 'Continuous integration and continuous deployment (CI/CD) pipelines, containerization with Docker, Kubernetes orchestration, and automated infrastructure as code.'
         },
-        nonFsiElectiveGroup: {
-          groupName: 'Professional Elective V',
-          rule: 'Offered for Non-FSI Track students:',
-          options: [
-            {
-              code: '23IT010',
-              name: 'Social Network Analysis',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'Network graph models, centrality measures, community detection algorithms, link prediction, and information diffusion.'
-            },
-            {
-              code: '23CS011',
-              name: 'Optimization Techniques',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'Linear programming, simplex method, duality, non-linear programming, integer programming, and dynamic optimization.'
-            },
-            {
-              code: '23CS012',
-              name: 'Wireless Adhoc Networks',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'Ad-hoc routing protocols (AODV, DSR), MAC protocols, wireless sensor network architectures, and security challenges.'
-            }
-          ]
-        }
+        nonFsiCareerPathSubjects: [
+          {
+            careerPathId: 'aiml',
+            careerPathName: 'AI & ML',
+            code: '23CSC13',
+            name: 'Natural Language Processing',
+            credits: 3,
+            type: 'Professional Elective V',
+            category: 'career_path',
+            description: 'Statistical language models, tokenization, POS tagging, syntactic parsing, semantic analysis, and transformer-based NLP.'
+          },
+          {
+            careerPathId: 'fsd',
+            careerPathName: 'Full Stack Developer',
+            code: '23CSC23',
+            name: 'Web Application Databases',
+            credits: 3,
+            type: 'Professional Elective V',
+            category: 'career_path',
+            description: 'NoSQL document databases, distributed caching (Redis), schema migrations, query optimization, and database clustering.'
+          },
+          {
+            careerPathId: 'cloud',
+            careerPathName: 'Cloud Computing',
+            code: '23MLC33',
+            name: 'Cloud Security Essentials',
+            credits: 3,
+            type: 'Professional Elective V',
+            category: 'career_path',
+            description: 'Cloud vulnerability assessment, identity federation, cryptographic key management, security monitoring, and regulatory compliance.'
+          }
+        ],
+        nonFsiElectiveGroups: [
+          {
+            groupName: 'Professional Elective VI',
+            rule: 'Choose one of the following electives (Non-FSI Track):',
+            options: [
+              {
+                code: '23CS014',
+                name: 'Green Computing',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Energy-efficient architectures, green data centers, carbon footprint reduction, and sustainable software engineering.'
+              },
+              {
+                code: '23CS015',
+                name: 'Software Project Management',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Agile project delivery, sprint planning, risk mitigation, software estimation techniques, and stakeholder management.'
+              },
+              {
+                code: '23CS016',
+                name: 'Soft Computing',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Fuzzy logic systems, evolutionary algorithms, hybrid genetic-neural models, and approximate reasoning.'
+              }
+            ]
+          }
+        ]
       }
     },
     {
       semester: 8,
       title: '8th Semester',
       description: 'Capstone Industry Experience & Advanced Professional Electives',
-      subjects: [
-        {
+      subjects: [],
+      careerPathSubjects: [],
+      electiveGroups: [],
+      fsiConfig: {
+        fsiSubject: {
           code: '23FIX01',
           name: 'Full Semester Internship (FSI)',
           credits: 10,
-          type: 'Internship',
-          category: 'internship',
+          type: 'Internship / FSI Requirement',
+          category: 'fsi_subject',
           description: 'Full semester immersive industrial or research internship in verified technology organizations and research institutions.'
-        }
-      ],
-      electiveGroups: [
-        {
-          groupName: 'Professional Elective VIII',
-          rule: 'Choose one of the following electives:',
-          options: [
-            {
-              code: '23CS017',
-              name: 'Fundamentals of Social Network Analysis',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'Graph representation of social ties, centrality metrics, influence maximization, and semantic web graphs.'
-            },
-            {
-              code: '23CS018',
-              name: 'Information Retrieval Systems',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'Inverted indexing, vector space models, probabilistic retrieval, web crawling, ranking algorithms, and search evaluation.'
-            },
-            {
-              code: '23CS019',
-              name: 'Fundamentals of DevOps',
-              credits: 3,
-              type: 'Professional Elective',
-              description: 'CI/CD pipeline automation, automated testing, containerized deployments, monitoring, and cloud infrastructure management.'
-            }
-          ]
-        }
-      ]
+        },
+        nonFsiElectiveGroups: [
+          {
+            groupName: 'Professional Elective VIII',
+            rule: 'Choose one of the following electives (Non-FSI Track):',
+            options: [
+              {
+                code: '23CS017',
+                name: 'Fundamentals of Social Network Analysis',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Graph representation of social ties, centrality metrics, influence maximization, and semantic web graphs.'
+              },
+              {
+                code: '23CS018',
+                name: 'Information Retrieval Systems',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'Inverted indexing, vector space models, probabilistic retrieval, web crawling, ranking algorithms, and search evaluation.'
+              },
+              {
+                code: '23CS019',
+                name: 'Fundamentals of DevOps',
+                credits: 3,
+                type: 'Professional Elective',
+                description: 'CI/CD pipeline automation, automated testing, containerized deployments, monitoring, and cloud infrastructure management.'
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 };

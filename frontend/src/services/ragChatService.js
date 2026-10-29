@@ -97,6 +97,23 @@ export class RagChatService {
         };
       }
 
+      // 2b. Restrict Faculty Access to student AI Copilot
+      const userRole = userData.user.user_metadata?.role || (await (async () => {
+        try {
+          const { data } = await supabase.from('users').select('role').eq('id', userData.user.id).maybeSingle();
+          return data?.role;
+        } catch { return null; }
+      })());
+      if (userRole === 'faculty') {
+        return {
+          success: false,
+          error: 'Faculty access to the Student AI Academic Copilot is restricted.',
+          question: cleanQuestion,
+          context: { question: cleanQuestion, chunks: [] },
+          sources: []
+        };
+      }
+
       // 3. Generate query embedding using multilingual-e5-small with 'query: ' prefix
       const queryVec = await ragIngestionService.generateEmbedding(cleanQuestion, true);
 
@@ -290,16 +307,154 @@ export class RagChatService {
   }
 
   /**
-   * Stage 3B: Full RAG Question Answering Pipeline
-   * 1. Performs Stage 3A Permission-Aware Retrieval
-   * 2. If 0 chunks retrieved -> returns safe insufficient-context response (No Groq call)
-   * 3. If chunks retrieved -> invokes secure server-side 'rag-answer' Edge Function with Groq
-   * 4. Merges authoritative Stage 3A source metadata with Groq grounded answer
+  /**
+   * DeepExtract LangGraph RAG Question Answering Pipeline:
+   * 1. Authenticates session token & verifies student/admin authorization
+   * 2. Generates E5 query embedding with 'query: ' prefix
+   * 3. Invokes backend DeepExtract LangGraph service (/api/rag/chat)
+   * 4. Enforces query classification, bounded retry, untrusted data isolation, and verified source citations
+   * 5. Maintains automatic fallback to Supabase Edge Function if backend service is unreachable
    */
   async askQuestionWithAnswer(question, options = {}) {
-    // 1. Execute Stage 3A retrieval
-    const retrieval = await this.askQuestion(question, options);
+    const val = this.validateQuestion(question);
+    if (!val.valid) {
+      return {
+        success: false,
+        question: question || '',
+        answer: null,
+        error: val.error,
+        sources: [],
+        retrieval: { chunkCount: 0, topSimilarity: 0 }
+      };
+    }
 
+    const cleanQuestion = val.cleanQuestion;
+
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        question: cleanQuestion,
+        answer: null,
+        error: 'Supabase client is not configured.',
+        sources: [],
+        retrieval: { chunkCount: 0, topSimilarity: 0 }
+      };
+    }
+
+    // 1. Verify user session & enforce faculty guard
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    if (sessionErr || !token) {
+      return {
+        success: false,
+        question: cleanQuestion,
+        answer: null,
+        error: 'Authentication required. Please sign in to access academic RAG knowledge.',
+        sources: [],
+        retrieval: { chunkCount: 0, topSimilarity: 0 }
+      };
+    }
+
+    const user = sessionData.session.user;
+    const userRole = user?.user_metadata?.role || (await (async () => {
+      try {
+        const { data } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+        return data?.role;
+      } catch { return null; }
+    })());
+
+    if (userRole === 'faculty') {
+      return {
+        success: false,
+        question: cleanQuestion,
+        answer: null,
+        error: 'Faculty access to the Student AI Academic Copilot is restricted.',
+        sources: [],
+        retrieval: { chunkCount: 0, topSimilarity: 0 }
+      };
+    }
+
+    // 2. Generate E5 query vector with 'query: ' prefix
+    let queryVec = null;
+    try {
+      queryVec = await ragIngestionService.generateEmbedding(cleanQuestion, true);
+    } catch (embErr) {
+      console.warn('[RagChatService] Client-side embedding generation failed; backend will generate vector:', embErr);
+    }
+
+    // 3. Primary Path: Invoke backend DeepExtract RAG workflow
+    const backendBaseUrl = typeof window !== 'undefined' && window.__VITE_BACKEND_URL__
+      ? window.__VITE_BACKEND_URL__
+      : 'http://localhost:8000';
+
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/rag/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          question: cleanQuestion,
+          query_vector: queryVec,
+          options: {
+            maxChunks: options.maxChunks || 5,
+            score_threshold: options.score_threshold || 0.60,
+            subjectId: options.subjectId || null,
+            departmentId: options.departmentId || null,
+            documentId: options.documentId || null
+          }
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const formattedSources = (data.sources || []).map(s => ({
+            documentId: s.document_id,
+            title: s.document_name || 'Academic Document',
+            fileName: s.file_name || 'document.pdf',
+            storagePath: s.storage_path || '',
+            storage_path: s.storage_path || '',
+            page: s.page_number || null,
+            chunkIndex: s.chunk_index,
+            similarity: s.score ?? s.similarity,
+            excerpt: s.excerpt || ''
+          }));
+
+          return {
+            success: true,
+            question: cleanQuestion,
+            answer: data.answer,
+            grounded: data.grounded,
+            sources: formattedSources,
+            retrieval: {
+              chunkCount: data.retrieval?.chunkCount ?? formattedSources.length,
+              topSimilarity: data.retrieval?.topSimilarity ?? (formattedSources[0]?.similarity || 0),
+              model: 'Groq (DeepExtract LangGraph)',
+              classification: data.retrieval?.classification,
+              retryCount: data.retrieval?.retryCount || 0
+            }
+          };
+        }
+      } else if (response.status === 403) {
+        const errJson = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          question: cleanQuestion,
+          answer: null,
+          error: errJson.detail || 'Access restricted by institutional policy.',
+          sources: [],
+          retrieval: { chunkCount: 0, topSimilarity: 0 }
+        };
+      }
+    } catch (backendErr) {
+      console.warn('[RagChatService] DeepExtract backend unreachable, falling back to Edge Function:', backendErr.message);
+    }
+
+    // 4. Fallback Path: Stage 3A Retrieval + Supabase Edge Function
+    const retrieval = await this.askQuestion(question, options);
     if (!retrieval.success) {
       return {
         success: false,
@@ -307,50 +462,32 @@ export class RagChatService {
         answer: null,
         error: retrieval.error,
         sources: [],
-        retrieval: {
-          chunkCount: 0,
-          topSimilarity: 0
-        }
+        retrieval: { chunkCount: 0, topSimilarity: 0 }
       };
     }
 
     const chunks = retrieval.context?.chunks || [];
-
-    // 2. Empty Context Check: Do not call Groq if no permission-authorized chunks exist
     if (chunks.length === 0) {
       return {
         success: true,
         question: retrieval.question,
         answer: "I couldn't find enough information in the available documents to answer that question.",
         sources: [],
-        retrieval: {
-          chunkCount: 0,
-          topSimilarity: 0
-        }
+        retrieval: { chunkCount: 0, topSimilarity: 0 }
       };
     }
 
-    // 3. Invoke secure server-side Edge Function for Groq generation
     try {
       const { data: fnData, error: fnError } = await supabase.functions.invoke('rag-answer', {
         body: {
           question: retrieval.question,
           context: chunks,
-          options: {
-            maxChunks: options.maxChunks || 5
-          }
+          options: { maxChunks: options.maxChunks || 5 }
         }
       });
 
       if (fnError || !fnData?.success) {
         let errorMsg = fnData?.error || fnError?.message || 'Failed to generate answer from AI service.';
-        if (fnError?.context && typeof fnError.context.json === 'function') {
-          try {
-            const errJson = await fnError.context.json();
-            if (errJson?.error) errorMsg = errJson.error;
-          } catch (_) {}
-        }
-
         return {
           success: false,
           question: retrieval.question,
@@ -375,9 +512,7 @@ export class RagChatService {
           model: fnData.model
         }
       };
-
     } catch (edgeErr) {
-      console.error('[RagChatService] askQuestionWithAnswer edge error:', edgeErr);
       return {
         success: false,
         question: retrieval.question,

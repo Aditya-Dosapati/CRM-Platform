@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Code2,
   Terminal,
@@ -30,9 +30,21 @@ import {
 import CodingWorkspaceModal from '../coding/CodingWorkspaceModal.jsx';
 import useSafeTimeout from '../../hooks/useSafeTimeout';
 import useEscapeKey from '../../hooks/useEscapeKey';
+import codingAssessmentService from '../../services/codingAssessmentService.js';
 
 export default function FacultyCodingManagement({ onOpenRagQuery }) {
-  const [assessments, setAssessments] = useState(codingAssessmentsList);
+  const [assessments, setAssessments] = useState(() => {
+    return codingAssessmentService.getAssessments({ user: null });
+  });
+
+  useEffect(() => {
+    const unsubscribe = codingAssessmentService.subscribe(() => {
+      setAssessments(codingAssessmentService.getAssessments({ user: null }));
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
   const [problems, setProblems] = useState(codingProblemsList);
   const [activeTab, setActiveTab] = useState('assessments'); // 'assessments' | 'problems' | 'struggles'
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,7 +167,8 @@ export default function FacultyCodingManagement({ onOpenRagQuery }) {
       questionIds: newAssessment.selectedProblemIds
     };
 
-    setAssessments(prev => [created, ...prev]);
+    codingAssessmentService.saveAssessment(created);
+    setAssessments(codingAssessmentService.getAssessments({ user: null }));
     setIsCreateAssessmentOpen(false);
     showToast(`Assessment "${newAssessment.title}" created & scheduled!`);
   };
