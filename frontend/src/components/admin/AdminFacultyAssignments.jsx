@@ -1525,8 +1525,6 @@ export default function AdminFacultyAssignments() {
                             style={{ fontSize: '12.5px', height: '38px' }}
                           >
                             <option value="AR23">AR23</option>
-                            <option value="R20">R20</option>
-                            <option value="R23">R23</option>
                           </select>
                         </div>
 

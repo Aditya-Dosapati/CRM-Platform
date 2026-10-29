@@ -52,18 +52,236 @@ export const MASTER_SUBJECTS = [
   { id: 'sub-se-6', code: '23CS603', name: 'Software Engineering & Agile Methodologies', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
   { id: 'sub-nlp-6', code: '23ML601', name: 'Natural Language Processing', semester: 6, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
 
-  // Semester 7 (4th Year)
-  { id: 'sub-llm-7', code: '23ML002', name: 'Large Language Models', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: '835f1428-d1ec-47b9-87e0-d281feba4234' },
-  { id: 'sub-ai-7', code: '23ML302', name: 'Artificial Intelligence', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
-  { id: 'sub-nlp-7', code: '23CSC13', name: 'Natural Language Processing', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
-  { id: 'sub-ml-7', code: '23CS502', name: 'Machine Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'PROFESSIONAL_ELECTIVE', departmentId: 'dept-cse' },
-  { id: 'sub-cloud-devops-7', code: '23CS701', name: 'Cloud Computing & DevOps', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
-  { id: 'sub-bda-7', code: '23CS702', name: 'Big Data Analytics', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
-  { id: 'sub-dl-7', code: '23ML701', name: 'Deep Learning & Reinforcement Learning', semester: 7, credits: 3, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-aiml' },
-  { id: 'sub-proj-7', code: '23CS703', name: 'Full Stack Capstone Project', semester: 7, credits: 4, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' },
+    // Semester 7 (4th Year) - AR23 Authoritative Curriculum
+  // FSI Prerequisite Subject (FSI Track)
+  {
+    id: 'sub-devops-7',
+    code: '23CS019',
+    name: 'Fundamentals of DevOps',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'FSI_REQUIREMENT',
+    electiveGroup: 'FSI Prerequisite',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  // Elective V (Career Path Electives - Non-FSI Track)
+  {
+    id: 'sub-nlp-7',
+    code: '23CSC13',
+    name: 'Natural Language Processing',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective V',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse'],
+    departmentCodes: ['CSE']
+  },
+  {
+    id: 'sub-convai-7',
+    code: '23MLC13',
+    name: 'Conversational AI',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective V',
+    departmentId: 'dept-aiml',
+    departmentIds: ['dept-aiml', 'dept-aids'],
+    departmentCodes: ['AIML', 'AIDS']
+  },
+  {
+    id: 'sub-webdb-7',
+    code: '23CSC23',
+    name: 'Web Application Databases',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective V',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  {
+    id: 'sub-cloudsec-7',
+    code: '23MLC33',
+    name: 'Cloud Security Essentials',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective V',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  // Elective VI (Professional Elective - Non-FSI Track)
+  // 23ML002 Large Language Models is STRICTLY for AIML only
+  {
+    id: 'sub-llm-7',
+    code: '23ML002',
+    name: 'Large Language Models',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VI',
+    departmentId: 'dept-aiml',
+    departmentIds: ['dept-aiml'],
+    departmentCodes: ['AIML']
+  },
+  {
+    id: 'sub-powerbi-7',
+    code: '23DS002',
+    name: 'Data Visualization with Power BI',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VI',
+    departmentId: 'dept-aids',
+    departmentIds: ['dept-aids'],
+    departmentCodes: ['AIDS']
+  },
+  {
+    id: 'sub-greencomp-7',
+    code: '23CS014',
+    name: 'Green Computing',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VI',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse'],
+    departmentCodes: ['CSE']
+  },
+  {
+    id: 'sub-spm-7',
+    code: '23CS015',
+    name: 'Software Project Management',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VI',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  {
+    id: 'sub-softcomp-7',
+    code: '23CS016',
+    name: 'Soft Computing',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VI',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse'],
+    departmentCodes: ['CSE']
+  },
+  {
+    id: 'sub-rl-7',
+    code: '23ML003',
+    name: 'Reinforcement Learning',
+    semester: 7,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VI',
+    departmentId: 'dept-aiml',
+    departmentIds: ['dept-aiml', 'dept-aids'],
+    departmentCodes: ['AIML', 'AIDS']
+  },
 
-  // Semester 8 (4th Year)
-  { id: 'sub-major-proj-8', code: '23CS801', name: 'Major Project / Industry Internship', semester: 8, credits: 10, regulation: 'AR23', subjectType: 'CORE', departmentId: 'dept-cse' }
+  // Semester 8 (4th Year) - AR23 Authoritative Curriculum
+  // FSI Capstone Internship (FSI Track)
+  {
+    id: 'sub-fsi-8',
+    code: '23FIX01',
+    name: 'Full Semester Internship (FSI)',
+    semester: 8,
+    credits: 10,
+    regulation: 'AR23',
+    subjectType: 'INTERNSHIP',
+    electiveGroup: 'FSI Track',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  {
+    id: 'sub-major-proj-8',
+    code: '23CS801',
+    name: 'Major Project / Industry Internship',
+    semester: 8,
+    credits: 10,
+    regulation: 'AR23',
+    subjectType: 'CORE',
+    electiveGroup: 'Capstone',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  // Elective VIII (Professional Elective VIII - Non-FSI Track)
+  {
+    id: 'sub-sna-8',
+    code: '23CS017',
+    name: 'Fundamentals of Social Network Analysis',
+    semester: 8,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VIII',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse'],
+    departmentCodes: ['CSE']
+  },
+  {
+    id: 'sub-irs-8',
+    code: '23CS018',
+    name: 'Information Retrieval Systems',
+    semester: 8,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VIII',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  {
+    id: 'sub-devops-8',
+    code: '23CS019',
+    name: 'Fundamentals of DevOps',
+    semester: 8,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VIII',
+    departmentId: 'dept-cse',
+    departmentIds: ['dept-cse', 'dept-aiml', 'dept-aids'],
+    departmentCodes: ['CSE', 'AIML', 'AIDS']
+  },
+  {
+    id: 'sub-cybersec-8',
+    code: '23DS003',
+    name: 'Cyber Security',
+    semester: 8,
+    credits: 3,
+    regulation: 'AR23',
+    subjectType: 'PROFESSIONAL_ELECTIVE',
+    electiveGroup: 'Elective VIII',
+    departmentId: 'dept-aiml',
+    departmentIds: ['dept-aiml', 'dept-aids'],
+    departmentCodes: ['AIML', 'AIDS']
+  }
 ];
 
 class AcademicDataService {
@@ -163,16 +381,41 @@ class AcademicDataService {
       }
     }
 
-    // Combine Supabase subjects with Master catalogue (deduplicated by code & name)
-    const combinedMap = new Map();
-    MASTER_SUBJECTS.forEach(s => combinedMap.set(s.id, s));
-    MASTER_SUBJECTS.forEach(s => combinedMap.set(s.code, s));
-    supabaseSubjects.forEach(s => {
-      combinedMap.set(s.id, s);
-      combinedMap.set(s.code, s);
+    // Deduplicate by normalized subject code (Supabase real database records MUST supersede master catalog)
+    const subjectMap = new Map();
+
+    // 1. Seed with master catalogue
+    MASTER_SUBJECTS.forEach(s => {
+      if (s?.code) {
+        subjectMap.set(s.code.toUpperCase().trim(), { ...s });
+      }
     });
 
-    const allDistinctSubjects = Array.from(new Set(Array.from(combinedMap.values())));
+    // 2. Overwrite with Supabase records (authoritative UUIDs & metadata)
+    supabaseSubjects.forEach(s => {
+      if (s?.code) {
+        const codeKey = s.code.toUpperCase().trim();
+        const existing = subjectMap.get(codeKey);
+        subjectMap.set(codeKey, {
+          ...(existing || {}),
+          ...s,
+          // Guarantee authoritative Supabase attributes
+          id: s.id,
+          code: s.code,
+          name: s.name || existing?.name,
+          semester: Number(s.semester) || existing?.semester || 1,
+          credits: Number(s.credits) || existing?.credits || 3,
+          regulation: s.regulation || existing?.regulation || 'AR23',
+          departmentId: s.departmentId || existing?.departmentId,
+          departmentIds: (s.departmentIds && s.departmentIds.length > 0) ? s.departmentIds : (existing?.departmentIds || []),
+          departmentCodes: (s.departmentCodes && s.departmentCodes.length > 0) ? s.departmentCodes : (existing?.departmentCodes || []),
+          subjectType: s.subjectType || existing?.subjectType || 'CORE',
+          electiveGroup: s.electiveGroup !== undefined ? s.electiveGroup : existing?.electiveGroup
+        });
+      }
+    });
+
+    const allDistinctSubjects = Array.from(subjectMap.values());
 
     let filtered = allDistinctSubjects;
     if (departmentIdOrCode && departmentIdOrCode !== 'All') {
@@ -224,9 +467,9 @@ class AcademicDataService {
   async getSubjectById(subjectIdOrCode) {
     if (!subjectIdOrCode) return null;
 
-    if (isSupabaseConfigured() && isValidUuid(subjectIdOrCode)) {
+    if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('subjects')
           .select(`
             id,
@@ -237,9 +480,15 @@ class AcademicDataService {
             subject_type,
             elective_group,
             regulation
-          `)
-          .eq('id', subjectIdOrCode)
-          .maybeSingle();
+          `);
+
+        if (isValidUuid(subjectIdOrCode)) {
+          query = query.eq('id', subjectIdOrCode);
+        } else {
+          query = query.ilike('code', String(subjectIdOrCode).trim());
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (!error && data) {
           return {
@@ -254,12 +503,13 @@ class AcademicDataService {
           };
         }
       } catch (err) {
-        console.warn('[AcademicDataService] Exception fetching subject by id:', err);
+        console.warn('[AcademicDataService] Exception fetching subject by id/code:', err);
       }
     }
 
     // Lookup in master subjects
-    return MASTER_SUBJECTS.find(s => s.id === subjectIdOrCode || s.code === subjectIdOrCode) || null;
+    const cleanSearch = String(subjectIdOrCode).toUpperCase().trim();
+    return MASTER_SUBJECTS.find(s => s.id === subjectIdOrCode || (s.code && s.code.toUpperCase() === cleanSearch)) || null;
   }
 
   /**
@@ -391,7 +641,8 @@ class AcademicDataService {
       return {
         branch: 'CSE',
         branchCode: 'CSE',
-        departmentName: 'Computer Science & Engineering',
+        canonicalBranch: 'CSE',
+        departmentName: 'Computer Science and Engineering',
         semester: 4,
         year: 2,
         section: 'A',
@@ -426,21 +677,31 @@ class AcademicDataService {
       const deptName = data?.departments?.name || '';
       const rawBranch = deptCode || deptName || 'CSE';
 
-      // Safe normalization for branch
-      let branchCode = 'CSE';
-      const cleanUpper = rawBranch.toUpperCase();
-      if (cleanUpper.includes('AIML') || cleanUpper.includes('MACHINE LEARNING')) {
-        branchCode = 'CSE-AIML';
-      } else if (
-        cleanUpper.includes('AIDS') ||
-        cleanUpper.includes('DATA SCIENCE') ||
-        cleanUpper.includes('AI&DS') ||
-        cleanUpper.includes('AI & DS')
-      ) {
-        branchCode = 'CSE-AIDS';
-      } else {
-        branchCode = 'CSE';
+      // Canonical normalization for branch using academicCohortService
+      const canonical = normalizeBranch(rawBranch);
+      const branchCode = canonical.code; // 'CSE-AIML', 'CSE-AIDS', 'CSE'
+      const canonicalBranch = canonical.branch; // 'AIML', 'AIDS', 'CSE'
+
+      // Check auth user metadata if student record doesn't have is_fsi
+      let isFsiMeta = false;
+      let careerPathMeta = null;
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const meta = authData?.user?.user_metadata || {};
+        if (meta.is_fsi !== undefined || meta.isFSI !== undefined) {
+          isFsiMeta = Boolean(meta.is_fsi ?? meta.isFSI);
+        }
+        careerPathMeta = meta.career_path || meta.careerPath || null;
+      } catch (e) {
+        // non-blocking
       }
+
+      const isFsiResolved = Boolean(
+        data?.is_fsi ??
+        data?.isFSI ??
+        isFsiMeta ??
+        false
+      );
 
       return {
         id: data?.id || null,
@@ -448,20 +709,22 @@ class AcademicDataService {
         rollNumber: data?.roll_number || '',
         branch: branchCode,
         branchCode: branchCode,
-        departmentName: deptName || 'Computer Science & Engineering',
+        canonicalBranch: canonicalBranch,
+        departmentName: deptName || canonical.name,
         semester: data?.semester || 1,
         year: data?.year || 1,
         section: data?.section || 'A',
         program: data?.program || 'B.Tech',
-        isFSI: Boolean(data?.is_fsi || data?.isFSI),
-        careerPath: data?.career_path || data?.careerPath || null
+        isFSI: isFsiResolved,
+        careerPath: data?.career_path || data?.careerPath || careerPathMeta || null
       };
     } catch (err) {
       console.warn('[AcademicDataService] Exception fetching student profile:', err);
       return {
         branch: 'CSE',
         branchCode: 'CSE',
-        departmentName: 'Computer Science & Engineering',
+        canonicalBranch: 'CSE',
+        departmentName: 'Computer Science and Engineering',
         semester: 4,
         year: 2,
         section: 'A',

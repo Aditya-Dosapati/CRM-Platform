@@ -801,17 +801,53 @@ class AuthService {
       throw new Error("Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are not configured. Please check your .env settings.");
     }
 
+    // Parse academic cohort parameters cleanly
+    const parsedYear = (() => {
+      const y = userData.year;
+      if (!y) return 1;
+      if (typeof y === 'number') return y;
+      const s = String(y).trim();
+      const d = s.match(/\d+/);
+      if (d) return parseInt(d[0], 10);
+      if (s.includes('IV')) return 4;
+      if (s.includes('III')) return 3;
+      if (s.includes('II')) return 2;
+      if (s.includes('I')) return 1;
+      return 1;
+    })();
+
+    const parsedSemester = (() => {
+      const sem = userData.semester;
+      if (!sem) return parsedYear * 2 - 1;
+      if (typeof sem === 'number') return sem;
+      const d = String(sem).match(/\d+/);
+      return d ? parseInt(d[0], 10) : parsedYear * 2 - 1;
+    })();
+
+    const cleanSection = (() => {
+      const sec = userData.section;
+      if (!sec) return 'A';
+      const s = String(sec).trim();
+      const match = s.match(/Section\s*([A-Za-z0-9]+)/i);
+      return match ? match[1].toUpperCase() : s.toUpperCase();
+    })();
+
+    const cleanBranch = (userData.branch || (role === 'student' ? 'CSE' : '')).trim();
+    const cleanDesignation = (userData.designation || 'Assistant Professor').trim();
+
     // Resolve department_id from public.departments
+    // For students, prioritize the specialization branch ID if provided, otherwise the department ID
     let resolvedDeptId = null;
-    if (department) {
+    const targetDeptOrBranch = (role === 'student' && cleanBranch) ? cleanBranch : department;
+    if (targetDeptOrBranch) {
       try {
-        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(department)) {
-          resolvedDeptId = department;
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetDeptOrBranch)) {
+          resolvedDeptId = targetDeptOrBranch;
         } else {
           const { data: deptRows } = await supabase
             .from('departments')
             .select('id, code, name')
-            .or(`code.eq.${department},name.ilike.%${department}%`)
+            .or(`code.eq.${targetDeptOrBranch},name.ilike.%${targetDeptOrBranch}%`)
             .limit(1);
           if (deptRows && deptRows.length > 0) {
             resolvedDeptId = deptRows[0].id;
@@ -831,34 +867,48 @@ class AuthService {
           password,
           role,
           department,
+          branch: role === 'student' ? cleanBranch : undefined,
           rollNumber: role === 'student' ? identifier : undefined,
           employeeId: role === 'faculty' ? identifier : undefined,
           program: role === 'student' ? (userData.program || 'B.Tech') : undefined,
-          year: role === 'student' ? (() => {
-            const y = userData.year;
-            if (!y) return 1;
-            if (typeof y === 'number') return y;
-            const s = String(y).trim();
-            const d = s.match(/\d+/);
-            if (d) return parseInt(d[0], 10);
-            if (s.includes('IV')) return 4;
-            if (s.includes('III')) return 3;
-            if (s.includes('II')) return 2;
-            if (s.includes('I')) return 1;
-            return 1;
-          })() : undefined,
-          section: role === 'student' ? (() => {
-            const sec = userData.section;
-            if (!sec) return 'A';
-            const s = String(sec).trim();
-            const match = s.match(/Section\s*([A-Za-z0-9]+)/i);
-            return match ? match[1].toUpperCase() : s.toUpperCase();
-          })() : undefined,
-          designation: role === 'faculty' ? (userData.designation || 'Assistant Professor') : undefined
+          year: role === 'student' ? parsedYear : undefined,
+          semester: role === 'student' ? parsedSemester : undefined,
+          section: role === 'student' ? cleanSection : undefined,
+          designation: role === 'faculty' ? cleanDesignation : undefined
         }
       });
 
       if (!fnError && data?.success) {
+        // Ensure student cohort or faculty details are atomically synchronized
+        if (data.userId) {
+          if (role === 'student') {
+            try {
+              await supabase.rpc('save_student_registration_cohort', {
+                p_user_id: data.userId,
+                p_roll_number: identifier,
+                p_department_id: resolvedDeptId,
+                p_year: parsedYear,
+                p_semester: parsedSemester,
+                p_section: cleanSection,
+                p_program: userData.program || 'B.Tech'
+              });
+            } catch (syncErr) {
+              console.warn('[AuthService] save_student_registration_cohort notice:', syncErr);
+            }
+          } else if (role === 'faculty') {
+            try {
+              await supabase.rpc('save_faculty_registration_details', {
+                p_user_id: data.userId,
+                p_employee_id: identifier,
+                p_department_id: resolvedDeptId,
+                p_designation: cleanDesignation
+              });
+            } catch (syncErr) {
+              console.warn('[AuthService] save_faculty_registration_details notice:', syncErr);
+            }
+          }
+        }
+
         auditService.logAction({
           user: name,
           role,
@@ -916,12 +966,14 @@ class AuthService {
           name,
           role,
           department,
+          branch: role === 'student' ? cleanBranch : undefined,
           roll_number: role === 'student' ? identifier : undefined,
           employee_id: role === 'faculty' ? identifier : undefined,
           program: role === 'student' ? (userData.program || 'B.Tech') : undefined,
-          year: role === 'student' ? (userData.year || 1) : undefined,
-          section: role === 'student' ? (userData.section || 'A') : undefined,
-          designation: role === 'faculty' ? (userData.designation || 'Assistant Professor') : undefined,
+          year: role === 'student' ? parsedYear : undefined,
+          semester: role === 'student' ? parsedSemester : undefined,
+          section: role === 'student' ? cleanSection : undefined,
+          designation: role === 'faculty' ? cleanDesignation : undefined,
           status: 'pending'
         }
       }
@@ -959,33 +1011,31 @@ class AuthService {
         console.warn('[AuthService] Exception during public.users insert:', userErr);
       }
 
-      // Create role-specific record (students or faculty)
+      // Create or update role-specific record (students or faculty) via RPC
       if (role === 'student') {
         try {
-          const studentPayload = {
-            user_id: authUserId,
-            roll_number: identifier || null,
-            department_id: resolvedDeptId,
-            semester: userData.year ? Number(userData.year) * 2 - 1 : 1,
-            year: userData.year ? (isNaN(Number(userData.year)) ? userData.year : Number(userData.year)) : 1,
-            section: userData.section || 'A',
-            program: userData.program || 'B.Tech'
-          };
-          await supabase.from('students').insert([studentPayload]);
+          await supabase.rpc('save_student_registration_cohort', {
+            p_user_id: authUserId,
+            p_roll_number: identifier,
+            p_department_id: resolvedDeptId,
+            p_year: parsedYear,
+            p_semester: parsedSemester,
+            p_section: cleanSection,
+            p_program: userData.program || 'B.Tech'
+          });
         } catch (studentErr) {
-          console.warn('[AuthService] Exception during student record insert:', studentErr);
+          console.warn('[AuthService] Exception during student cohort save:', studentErr);
         }
       } else if (role === 'faculty') {
         try {
-          const facultyPayload = {
-            user_id: authUserId,
-            employee_id: identifier || null,
-            department_id: resolvedDeptId,
-            designation: userData.designation || 'Assistant Professor'
-          };
-          await supabase.from('faculty').insert([facultyPayload]);
+          await supabase.rpc('save_faculty_registration_details', {
+            p_user_id: authUserId,
+            p_employee_id: identifier,
+            p_department_id: resolvedDeptId,
+            p_designation: cleanDesignation
+          });
         } catch (facultyErr) {
-          console.warn('[AuthService] Exception during faculty record insert:', facultyErr);
+          console.warn('[AuthService] Exception during faculty profile save:', facultyErr);
         }
       }
     }

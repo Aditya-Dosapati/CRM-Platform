@@ -4,8 +4,9 @@
 import { cseSyllabus } from './cse.js';
 import { cseAIMLSyllabus } from './cse-aiml.js';
 import { cseAIDSSyllabus } from './cse-aids.js';
+import { resolveBranch } from '../../services/academicCohortService.js';
 
-// Syllabus catalog keyed by normalized branch codes
+// Syllabus catalog keyed by normalized canonical branch codes
 const SYLLABUS_REGISTRY = {
   CSE: cseSyllabus,
   'CSE-AIML': cseAIMLSyllabus,
@@ -15,27 +16,13 @@ const SYLLABUS_REGISTRY = {
 /**
  * Normalizes branch or department string into canonical branch codes:
  * 'CSE' | 'CSE-AIML' | 'CSE-AIDS'
+ * Uses canonical academic cohort service without string splitting.
  */
 export function normalizeBranchCode(rawBranch) {
   if (!rawBranch) return 'CSE';
-  const str = String(rawBranch).trim().toUpperCase();
-
-  if (str.includes('AIML') || str.includes('MACHINE LEARNING')) {
-    return 'CSE-AIML';
-  }
-  if (
-    str.includes('AIDS') ||
-    str.includes('DATA SCIENCE') ||
-    str.includes('AI&DS') ||
-    str.includes('AI & DS')
-  ) {
-    return 'CSE-AIDS';
-  }
-  if (str.includes('CSE') || str.includes('COMPUTER SCIENCE')) {
-    return 'CSE';
-  }
-
-  // Default fallback to CSE
+  const b = resolveBranch(rawBranch);
+  if (b === 'AIML') return 'CSE-AIML';
+  if (b === 'AIDS') return 'CSE-AIDS';
   return 'CSE';
 }
 
@@ -55,7 +42,6 @@ export function getSyllabusByBranch(rawBranch) {
     };
   }
 
-  // Current phase: only CSE is fully populated.
   // Gracefully fallback to CSE while preserving architecture
   return {
     syllabus: cseSyllabus,

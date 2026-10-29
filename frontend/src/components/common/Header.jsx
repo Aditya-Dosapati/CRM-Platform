@@ -125,24 +125,26 @@ export default function Header({
       {/* Right: AI Copilot Trigger, Notifications & Profile Menu */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
         
-        {/* Quick AI Assistant Trigger */}
-        <button
-          onClick={() => onOpenRagQuery && onOpenRagQuery('')}
-          className="btn btn-sm"
-          style={{
-            background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
-            color: '#C2410C',
-            border: '1px solid #FED7AA',
-            fontWeight: 700,
-            padding: '6px 13px',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(234, 88, 12, 0.12)'
-          }}
-          title="Open AI Academic Copilot"
-        >
-          <Sparkles size={14} color="#EA580C" />
-          <span className="hide-on-mobile">Ask AI</span>
-        </button>
+        {/* Quick AI Assistant Trigger (Restricted from faculty) */}
+        {activeRole !== 'faculty' && (
+          <button
+            onClick={() => onOpenRagQuery && onOpenRagQuery('')}
+            className="btn btn-sm"
+            style={{
+              background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
+              color: '#C2410C',
+              border: '1px solid #FED7AA',
+              fontWeight: 700,
+              padding: '6px 13px',
+              borderRadius: '8px',
+              boxShadow: '0 1px 3px rgba(234, 88, 12, 0.12)'
+            }}
+            title="Open AI Academic Copilot"
+          >
+            <Sparkles size={14} color="#EA580C" />
+            <span className="hide-on-mobile">Ask AI</span>
+          </button>
+        )}
 
         {/* Notifications Bell */}
         <button
@@ -301,26 +303,28 @@ export default function Header({
                   <span>Portal Preferences</span>
                 </div>
 
-                <div 
-                  role="button"
-                  onClick={() => { setIsDropdownOpen(false); onOpenRagQuery && onOpenRagQuery(''); }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '9px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                    color: '#C2410C',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                >
-                  <Sparkles size={15} color="#EA580C" />
-                  <span>Ask GMRIT Copilot</span>
-                </div>
+                {activeRole !== 'faculty' && (
+                  <div 
+                    role="button"
+                    onClick={() => { setIsDropdownOpen(false); onOpenRagQuery && onOpenRagQuery(''); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '9px',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      color: '#C2410C',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <Sparkles size={15} color="#EA580C" />
+                    <span>Ask GMRIT Copilot</span>
+                  </div>
+                )}
 
                 <div style={{ height: '1px', backgroundColor: 'var(--border-light)', margin: '4px 0' }} />
 

@@ -28,8 +28,13 @@ export default function SyllabusViewer({
     () => studentProfile?.careerPath || 'all'
   );
 
-  // FSI Status state: defaults to student's verified profile status, with live toggle for inspection
+  // FSI Status state: strictly initialized from student's authoritative profile
   const [isFSI, setIsFSI] = useState(() => Boolean(studentProfile?.isFSI));
+
+  // Keep in sync with profile updates
+  useEffect(() => {
+    setIsFSI(Boolean(studentProfile?.isFSI));
+  }, [studentProfile?.isFSI]);
 
   // Reset career path filter if invalid for active syllabus
   useEffect(() => {
@@ -168,7 +173,7 @@ export default function SyllabusViewer({
         </div>
       )}
 
-      {/* Control Bar: Expand/Collapse, Career Path Filter, and 7th Sem FSI Toggle */}
+      {/* Control Bar: Expand/Collapse, Career Path Filter, and Academic Track Selector */}
       <div
         className="card"
         style={{
@@ -223,11 +228,11 @@ export default function SyllabusViewer({
             </div>
           </div>
 
-          {/* Center/Right Controls: 7th Sem FSI Track Toggle */}
+          {/* Center/Right Controls: Academic Track Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <Briefcase size={13} />
-              7th Sem FSI Track:
+              Academic Track:
             </span>
 
             <div
@@ -240,6 +245,7 @@ export default function SyllabusViewer({
               }}
             >
               <button
+                type="button"
                 onClick={() => setIsFSI(false)}
                 style={{
                   fontSize: '11.5px',
@@ -254,10 +260,11 @@ export default function SyllabusViewer({
                   transition: 'all 0.15s ease'
                 }}
               >
-                Non-FSI (Elective V)
+                Campus (Non-FSI)
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsFSI(true)}
                 style={{
                   fontSize: '11.5px',
@@ -272,7 +279,7 @@ export default function SyllabusViewer({
                   transition: 'all 0.15s ease'
                 }}
               >
-                FSI (DevOps)
+                Internship (FSI)
               </button>
             </div>
           </div>

@@ -464,6 +464,7 @@ class RagDocumentService {
         semester: semester || 'Semester 4',
         academic_year: academicYear || '2025-2026',
         uploaded_by: uploadedBy,
+        audience_type: documentType === 'syllabus' ? 'all' : 'cohort',
         status: 'uploaded',
         metadata: {
           original_name: file.name,
@@ -493,6 +494,11 @@ class RagDocumentService {
         saveBlobToIdb(uploadedStoragePath, file);
         saveBlobToIdb(docRecord.id, file);
       }
+
+      // Sync to local store for instant UI reactivity
+      const currentLocal = this._loadLocalStore();
+      const updatedLocal = [docRecord, ...currentLocal.filter(d => d.id !== docRecord.id)];
+      this._saveLocalStore(updatedLocal);
 
       return {
         success: true,
@@ -1044,8 +1050,59 @@ class RagDocumentService {
         };
       });
 
+      // Merge with local store (cached or offline uploads)
+      const localStore = this._loadLocalStore();
+      const merged = [...formatted];
+      for (const lDoc of localStore) {
+        const isDuplicate = merged.some(d =>
+          (d.id && lDoc.id && d.id === lDoc.id) ||
+          (d.storagePath && lDoc.storage_path && d.storagePath === lDoc.storage_path) ||
+          (d.storagePath && lDoc.storagePath && d.storagePath === lDoc.storagePath) ||
+          (d.fileName && lDoc.file_name && d.fileName === lDoc.file_name)
+        );
+        if (!isDuplicate) {
+          if (filters?.documentType && filters.documentType !== 'All') {
+            const dt = lDoc.document_type || lDoc.documentType;
+            if (dt !== filters.documentType) continue;
+          }
+          if (filters?.subjectId && filters.subjectId !== 'All') {
+            const sid = lDoc.subject_id || lDoc.subjectId;
+            if (sid !== filters.subjectId) continue;
+          }
+          merged.push({
+            id: lDoc.id,
+            document: lDoc.title || lDoc.file_name,
+            title: lDoc.title,
+            description: lDoc.description,
+            fileName: lDoc.file_name || lDoc.fileName,
+            storagePath: lDoc.storage_path || lDoc.storagePath,
+            category: DOCUMENT_TYPES.find(t => t.value === (lDoc.document_type || lDoc.documentType))?.label || lDoc.document_type || 'Academic Material',
+            documentType: lDoc.document_type || lDoc.documentType || 'syllabus',
+            department: lDoc.department || 'General',
+            departmentId: lDoc.department_id || lDoc.departmentId,
+            branch: lDoc.branch || 'CSE',
+            year: lDoc.year || 2,
+            semester: lDoc.semester || 'Semester 3',
+            section: lDoc.section || 'A',
+            academicYear: lDoc.academic_year || lDoc.academicYear || '2025-2026',
+            subject: lDoc.subject || lDoc.subjectName || 'General Curriculum',
+            subjectId: lDoc.subject_id || lDoc.subjectId,
+            subjectCode: lDoc.subject_code || lDoc.subjectCode || '',
+            chunks: lDoc.chunks || lDoc.metadata?.chunks_count || 24,
+            status: lDoc.status || 'Indexed',
+            rawStatus: lDoc.rawStatus || 'indexed',
+            statusType: 'success',
+            uploadedBy: lDoc.uploaded_by || lDoc.uploadedBy,
+            fileSizeFormatted: lDoc.fileSizeFormatted || 'PDF Document',
+            metadata: lDoc.metadata || {},
+            lastUpdated: lDoc.lastUpdated || 'Recently',
+            createdAt: lDoc.createdAt || lDoc.created_at || new Date().toISOString()
+          });
+        }
+      }
+
       return {
-        data: formatted,
+        data: merged,
         source: 'supabase',
         error: null
       };

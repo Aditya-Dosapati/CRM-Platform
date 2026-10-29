@@ -217,7 +217,7 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
       e.preventDefault();
       if (flatResults[selectedIndex]) {
         flatResults[selectedIndex].action();
-      } else if (searchQuery.length > 2 && onOpenRagQuery) {
+      } else if (searchQuery.length > 2 && onOpenRagQuery && activeRole !== 'faculty') {
         onOpenRagQuery(searchQuery);
         onClose();
       }
@@ -292,8 +292,8 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, onOpenRagQ
           </span>
         </div>
 
-        {/* AI Query Prompt Trigger */}
-        {searchQuery.length > 2 && (
+        {/* AI Query Prompt Trigger (Students & Admin only) */}
+        {searchQuery.length > 2 && activeRole !== 'faculty' && (
           <div
             onClick={() => {
               if (onOpenRagQuery) onOpenRagQuery(searchQuery);

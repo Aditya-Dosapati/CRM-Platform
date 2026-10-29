@@ -12,7 +12,15 @@ export default function SemesterAccordion({
 }) {
   if (!semesterData) return null;
 
-  const { semester, title, description, subjects = [], careerPathSubjects = [], electiveGroups = [], fsiConfig } = semesterData;
+  const {
+    semester,
+    title,
+    description,
+    subjects = [],
+    careerPathSubjects = [],
+    electiveGroups = [],
+    fsiConfig
+  } = semesterData;
 
   // Filter career path subjects based on selectedCareerPath
   const filteredCareerPaths = careerPathSubjects.filter(sub => {
@@ -20,7 +28,7 @@ export default function SemesterAccordion({
     return sub.careerPathId === selectedCareerPath;
   });
 
-  // Calculate total visible subjects in this semester
+  // Calculate total visible subjects in this semester based on FSI status
   let subjectCount = subjects.length + filteredCareerPaths.length;
   if (electiveGroups.length > 0) {
     electiveGroups.forEach(g => {
@@ -36,11 +44,23 @@ export default function SemesterAccordion({
           selectedCareerPath === 'all' || sub.careerPathId === selectedCareerPath
         );
         subjectCount += visibleNonFsi.length;
+      }
+      if (Array.isArray(fsiConfig.nonFsiElectiveGroups)) {
+        fsiConfig.nonFsiElectiveGroups.forEach(g => {
+          subjectCount += (g.options?.length || 0);
+        });
       } else if (fsiConfig.nonFsiElectiveGroup?.options) {
         subjectCount += fsiConfig.nonFsiElectiveGroup.options.length;
       }
     }
   }
+
+  // Normalize non-FSI elective groups into an array
+  const activeNonFsiElectiveGroups = fsiConfig?.nonFsiElectiveGroups
+    ? fsiConfig.nonFsiElectiveGroups
+    : fsiConfig?.nonFsiElectiveGroup
+      ? [fsiConfig.nonFsiElectiveGroup]
+      : [];
 
   return (
     <div
@@ -106,8 +126,8 @@ export default function SemesterAccordion({
                 {subjectCount} {subjectCount === 1 ? 'Subject' : 'Subjects'}
               </span>
 
-              {semester === 7 && (
-                <span className={`badge ${isFSI ? 'badge-blue' : 'badge-gray'}`} style={{ fontSize: '10.5px' }}>
+              {(semester === 7 || semester === 8) && (
+                <span className={`badge ${isFSI ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '10.5px' }}>
                   {isFSI ? 'FSI Track Active' : 'Non-FSI Track Active'}
                 </span>
               )}
@@ -147,7 +167,7 @@ export default function SemesterAccordion({
             gap: '20px'
           }}
         >
-          {/* SECTION 1: Core Subjects & Labs */}
+          {/* SECTION 1: Core Technical Subjects & Laboratories */}
           {subjects.length > 0 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -171,7 +191,7 @@ export default function SemesterAccordion({
             </div>
           )}
 
-          {/* SECTION 2: Career Path Electives (Semesters 5, 6, 7) */}
+          {/* SECTION 2: Career Path Electives (Semesters 5 & 6) */}
           {careerPathSubjects.length > 0 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
@@ -201,14 +221,18 @@ export default function SemesterAccordion({
             </div>
           )}
 
-          {/* SECTION 3: 7th Semester FSI Logic */}
+          {/* SECTION 3: Track-Specific Curriculum (Semesters 7 & 8) */}
           {fsiConfig && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Briefcase size={16} color="var(--primary-blue)" />
                   <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
-                    7th Semester Curriculum Allocation (Based on FSI Status)
+                    {semester === 7
+                      ? '7th Semester Curriculum Allocation (Based on FSI Status)'
+                      : semester === 8
+                        ? '8th Semester Curriculum Allocation (Based on FSI Status)'
+                        : `${semester}th Semester Curriculum Allocation`}
                   </h4>
                 </div>
                 <span className={`badge ${isFSI ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '11px' }}>
@@ -216,7 +240,7 @@ export default function SemesterAccordion({
                 </span>
               </div>
 
-              {/* IF FSI === TRUE: Show Fundamentals of DevOps, HIDE Professional Elective V */}
+              {/* IF FSI === TRUE: Show FSI-track subject, HIDE Non-FSI electives */}
               {isFSI ? (
                 <div>
                   <div
@@ -231,15 +255,21 @@ export default function SemesterAccordion({
                       fontWeight: 600
                     }}
                   >
-                    ✦ Enrolled in Full Semester Internship (FSI): Showing mandatory prerequisite <strong>Fundamentals of DevOps</strong>. Professional Elective V is not required.
+                    {semester === 7 ? (
+                      <>✦ Enrolled in Full Semester Internship (FSI Track): Showing mandatory prerequisite <strong>Fundamentals of DevOps</strong> (3 Credits). Non-FSI professional electives and LLM courses are not required.</>
+                    ) : (
+                      <>✦ Enrolled in Full Semester Internship (FSI Track): Showing mandatory <strong>Full Semester Internship (FSI)</strong> (10 Credits). Professional Elective VIII is not required.</>
+                    )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
-                    <SubjectCard subject={fsiConfig.fsiSubject} onAskAi={onAskAi} />
-                  </div>
+                  {fsiConfig.fsiSubject && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                      <SubjectCard subject={fsiConfig.fsiSubject} onAskAi={onAskAi} />
+                    </div>
+                  )}
                 </div>
               ) : (
-                /* IF FSI === FALSE: Show Professional Elective V, HIDE Fundamentals of DevOps */
+                /* IF FSI === FALSE: Show Non-FSI Professional Electives, HIDE FSI-exclusive subjects */
                 <div>
                   <div
                     style={{
@@ -252,55 +282,93 @@ export default function SemesterAccordion({
                       color: 'var(--text-secondary)'
                     }}
                   >
-                    ✦ Non-FSI Campus Track: Showing <strong>Professional Elective V</strong> based on Career Path. Fundamentals of DevOps is scheduled for 8th Semester.
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
-                    {fsiConfig.nonFsiCareerPathSubjects ? (
-                      fsiConfig.nonFsiCareerPathSubjects
-                        .filter(sub => selectedCareerPath === 'all' || sub.careerPathId === selectedCareerPath)
-                        .map(option => (
-                          <SubjectCard key={option.code} subject={option} onAskAi={onAskAi} />
-                        ))
+                    {semester === 7 ? (
+                      <>✦ Non-FSI Campus Track: Showing <strong>Professional Elective V & VI</strong> based on Career Path and branch curriculum. Fundamentals of DevOps is scheduled for 8th Semester.</>
                     ) : (
-                      (fsiConfig.nonFsiElectiveGroup?.options || []).map(option => (
-                        <SubjectCard key={option.code} subject={option} onAskAi={onAskAi} />
-                      ))
+                      <>✦ Non-FSI Campus Track: Showing <strong>Professional Elective VIII</strong> options. Full Semester Internship is not applicable for campus track.</>
                     )}
                   </div>
+
+                  {/* Career Path Electives (e.g. Elective V in Sem 7) */}
+                  {fsiConfig.nonFsiCareerPathSubjects && fsiConfig.nonFsiCareerPathSubjects.length > 0 && (
+                    <div style={{ marginBottom: activeNonFsiElectiveGroups.length > 0 ? '16px' : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <Award size={15} color="#8B5CF6" />
+                        <h5 style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', margin: 0 }}>
+                          Career Path Elective (Elective V)
+                        </h5>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                        {fsiConfig.nonFsiCareerPathSubjects
+                          .filter(sub => selectedCareerPath === 'all' || sub.careerPathId === selectedCareerPath)
+                          .map(option => (
+                            <SubjectCard key={option.code} subject={option} onAskAi={onAskAi} />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Branch Elective Groups (e.g. Elective VI in Sem 7, or Elective VIII in Sem 8) */}
+                  {activeNonFsiElectiveGroups.map(group => (
+                    <div key={group.groupName} style={{ marginTop: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Layers size={15} color="var(--primary-blue)" />
+                          <h5 style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', margin: 0 }}>
+                            {group.groupName}
+                          </h5>
+                        </div>
+                        {group.rule && (
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                            {group.rule}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                        {(group.options || []).map(option => (
+                          <SubjectCard key={option.code} subject={option} onAskAi={onAskAi} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           )}
 
-          {/* SECTION 4: Professional Elective Groups (Semester 5 & 8) */}
-          {electiveGroups.map(group => (
-            <div key={group.groupName}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Layers size={16} color="var(--primary-blue)" />
-                  <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
-                    {group.groupName}
-                  </h4>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  {group.rule}
-                </div>
-              </div>
+          {/* SECTION 4: General Professional Elective Groups (e.g. Semester 5) */}
+          {electiveGroups.length > 0 && (
+            <div>
+              {electiveGroups.map(group => (
+                <div key={group.groupName}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Layers size={16} color="var(--primary-blue)" />
+                      <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
+                        {group.groupName}
+                      </h4>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      {group.rule}
+                    </div>
+                  </div>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                  gap: '12px'
-                }}
-              >
-                {(group.options || []).map(option => (
-                  <SubjectCard key={option.code} subject={option} onAskAi={onAskAi} />
-                ))}
-              </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                      gap: '12px'
+                    }}
+                  >
+                    {(group.options || []).map(option => (
+                      <SubjectCard key={option.code} subject={option} onAskAi={onAskAi} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

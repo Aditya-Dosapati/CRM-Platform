@@ -5,6 +5,7 @@ import academicDataService from '../../services/academicDataService';
 import useSafeTimeout from '../../hooks/useSafeTimeout';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import EmptyState from '../common/EmptyState';
+import RagUploadModal from './RagUploadModal';
 
 export default function AdminSyllabus({ onOpenPdf }) {
   const [syllabi, setSyllabi] = useState([]);
@@ -93,7 +94,7 @@ export default function AdminSyllabus({ onOpenPdf }) {
             {isLoading ? '...' : syllabi.length} Courses
           </div>
           <div style={{ fontSize: '11.5px', color: 'var(--color-text)', opacity: 0.7, marginTop: '2px' }}>
-            R20 & R23 Regulations
+            AR23 Regulation
           </div>
         </div>
 
@@ -217,7 +218,7 @@ export default function AdminSyllabus({ onOpenPdf }) {
                   <td>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
-                        onClick={() => onOpenPdf({ title: s.title || s.fileName, doc: s.storagePath || s.fileName, page: 1 })}
+                        onClick={() => onOpenPdf && onOpenPdf({ id: s.id, title: s.title || s.fileName, doc: s.storagePath || s.fileName, storagePath: s.storagePath, fileName: s.fileName, page: 1 })}
                         className="btn btn-secondary btn-sm"
                       >
                         View
@@ -238,42 +239,16 @@ export default function AdminSyllabus({ onOpenPdf }) {
         </table>
       </div>
 
-      {/* Upload Modal Info */}
+      {/* Institutional Syllabus Upload Modal */}
       {showUploadModal && (
-        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)' }}>
-                Upload & Auto-Index Course Syllabus
-              </h3>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.8, marginBottom: '14px' }}>
-                Please use the RAG Document Ingestion Center to upload curriculum syllabi directly to the Supabase RAG storage bucket.
-              </p>
-              <div style={{
-                padding: '24px 20px',
-                border: '2px dashed var(--color-border)',
-                borderRadius: '10px',
-                textAlign: 'center',
-                background: 'var(--color-bg)'
-              }}>
-                <Cpu size={24} color="var(--color-primary)" style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text)' }}>
-                  Supabase RAG Knowledge Ingestion
-                </p>
-                <p style={{ fontSize: '12px', color: 'var(--color-text)', opacity: 0.6, marginTop: '2px' }}>
-                  Document is automatically chunked and registered in pgvector (384-dim vector index).
-                </p>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowUploadModal(false)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <RagUploadModal
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onUploadSuccess={() => {
+            setShowUploadModal(false);
+            loadData();
+          }}
+        />
       )}
     </div>
   );

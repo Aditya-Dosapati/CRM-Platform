@@ -75,11 +75,27 @@ export function ToastContainer() {
             style={{
               background: 'none',
               border: 'none',
-              padding: 0,
+              padding: '2px',
               color: 'rgba(255,255,255,0.7)',
               cursor: 'pointer',
-              marginLeft: '4px'
+              marginLeft: '4px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.16s ease'
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#FFFFFF';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            aria-label="Dismiss notification"
           >
             <X size={14} />
           </button>

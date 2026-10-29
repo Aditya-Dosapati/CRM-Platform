@@ -445,7 +445,7 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
                 {isLoading ? '...' : stats.subjectsCount}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '6px', fontWeight: 500 }}>
-                R20 & R23 Regulations
+                AR23 Regulation
               </div>
             </div>
           </div>
@@ -536,7 +536,7 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
             </div>
             <div style={{ minWidth: 0 }}>
               <div className="quick-action-title" style={{ fontSize: '14.5px', fontWeight: 700 }}>Manage Syllabus</div>
-              <div className="quick-action-desc" style={{ fontSize: '12.5px', marginTop: '3px' }}>BOS curriculum R20 / R23 PDFs</div>
+              <div className="quick-action-desc" style={{ fontSize: '12.5px', marginTop: '3px' }}>BOS curriculum AR23 PDFs</div>
             </div>
           </div>
 
@@ -655,7 +655,7 @@ export default function AdminDashboard({ onNavigate, onOpenRagQuery }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13.5px', padding: '8px 0' }}>
               <span style={{ color: 'var(--color-text)', opacity: 0.75 }}>Curriculum Engine</span>
-              <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>AR23 / R20</span>
+              <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>AR23</span>
             </div>
           </div>
         </div>

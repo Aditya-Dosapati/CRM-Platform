@@ -35,13 +35,19 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
     try {
       const user = authService.getCurrentUser();
       const profile = await academicDataService.getStudentProfile(user?.userId || user?.id);
+      if (user?.isFSI !== undefined || user?.is_fsi !== undefined) {
+        profile.isFSI = Boolean(user.isFSI ?? user.is_fsi);
+      } else if (user?.user_metadata?.is_fsi !== undefined || user?.user_metadata?.isFSI !== undefined) {
+        profile.isFSI = Boolean(user.user_metadata.is_fsi ?? user.user_metadata.isFSI);
+      }
       setStudentProfile(profile);
     } catch (err) {
       console.warn('[StudentSubjects] Failed to resolve student profile:', err);
       setStudentProfile({
         branch: 'CSE',
         branchCode: 'CSE',
-        departmentName: 'Computer Science & Engineering',
+        canonicalBranch: 'CSE',
+        departmentName: 'Computer Science and Engineering',
         semester: 1,
         year: 1,
         isFSI: false,
@@ -391,65 +397,72 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
           {/* TAB 1: SYLLABUS UNITS */}
           {activeTab === 'syllabus' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {(selectedSubject.units || [
-                { number: 'Unit I', title: 'Introduction & Core Foundations', summary: `Covers foundational principles and algorithmic models of ${selectedSubject.name}.`, pdfName: `${selectedSubject.code}_Unit1.pdf`, ragChunks: 38 },
-                { number: 'Unit II', title: 'Theoretical Frameworks & Structures', summary: `Detailed examination of theoretical constructs and system architecture.`, pdfName: `${selectedSubject.code}_Unit2.pdf`, ragChunks: 42 },
-                { number: 'Unit III', title: 'Algorithmic Formulations & Problem Solving', summary: `Analytical formulations, complexity analysis, and modern algorithms.`, pdfName: `${selectedSubject.code}_Unit3.pdf`, ragChunks: 56 },
-                { number: 'Unit IV', title: 'Advanced Applications & Emerging Trends', summary: `Real-world case studies, system implementations, and modern architectures.`, pdfName: `${selectedSubject.code}_Unit4.pdf`, ragChunks: 46 }
-              ]).map((unit) => (
-                <div key={unit.number} className="card" style={{ padding: '18px 22px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-                    <div style={{ flex: 1, minWidth: '260px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                        <span className="badge badge-blue" style={{ fontWeight: 800 }}>
-                          {unit.number}
-                        </span>
-                        <h4 style={{ fontSize: '15.5px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {unit.title}
-                        </h4>
-                        <span className="badge badge-green" style={{ fontSize: '11px' }}>
-                          <CheckCircle2 size={12} />
-                          RAG Vectorized
-                        </span>
+              {selectedSubject.units && selectedSubject.units.length > 0 ? (
+                selectedSubject.units.map((unit) => (
+                  <div key={unit.number || unit.title} className="card" style={{ padding: '18px 22px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                      <div style={{ flex: 1, minWidth: '260px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                          <span className="badge badge-blue" style={{ fontWeight: 800 }}>
+                            {unit.number}
+                          </span>
+                          <h4 style={{ fontSize: '15.5px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            {unit.title}
+                          </h4>
+                          <span className="badge badge-green" style={{ fontSize: '11px' }}>
+                            <CheckCircle2 size={12} />
+                            RAG Vectorized
+                          </span>
+                        </div>
+
+                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.45, marginTop: '6px' }}>
+                          {unit.summary}
+                        </p>
+
+                        {unit.pdfName && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                            <span>📄 {unit.pdfName}</span>
+                            <span style={{ color: 'var(--primary-blue)', fontWeight: 600 }}>⚡ {unit.ragChunks || 42} Vector Chunks</span>
+                          </div>
+                        )}
                       </div>
 
-                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.45, marginTop: '6px' }}>
-                        {unit.summary}
-                      </p>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                        <span>📄 {unit.pdfName}</span>
-                        <span style={{ color: 'var(--primary-blue)', fontWeight: 600 }}>⚡ {unit.ragChunks || 42} Vector Chunks</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {onOpenPdf && unit.pdfName && (
+                          <button
+                            onClick={() => onOpenPdf({
+                              title: `${selectedSubject.name}: ${unit.number} — ${unit.title}`,
+                              doc: unit.pdfName,
+                              page: 1
+                            })}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <FileText size={13} />
+                            <span>View Notes PDF</span>
+                          </button>
+                        )}
+                        {onOpenRagQuery && (
+                          <button
+                            onClick={() => onOpenRagQuery(`Explain ${unit.number || unit.title} of ${selectedSubject.name}. Provide key concepts and exam topics.`)}
+                            className="btn btn-subtle btn-sm"
+                          >
+                            <Sparkles size={13} />
+                            <span>Ask AI Tutor</span>
+                          </button>
+                        )}
                       </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {onOpenPdf && (
-                        <button
-                          onClick={() => onOpenPdf({
-                            title: `${selectedSubject.name}: ${unit.number} — ${unit.title}`,
-                            doc: unit.pdfName,
-                            page: 1
-                          })}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          <FileText size={13} />
-                          <span>View Notes PDF</span>
-                        </button>
-                      )}
-                      {onOpenRagQuery && (
-                        <button
-                          onClick={() => onOpenRagQuery(`Explain ${unit.number} of ${selectedSubject.name} (${unit.title}). Provide key concepts and exam topics.`)}
-                          className="btn btn-subtle btn-sm"
-                        >
-                          <Sparkles size={13} />
-                          <span>Ask AI Tutor</span>
-                        </button>
-                      )}
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="card" style={{ padding: '30px' }}>
+                  <EmptyState
+                    icon={BookOpen}
+                    title="No syllabus uploaded yet."
+                    message={`No syllabus course units have been uploaded yet for ${selectedSubject.name} (${selectedSubject.code}).`}
+                  />
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -515,8 +528,8 @@ export default function StudentSubjects({ onOpenPdf, onOpenRagQuery }) {
                     {subjectPYQs.length === 0 ? (
                       <EmptyState
                         icon={FileText}
-                        title="No PYQs Available"
-                        message={`No previous year question papers found for ${selectedSubject.name}.`}
+                        title="No previous question papers uploaded yet."
+                        message={`No previous question papers have been uploaded yet for ${selectedSubject.name}.`}
                         isTableRow={true}
                         colSpan={4}
                       />

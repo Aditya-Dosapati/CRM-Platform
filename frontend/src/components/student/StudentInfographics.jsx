@@ -73,7 +73,7 @@ export default function StudentInfographics({ onOpenRagQuery }) {
               Your Academic Journey
             </h2>
           </div>
-          <span className="badge">R20 Regulation</span>
+          <span className="badge">AR23 Regulation</span>
         </div>
 
         {/* Progression Nodes */}

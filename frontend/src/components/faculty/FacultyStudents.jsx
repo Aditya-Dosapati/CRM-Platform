@@ -142,14 +142,6 @@ export default function FacultyStudents({ onOpenRagQuery, initialAssignmentId = 
             Monitor student attendance, continuous marks, and assign interventions for your assigned cohorts
           </p>
         </div>
-
-        <button
-          onClick={() => onOpenRagQuery("Analyze student performance trends and suggest personalized remediation")}
-          className="btn btn-primary"
-        >
-          <Sparkles size={14} />
-          <span>AI Cohort Insights</span>
-        </button>
       </div>
 
       {/* Filter Bar */}

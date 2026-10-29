@@ -424,6 +424,7 @@ export default function App() {
   };
 
   const handleOpenRagQuery = (queryText) => {
+    if (activeRole === 'faculty') return;
     setRagInitialQuery(queryText);
     setIsRagChatOpen(true);
   };
@@ -513,7 +514,7 @@ export default function App() {
         case 'coding-practice':
           return <CodingPracticeView onOpenRagQuery={handleOpenRagQuery} />;
         case 'coding-assessments':
-          return <CodingAssessmentsView />;
+          return <CodingAssessmentsView currentUser={currentUser} />;
         case 'performance':
           return <StudentPerformance onOpenRagQuery={handleOpenRagQuery} />;
         case 'infographics':
@@ -527,16 +528,15 @@ export default function App() {
       }
     }
 
-    // 3. Faculty Authorized Views
+    // 3. Faculty Authorized Views (No RAG copilot access)
     if (activeRole === 'faculty') {
       switch (currentView) {
         case 'dashboard':
-          return <FacultyDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
+          return <FacultyDashboard onNavigate={handleNavigate} />;
         case 'classes':
           return (
             <FacultyClasses 
               onNavigate={handleNavigate}
-              onOpenRagQuery={handleOpenRagQuery} 
               initialAssignmentId={currentViewProps?.selectedAssignmentId}
               initialSection={currentViewProps?.selectedSection}
             />
@@ -544,7 +544,6 @@ export default function App() {
         case 'students':
           return (
             <FacultyStudents 
-              onOpenRagQuery={handleOpenRagQuery} 
               initialAssignmentId={currentViewProps?.selectedAssignmentId}
               initialSection={currentViewProps?.selectedSection}
             />
@@ -554,21 +553,20 @@ export default function App() {
           return (
             <FacultyAnalytics 
               onNavigate={handleNavigate} 
-              onOpenRagQuery={handleOpenRagQuery} 
               initialAssignmentId={currentViewProps?.selectedAssignmentId}
             />
           );
         case 'assessments':
-          return <FacultyAssessments onOpenRagQuery={handleOpenRagQuery} />;
+          return <FacultyAssessments />;
         case 'coding-assessments':
-          return <FacultyCodingManagement onOpenRagQuery={handleOpenRagQuery} />;
+          return <FacultyCodingManagement />;
         case 'resources':
         case 'syllabus':
           return <FacultyResources onOpenPdf={handleOpenPdf} />;
         case 'settings':
           return <FacultySettings />;
         default:
-          return <FacultyDashboard onNavigate={handleNavigate} onOpenRagQuery={handleOpenRagQuery} />;
+          return <FacultyDashboard onNavigate={handleNavigate} />;
       }
     }
 
@@ -590,7 +588,7 @@ export default function App() {
         case 'coding-practice':
           return <CodingPracticeView onOpenRagQuery={handleOpenRagQuery} />;
         case 'coding-assessments':
-          return <CodingAssessmentsView />;
+          return <CodingAssessmentsView currentUser={currentUser} />;
         case 'rag-base':
           return <AdminRagBase onOpenPdf={handleOpenPdf} onNavigate={handleNavigate} />;
         case 'rag-settings':
@@ -620,7 +618,9 @@ export default function App() {
         currentView={currentView}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
-        onOpenRag={() => setIsRagChatOpen(true)}
+        onOpenRag={() => {
+          if (activeRole !== 'faculty') setIsRagChatOpen(true);
+        }}
         currentUser={currentUser}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebarCollapse}
@@ -655,15 +655,17 @@ export default function App() {
         />
       )}
 
-      {/* Floating RAG AI Assistant Button & Panel */}
-      <RagChatbot
-        isOpen={isRagChatOpen}
-        onToggle={() => setIsRagChatOpen(!isRagChatOpen)}
-        initialQuery={ragInitialQuery}
-        onSelectSource={handleOpenPdf}
-        activeRole={activeRole}
-        currentUser={currentUser}
-      />
+      {/* Floating RAG AI Assistant Button & Panel (Restricted from Faculty) */}
+      {activeRole !== 'faculty' && (
+        <RagChatbot
+          isOpen={isRagChatOpen}
+          onToggle={() => setIsRagChatOpen(!isRagChatOpen)}
+          initialQuery={ragInitialQuery}
+          onSelectSource={handleOpenPdf}
+          activeRole={activeRole}
+          currentUser={currentUser}
+        />
+      )}
 
       {/* Global Command Palette (Ctrl+K) */}
       <CommandPalette

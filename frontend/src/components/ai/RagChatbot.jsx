@@ -14,14 +14,19 @@ export default function RagChatbot({
   activeRole = 'student',
   currentUser
 }) {
-  const userName = currentUser?.name?.split(' ')[0] || (activeRole === 'admin' ? 'Administrator' : activeRole === 'faculty' ? 'Professor' : 'Rahul');
+  // Institutional Security Guard: Faculty must not access student AI Academic Copilot / RAG Chatbot
+  if (activeRole === 'faculty' || currentUser?.role === 'faculty') {
+    return null;
+  }
+
+  const userName = currentUser?.name?.split(' ')[0] || (activeRole === 'admin' ? 'Administrator' : 'Rahul');
   const [messages, setMessages] = useState([
     {
       id: 'welcome',
       sender: 'bot',
       text: `Hello ${userName}! 👋 I am your **GMRIT AI Assistant**, your intelligent academic companion.
 
-I can assist you with your **R20/R23 syllabus PDFs, faculty lecture notes, PYQs (2020-2025), and personal gradebook**.
+I can assist you with your **AR23 syllabus PDFs, faculty lecture notes, PYQs (2020-2025), and personal gradebook**.
 
 What would you like to explore today?`,
       sources: [],
@@ -40,9 +45,32 @@ What would you like to explore today?`,
   const processedInitialQueryRef = useRef(null);
   const setSafeTimeout = useSafeTimeout();
 
+  const panelRef = useRef(null);
+  const fabRef = useRef(null);
+
   useEscapeKey(() => {
     if (isOpen) onToggle();
   }, isOpen);
+
+  // Outside-click dismissal for the RAG assistant panel
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsideClick = (event) => {
+      if (panelRef.current && panelRef.current.contains(event.target)) {
+        return;
+      }
+      if (fabRef.current && fabRef.current.contains(event.target)) {
+        return;
+      }
+      onToggle();
+    };
+
+    document.addEventListener('pointerdown', handleOutsideClick, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideClick, true);
+    };
+  }, [isOpen, onToggle]);
 
   const sampleChips = [
     "Explain Unit 3 of Machine Learning",
@@ -160,6 +188,7 @@ What would you like to explore today?`,
     <>
       {/* Floating Action Button (Refined terracotta gradient with luminous warm glow) */}
       <button
+        ref={fabRef}
         onClick={onToggle}
         style={{
           position: 'fixed',
@@ -199,6 +228,7 @@ What would you like to explore today?`,
       {/* Right-Side AI Assistant Panel */}
       {isOpen && (
         <div
+          ref={panelRef}
           style={{
             position: 'fixed',
             bottom: '80px',
@@ -262,8 +292,24 @@ What would you like to explore today?`,
                 border: 'none',
                 color: 'var(--text-muted)',
                 cursor: 'pointer',
-                padding: '4px'
+                padding: '4px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.16s ease'
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--text-primary)';
+                e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.06)';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--text-muted)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              aria-label="Close assistant"
             >
               <X size={18} />
             </button>
@@ -383,9 +429,25 @@ What would you like to explore today?`,
             ))}
 
             {isThinking && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                <Cpu size={14} className="spin" color="var(--primary-blue)" />
-                <span>{activeStep}</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                maxWidth: 'fit-content',
+                animation: 'messageSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both'
+              }}>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EA580C', display: 'inline-block', animation: 'typingDot 1.2s infinite ease-in-out', animationDelay: '0s' }} />
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EA580C', display: 'inline-block', animation: 'typingDot 1.2s infinite ease-in-out', animationDelay: '0.2s' }} />
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EA580C', display: 'inline-block', animation: 'typingDot 1.2s infinite ease-in-out', animationDelay: '0.4s' }} />
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                  {activeStep || 'Synthesizing grounded response...'}
+                </span>
               </div>
             )}
             <div ref={messagesEndRef} />

@@ -44,10 +44,12 @@ serve(async (req: Request) => {
       password,
       role: rawRole,
       department,
+      branch,
       rollNumber,
       employeeId,
       program,
       year,
+      semester,
       section,
       designation
     } = body;
@@ -136,15 +138,16 @@ serve(async (req: Request) => {
 
     // 4. Resolve department_id
     let resolvedDeptId = null;
-    if (department) {
-      const cleanDept = String(department).trim();
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanDept)) {
-        resolvedDeptId = cleanDept;
+    const targetDeptOrBranch = (cleanRole === 'student' && branch) ? branch : department;
+    if (targetDeptOrBranch) {
+      const cleanTarget = String(targetDeptOrBranch).trim();
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanTarget)) {
+        resolvedDeptId = cleanTarget;
       } else {
         const { data: deptRows } = await supabaseAdmin
           .from('departments')
           .select('id, code, name')
-          .or(`code.eq.${cleanDept},name.ilike.%${cleanDept}%`)
+          .or(`code.eq.${cleanTarget},name.ilike.%${cleanTarget}%`)
           .limit(1);
         if (deptRows && deptRows.length > 0) {
           resolvedDeptId = deptRows[0].id;
@@ -162,6 +165,17 @@ serve(async (req: Request) => {
         full_name: cleanName,
         name: cleanName,
         role: cleanRole,
+        department: department || 'CSE',
+        department_id: resolvedDeptId,
+        branch: branch || (cleanRole === 'student' ? 'CSE' : undefined),
+        rollNumber: cleanRole === 'student' ? cleanIdentifier : undefined,
+        roll_number: cleanRole === 'student' ? cleanIdentifier : undefined,
+        employeeId: cleanRole === 'faculty' ? cleanIdentifier : undefined,
+        employee_id: cleanRole === 'faculty' ? cleanIdentifier : undefined,
+        year: year,
+        semester: semester,
+        section: section,
+        designation: designation,
         status: 'pending'
       }
     });
@@ -200,33 +214,36 @@ serve(async (req: Request) => {
       // 7. Insert role-specific record (students or faculty)
       if (cleanRole === 'student') {
         const numYear = year ? (isNaN(Number(year)) ? 1 : Number(year)) : 1;
+        const numSem = semester ? (isNaN(Number(semester)) ? (numYear * 2 - 1) : Number(semester)) : (numYear * 2 - 1);
+        const cleanSection = (section || 'A').toString().trim().replace(/^Section\s*/i, '').toUpperCase();
         const { error: studentError } = await supabaseAdmin
           .from('students')
-          .insert([{
+          .upsert([{
             user_id: newUserId,
             roll_number: cleanIdentifier || null,
             department_id: resolvedDeptId,
-            semester: numYear * 2 - 1,
+            semester: numSem,
             year: numYear,
-            section: (section || 'A').trim().toUpperCase(),
+            section: cleanSection,
             program: (program || 'B.Tech').trim()
-          }]);
+          }], { onConflict: 'user_id' });
 
         if (studentError) {
-          console.warn('[register-user] Student table insert error:', studentError.message);
+          console.warn('[register-user] Student table upsert error:', studentError.message);
         }
       } else if (cleanRole === 'faculty') {
+        const cleanDesignation = (designation || 'Assistant Professor').trim();
         const { error: facultyError } = await supabaseAdmin
           .from('faculty')
-          .insert([{
+          .upsert([{
             user_id: newUserId,
             employee_id: cleanIdentifier || null,
             department_id: resolvedDeptId,
-            designation: (designation || 'Assistant Professor').trim()
-          }]);
+            designation: cleanDesignation
+          }], { onConflict: 'user_id' });
 
         if (facultyError) {
-          console.warn('[register-user] Faculty table insert error:', facultyError.message);
+          console.warn('[register-user] Faculty table upsert error:', facultyError.message);
         }
       }
 

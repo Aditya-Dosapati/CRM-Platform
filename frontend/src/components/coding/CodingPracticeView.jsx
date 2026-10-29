@@ -182,6 +182,27 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
     }
   };
 
+  if (activeProblem) {
+    return (
+      <div className="coding-practice-workspace-wrapper">
+        <CodingWorkspaceModal
+          isOpen={true}
+          embedded={true}
+          problem={activeProblem}
+          onClose={() => {
+            setActiveProblem(null);
+            setUserProgress(codeExecutionService.getUserProgress(currentUser?.userId));
+          }}
+          onProblemSolved={(probId) => {
+            const updated = codeExecutionService.getUserProgress(currentUser?.userId);
+            setUserProgress(updated);
+          }}
+          activeRole="student"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="page-content">
       {/* Page Header */}
@@ -770,22 +791,7 @@ export default function CodingPracticeView({ onOpenRagQuery }) {
         </div>
       )}
 
-      {/* Embedded Split-Pane Workspace Modal */}
-      {activeProblem && (
-        <CodingWorkspaceModal
-          isOpen={Boolean(activeProblem)}
-          onClose={() => {
-            setActiveProblem(null);
-            setUserProgress(codeExecutionService.getUserProgress(currentUser?.userId));
-          }}
-          problem={activeProblem}
-          onProblemSolved={(probId) => {
-            const updated = codeExecutionService.getUserProgress(currentUser?.userId);
-            setUserProgress(updated);
-          }}
-          activeRole="student"
-        />
-      )}
+
     </div>
   );
 }

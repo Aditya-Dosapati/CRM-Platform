@@ -16,7 +16,7 @@ export default function AdminPYQs({ onOpenPdf }) {
   const [subject, setSubject] = useState('');
   const [year, setYear] = useState('2025');
   const [examType, setExamType] = useState('Semester End Examination');
-  const [regulation, setRegulation] = useState('R20');
+  const [regulation, setRegulation] = useState('AR23');
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
