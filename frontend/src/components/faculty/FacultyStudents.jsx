@@ -65,8 +65,8 @@ export default function FacultyStudents({ onOpenRagQuery, initialAssignmentId = 
       window.addEventListener('gmrit_assignments_updated', handleUpdate);
     }
 
-    return () => { 
-      isMounted = false; 
+    return () => {
+      isMounted = false;
       if (typeof window !== 'undefined') {
         window.removeEventListener('gmrit_assignments_updated', handleUpdate);
       }
@@ -90,7 +90,7 @@ export default function FacultyStudents({ onOpenRagQuery, initialAssignmentId = 
       const name = (s.user?.full_name || s.name || '').toLowerCase();
       const roll = (s.roll_number || s.rollNumber || s.user_id || '').toLowerCase();
       const sCohort = extractCanonicalCohort(s);
-      
+
       if (filterAtRiskOnly && !s.isAtRisk) return false;
       if (sectionFilter !== 'All') {
         const cleanTargetSec = normalizeSection(sectionFilter);
@@ -136,7 +136,7 @@ export default function FacultyStudents({ onOpenRagQuery, initialAssignmentId = 
       }}>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' }}>
-            Students Management
+            My   Students
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
             Monitor student attendance, continuous marks, and assign interventions for your assigned cohorts
