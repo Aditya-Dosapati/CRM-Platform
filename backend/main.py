@@ -427,10 +427,10 @@ async def get_coding_feedback(req: CodingFeedbackRequest):
 
     # Fallback response if LLM call fails
     return {
-        "what_went_wrong": req.status or "Execution completed with warnings or logic discrepancy.",
-        "why_it_went_wrong": req.compiler_output or req.execution_output or "Mismatch between actual and expected behavior.",
-        "progressive_hint": "Trace variable mutations and loop boundaries for small sample inputs.",
-        "approach_guidance": "Verify problem constraints and test boundary inputs (e.g. single element, negatives).",
-        "test_case_analysis": "Review failing test case input and compare intermediate state at each step.",
+        "what_went_wrong": "Code executed successfully and all test cases passed." if (req.status in ["Accepted", "Success", "Passed"]) else (req.status or "Execution completed with warnings or logic discrepancy."),
+        "why_it_went_wrong": "The solution logic correctly meets problem requirements and constraints." if (req.status in ["Accepted", "Success", "Passed"]) else (req.compiler_output or req.execution_output or "Mismatch between actual and expected behavior."),
+        "progressive_hint": "Consider analyzing time and space complexity optimizations." if (req.status in ["Accepted", "Success", "Passed"]) else "Trace variable mutations and loop boundaries for small sample inputs.",
+        "approach_guidance": "The implemented algorithm is sound and satisfies edge constraints." if (req.status in ["Accepted", "Success", "Passed"]) else "Verify problem constraints and test boundary inputs (e.g. single element, negatives).",
+        "test_case_analysis": "All verified test cases passed without runtime or logic errors." if (req.status in ["Accepted", "Success", "Passed"]) else "Review failing test case input and compare intermediate state at each step.",
         "is_verified_execution": bool(req.status or req.test_results)
-    }
+    }

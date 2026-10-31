@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  Users, BookOpen, Clock, Calendar, CheckCircle2, 
+import {
+  Users, BookOpen, Clock, Calendar, CheckCircle2,
   Sparkles, Award, ArrowUpRight, Search, FileText, Plus, AlertCircle, Layers, BarChart2
 } from 'lucide-react';
 import facultyAssignmentService from '../../services/facultyAssignmentService';
@@ -65,8 +65,8 @@ export default function FacultyClasses({ onOpenRagQuery, onNavigate, initialAssi
       window.addEventListener('gmrit_assignments_updated', handleUpdate);
     }
 
-    return () => { 
-      isMounted = false; 
+    return () => {
+      isMounted = false;
       if (typeof window !== 'undefined') {
         window.removeEventListener('gmrit_assignments_updated', handleUpdate);
       }
@@ -132,7 +132,7 @@ export default function FacultyClasses({ onOpenRagQuery, onNavigate, initialAssi
       }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.4px' }}>
-            My Subjects
+            My Classes & Subjects
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--color-text)', opacity: 0.75, marginTop: '2px' }}>
             Manage assigned course sections, syllabus coverage, and student rosters
